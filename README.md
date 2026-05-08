@@ -9,32 +9,32 @@ WorkoutPlanner is a personal workout planning tool designed to help you organize
 ## Features
 
 ### Upload TSV/CSV Workouts
-[Screenshot placeholder - Bulk upload interface]
+![Upload TSV/CSV interface](./screenshots/intro.jpg)
 
 Easily import your entire workout library using simple spreadsheet files. Support for both TSV and CSV formats makes it compatible with Excel, Google Sheets, and any spreadsheet software.
 
 ### Add Paths to Your Local Media
-[Screenshot placeholder - Video path configuration]
+![Video library management](./screenshots/video%20library.jpg)
 
 Link to your local workout video files directly on your computer. Keep full control over your video library without uploading anything to the cloud.
 
 ### Create Multiple Plans
-[Screenshot placeholder - Multi-plan dashboard]
+![Multi-plan management](./screenshots/plans.jpg)
 
 Build and manage multiple workout plans simultaneously. Switch between different routines whenever you want—perfect for varying your training intensity or style.
 
 ### Flexible Custom Patterns
-[Screenshot placeholder - Pattern configuration]
+![Custom workout patterns](./screenshots/workout%20pattern.jpg)
 
 No hard-coded weekdays (Monday-Sunday). Define your own workout patterns: 3 days on/1 day off, 5 on/2 off, or any custom sequence that fits your lifestyle.
 
 ### Responsive & Intuitive UI
-[Screenshot placeholder - Mobile-friendly interface]
+![Workout calendar and dashboard](./screenshots/workout%20calendar.jpg)
 
 Track your workouts across desktop and mobile devices with a clean, user-friendly interface that puts your schedule front and center.
 
 ### Personalization & Customization
-[Screenshot placeholder - Settings and theme options]
+![Color themes and customization](./screenshots/themes.jpg)
 
 Make the app truly yours with customizable color themes and personalization options. Choose your preferred color scheme and adjust the interface to match your style.
 
