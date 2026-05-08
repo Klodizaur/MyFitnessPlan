@@ -1,10 +1,10 @@
-# WorkoutPlanner
+# MyFitnessPlan
 
 A self-hosted local application for managing custom workout plans with flexible scheduling patterns based on your own video collection.
 
 ## About
 
-WorkoutPlanner is a personal workout planning tool designed to help you organize and track workout routines using your own video resources. Unlike rigid, predefined weekly schedules, WorkoutPlanner lets you define custom workout patterns that fit your lifestyle—whether that's 3 days on, 1 day off, or any other pattern you prefer.
+MyFitnessPlan is a personal workout planning tool designed to help you organize and track workout routines using your own video resources. Unlike rigid, predefined weekly schedules, MyFitnessPlan lets you define custom workout patterns that fit your lifestyle—whether that's 3 days on, 1 day off, or any other pattern you prefer.
 
 ## Features
 
@@ -89,13 +89,13 @@ Make the app truly yours with customizable color themes and personalization opti
 
 ## ⚠️ Important Notice
 
-**WorkoutPlanner does not provide any workout videos, content, or exercises.** You are entirely responsible for sourcing your own workout videos. The application is a planning and scheduling tool only. Please ensure all video content you use complies with copyright laws and terms of service. I am not responsible for how you use this application or any content you source.
+**MyFitnessPlan does not provide any workout videos, content, or exercises.** You are entirely responsible for sourcing your own workout videos. The application is a planning and scheduling tool only. Please ensure all video content you use complies with copyright laws and terms of service. I am not responsible for how you use this application or any content you source.
 
 ## Adding Workouts
 
 ### Using TSV/CSV File Import
 
-WorkoutPlanner supports bulk importing workouts from TSV (Tab-Separated Values) or CSV (Comma-Separated Values) files.
+MyFitnessPlan supports bulk importing workouts from TSV (Tab-Separated Values) or CSV (Comma-Separated Values) files.
 
 #### Example Workout Formats
 
