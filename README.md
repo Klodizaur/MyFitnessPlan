@@ -132,6 +132,7 @@ Two example TSV files are provided in the `example_workout_sheets/` folder:
 #### File Requirements
 
 - File format: `.tsv` (Tab-Separated Values) or `.csv` (Comma-Separated Values)
+- **Video name matching**: Video file names must match or be very similar to the workout names in your spreadsheet. The app uses these names to locate and link your videos to the correct workouts. For example, if your spreadsheet says "30min Cardio Workout", your video file should be named something like "30min Cardio Workout.mp4" or "30min-Cardio-Workout.mp4"
 - Video references: Use the actual names of your workout videos
 - Rest days: Leave cells empty or use "—" to indicate no workout
 - UTF-8 compatible for cross-platform support
