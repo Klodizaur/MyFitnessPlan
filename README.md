@@ -33,6 +33,11 @@ No hard-coded weekdays (Monday-Sunday). Define your own workout patterns: 3 days
 
 Track your workouts across desktop and mobile devices with a clean, user-friendly interface that puts your schedule front and center.
 
+### Personalization & Customization
+[Screenshot placeholder - Settings and theme options]
+
+Make the app truly yours with customizable color themes and personalization options. Choose your preferred color scheme and adjust the interface to match your style.
+
 ### Additional Features
 - **Local & Self-Hosted**: Run entirely on your own machine with no cloud dependency
 - **Multi-language Support**: Available in English and Polish
