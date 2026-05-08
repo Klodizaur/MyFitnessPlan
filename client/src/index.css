@@ -242,10 +242,32 @@ p { color: var(--text-secondary); line-height: 1.6; }
 
 nav {
   display: flex;
-  gap: 1rem;
+  align-items: center;
+  gap: 2rem;
   margin-bottom: 2.5rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--glass-border);
+}
+
+.logo {
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent-color);
+  text-decoration: none;
+  padding: 0.5rem 0;
+}
+
+.nav-links {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex: 1;
 }
 
 nav a {
@@ -257,7 +279,7 @@ nav a {
   border-radius: 10px;
 }
 
-nav a:hover, nav a.active {
+nav .nav-links a:hover, nav .nav-links a.active {
   color: var(--text-primary);
   background: var(--surface-hover);
 }
@@ -277,6 +299,7 @@ nav a:hover, nav a.active {
   font-family: var(--font-family);
   transition: all 0.2s ease;
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .language-switcher:hover {
