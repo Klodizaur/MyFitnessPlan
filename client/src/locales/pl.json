@@ -3,7 +3,8 @@
     "dashboard": "Panel główny",
     "plans": "Plany",
     "calendar": "Kalendarz",
-    "settings": "Ustawienia"
+    "settings": "Ustawienia",
+    "about": "O aplikacji"
   },
   "dashboard": {
     "todays_workout": "Dzisiejszy trening",
@@ -123,5 +124,25 @@
     "failed_save": "Błąd: Nie udało się zapisać ustawień.",
     "failed_connect": "Błąd: Nie udało się połączyć z serwerem.",
     "appearance_msg": "Wybierz swój ulubiony motyw."
+  },
+  "about": {
+    "version": "Wersja",
+    "created_by": "Utworzone przez",
+    "linkedin": "Profil LinkedIn",
+    "github": "Profil GitHub",
+    "company": "Firma",
+    "description": "O WorkoutPlanner",
+    "description_text": "WorkoutPlanner to samodzielnie hostowane, osobiste narzędzie do planowania treningów, które pomaga organizować i śledzić niestandardowe rutyny treningowe przy użyciu własnych zasobów wideo. W przeciwieństwie do sztywnych, predefiniowanych harmonogramów tygodniowych, WorkoutPlanner pozwala zdefiniować niestandardowe wzory treningów, które pasują do Twojego stylu życia.",
+    "license": "Licencja",
+    "license_text": "Ten projekt jest objęty licencją niepełnorodzinną. Możesz swobodnie używać, modyfikować i udostępniać to oprogramowanie do projektów osobistych.",
+    "non_commercial": "To oprogramowanie jest przeznaczone wyłącznie do użytku niekomercyjnego. Użycie komercyjne wymaga wyraźnego pisemnego zezwolenia.",
+    "commercial_inquiry": "W przypadku zapytań komercyjnych skontaktuj się z: ",
+    "features": "Główne cechy",
+    "feature_custom_patterns": "Zdefiniuj własne niestandardowe wzory treningów",
+    "feature_local_videos": "Łącz się ze swoimi lokalnymi plikami wideo",
+    "feature_csv_import": "Importuj treningi za pomocą plików CSV/TSV",
+    "feature_themes": "Dostosuj swój motyw kolorów",
+    "feature_privacy": "100% prywatne - dane pozostają na Twoim komputerze"
   }
 }
+

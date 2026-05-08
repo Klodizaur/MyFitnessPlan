@@ -3,7 +3,8 @@
     "dashboard": "Dashboard",
     "plans": "Plans",
     "calendar": "Calendar",
-    "settings": "Settings"
+    "settings": "Settings",
+    "about": "About"
   },
   "dashboard": {
     "todays_workout": "Today's Workout",
@@ -123,5 +124,25 @@
     "failed_save": "Error: Failed to save settings.",
     "failed_connect": "Error: Failed to connect to server.",
     "appearance_msg": "Choose your favorite theme."
+  },
+  "about": {
+    "version": "Version",
+    "created_by": "Created By",
+    "linkedin": "LinkedIn Profile",
+    "github": "GitHub Profile",
+    "company": "Company",
+    "description": "About WorkoutPlanner",
+    "description_text": "WorkoutPlanner is a self-hosted, personal workout planning tool that helps you organize and track custom workout routines using your own video resources. Unlike rigid, predefined weekly schedules, WorkoutPlanner lets you define custom workout patterns that fit your lifestyle.",
+    "license": "License",
+    "license_text": "This project is licensed under a Non-Commercial Use License. You are free to use, modify, and share this software for personal projects.",
+    "non_commercial": "This software is for non-commercial use only. Commercial use requires explicit written permission.",
+    "commercial_inquiry": "For commercial inquiries, contact: ",
+    "features": "Key Features",
+    "feature_custom_patterns": "Define your own custom workout patterns",
+    "feature_local_videos": "Link to your local video files",
+    "feature_csv_import": "Import workouts via CSV/TSV files",
+    "feature_themes": "Customize your color theme",
+    "feature_privacy": "100% private - data stays on your computer"
   }
 }
+
