@@ -58,7 +58,7 @@ Make the app truly yours with customizable color themes and personalization opti
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd WorkoutPlanner
+   cd <downloaded root folder>
    ```
 
 2. **Install server dependencies**
