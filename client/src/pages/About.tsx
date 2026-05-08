@@ -7,7 +7,7 @@ export default function About() {
   return (
     <div className="about-container">
       <div className="about-card">
-        <h1>WorkoutPlanner</h1>
+        <h1>MyFitnessPlan</h1>
         
         <div className="about-section">
           <h2>{t('about.version')}</h2>
@@ -36,12 +36,11 @@ export default function About() {
             >
               {t('about.github')}
             </a>
+            <br />
+            <em>{t('about.role')}</em>
+            <br />
+            <strong>Big Deck IT LTD</strong>
           </p>
-        </div>
-
-        <div className="about-section">
-          <h2>{t('about.company')}</h2>
-          <p>Big Deck IT LTD</p>
         </div>
 
         <div className="about-section">
