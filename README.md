@@ -1,3 +1,5 @@
+🇵🇱 Polski: [README.pl.md](README.pl.md)
+
 # MyFitnessPlan
 
 A self-hosted local application for managing custom workout plans with flexible scheduling patterns based on your own video collection.
