@@ -8,13 +8,36 @@ WorkoutPlanner is a personal workout planning tool designed to help you organize
 
 ## Features
 
+### Upload TSV/CSV Workouts
+[Screenshot placeholder - Bulk upload interface]
+
+Easily import your entire workout library using simple spreadsheet files. Support for both TSV and CSV formats makes it compatible with Excel, Google Sheets, and any spreadsheet software.
+
+### Add Paths to Your Local Media
+[Screenshot placeholder - Video path configuration]
+
+Link to your local workout video files directly on your computer. Keep full control over your video library without uploading anything to the cloud.
+
+### Create Multiple Plans
+[Screenshot placeholder - Multi-plan dashboard]
+
+Build and manage multiple workout plans simultaneously. Switch between different routines whenever you want—perfect for varying your training intensity or style.
+
+### Flexible Custom Patterns
+[Screenshot placeholder - Pattern configuration]
+
+No hard-coded weekdays (Monday-Sunday). Define your own workout patterns: 3 days on/1 day off, 5 on/2 off, or any custom sequence that fits your lifestyle.
+
+### Responsive & Intuitive UI
+[Screenshot placeholder - Mobile-friendly interface]
+
+Track your workouts across desktop and mobile devices with a clean, user-friendly interface that puts your schedule front and center.
+
+### Additional Features
 - **Local & Self-Hosted**: Run entirely on your own machine with no cloud dependency
-- **Custom Workout Patterns**: Define your own workout schedules (e.g., 3 days workout → 1 day break → 2 days workout → 1 day break)
-- **Video Storage Integration**: Add local paths to your video workout files
-- **Bulk Upload Support**: Import workouts via TSV/CSV files for easy batch management
-- **Responsive UI**: Track and manage your plans across desktop and mobile-friendly interface
 - **Multi-language Support**: Available in English and Polish
 - **No Subscription Required**: Complete control over your data and workout library
+- **Privacy First**: All data stays on your computer
 
 ## Getting Started
 
