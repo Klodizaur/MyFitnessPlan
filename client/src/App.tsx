@@ -1,0 +1,49 @@
+import { Routes, Route, NavLink } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import Dashboard from './pages/Dashboard';
+import Settings from './pages/Settings';
+import Calendar from './pages/Calendar';
+import Player from './pages/Player';
+import Plans from './pages/Plans';
+import LanguageSwitcher from './components/LanguageSwitcher';
+
+function App() {
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    // Fetch settings to get the current theme
+    fetch('http://localhost:3000/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data.theme) {
+          document.body.setAttribute('data-theme', data.theme);
+        }
+      })
+      .catch(err => console.error('Failed to fetch theme:', err));
+  }, []);
+
+  return (
+    <div className="app-container">
+      <nav>
+        <NavLink to="/" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.dashboard')}</NavLink>
+        <NavLink to="/plans" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.plans')}</NavLink>
+        <NavLink to="/calendar" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.calendar')}</NavLink>
+        <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.settings')}</NavLink>
+        <LanguageSwitcher />
+      </nav>
+
+      <main className="animate-fade-in">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/plans" element={<Plans />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/player/:videoId/:workoutId" element={<Player />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+export default App;
