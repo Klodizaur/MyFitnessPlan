@@ -28,10 +28,10 @@ Build and manage multiple workout plans simultaneously. Switch between different
 
 No hard-coded weekdays (Monday-Sunday). Define your own workout patterns: 3 days on/1 day off, 5 on/2 off, or any custom sequence that fits your lifestyle.
 
-### Responsive & Intuitive UI
+### Smart Workout Recognition
 ![Workout calendar and dashboard](./screenshots/4.%20workout%20calendar.jpg)
 
-Track your workouts across desktop and mobile devices with a clean, user-friendly interface that puts your schedule front and center.
+Works seamlessly with TSV/CSV files, automatically recognizing multiple workout entries per row. Mark individual exercises as done while tracking your progress through each workout session—complete flexibility in how you log your training.
 
 ### Personalization & Customization
 ![Color themes and customization](./screenshots/6.%20themes.jpg)
@@ -205,7 +205,31 @@ Configuration files can be customized in:
 
 ## License
 
-[Add your license here]
+This project is licensed under a **Non-Commercial Use License**.
+
+### You are free to:
+- Use the software for personal projects and self-hosted setups
+- Modify and improve it for your own use
+- Share it with others for non-commercial purposes
+- Contribute improvements back to the project
+
+### You **cannot**:
+- Use this for commercial purposes or to earn revenue
+- Redistribute it as a commercial product
+- Sell access to this software or its features
+- Use it as part of a paid service offering
+
+### Commercial Use
+If you wish to use WorkoutPlanner for commercial purposes, please contact for a commercial license agreement.
+
+---
+
+**Copyright © 2026 Klaudia Krzos, Big Deck IT LTD**
+
+For more details, see the [LICENSE](LICENSE) file.
+
+**Created by:** [Klaudia Krzos](https://www.linkedin.com/in/klaudiacreativestuff/)  
+**Company:** Big Deck IT LTD
 
 ## Support
 
