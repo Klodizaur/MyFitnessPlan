@@ -60,7 +60,7 @@ Dostosuj aplikację do siebie dzięki personalizowanym motywom kolorystycznym i 
 
 ```bash
 git clone <repository-url>
-cd WorkoutPlanner
+cd <downloaded root folder>
 ```
 
 2. **Zainstaluj zależności serwera**
