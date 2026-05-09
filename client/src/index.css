@@ -253,6 +253,20 @@ nav {
   flex-shrink: 0;
 }
 
+.logo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+}
+
+.logo-img {
+  height: 36px;
+  width: auto;
+  display: block;
+  border-radius: 6px;
+}
+
 .logo-text {
   font-size: 1.3rem;
   font-weight: 900;

@@ -17,7 +17,7 @@ export default function About() {
         <div className="about-section">
           <h2>{t('about.created_by')}</h2>
           <p>
-            <strong>Klaudia Krzos</strong>
+            <strong>Klaudia</strong>
             <br />
             <a 
               href="https://www.linkedin.com/in/klaudiacreativestuff/" 
