@@ -28,7 +28,10 @@ function App() {
     <div className="app-container">
       <nav>
         <div className="logo">
-          <NavLink to="/" className="logo-text">MyFitnessPlan</NavLink>
+          <NavLink to="/" className="logo-link">
+            <img src="/logo.png" alt="Workout Planner" className="logo-img" />
+            <span className="logo-text">MyFitnessPlan</span>
+          </NavLink>
         </div>
         <div className="nav-links">
           <NavLink to="/" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.dashboard')}</NavLink>
