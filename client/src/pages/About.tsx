@@ -55,13 +55,17 @@ export default function About() {
           <p>{t('about.license_text')}</p>
           <p className="about-highlight">
             {t('about.non_commercial')}
-          </p>
-          <p className="about-commercial">
-            {t('about.commercial_inquiry')} 
-            <a href="mailto:hello@bigdeckit.com" className="about-link">
-              hello@bigdeckit.com
+            <a
+              href="https://github.com/Klodizaur/MyFitnessPlan"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="about-link"
+            >
+            {t('about.contribute')}            
             </a>
           </p>
+
+
         </div>
 
         <div className="about-section">
