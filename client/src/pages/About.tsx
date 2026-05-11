@@ -79,9 +79,6 @@ export default function About() {
           </ul>
         </div>
 
-        <div className="about-footer">
-          <p>&copy; 2026 Klaudia Krzos, Big Deck IT LTD. All rights reserved.</p>
-        </div>
       </div>
     </div>
   );
