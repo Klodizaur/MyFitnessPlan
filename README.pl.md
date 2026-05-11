@@ -1,12 +1,14 @@
 🇬🇧 English: [README.md](README.md)
 
-# MyFitnessPlan
-
-Samodzielnie hostowana lokalna aplikacja do zarządzania własnymi planami treningowymi z elastycznymi schematami harmonogramów opartymi na Twojej własnej kolekcji wideo.
+<p align="center">
+  <img src="client/public/logo.png" alt="MyFitnessPlan Logo" width="120"/>
+</p>
+<h1 align="center">MyFitnessPlan - Open Source Self-Hosted Home Video Workout Planner</h1>
 
 ## O projekcie
+Samodzielnie hostowana lokalna aplikacja do zarządzania własnymi planami treningowymi z elastycznymi schematami harmonogramów opartymi na Twojej własnej kolekcji wideo.
 
-MyFitnessPlan to osobiste narzędzie do planowania treningów stworzone z myślą o organizowaniu i śledzeniu rutyn treningowych przy użyciu własnych materiałów wideo. W przeciwieństwie do sztywnych, tygodniowych harmonogramów, MyFitnessPlan pozwala definiować własne schematy treningowe dopasowane do Twojego stylu życia — niezależnie od tego, czy jest to 3 dni treningu i 1 dzień przerwy, czy dowolny inny układ.
+MyFitnessPlan to osobiste narzędzie do planowania treningów stworzone z myślą o organizowaniu i śledzeniu rutyn treningowych przy użyciu kolekcji własnych materiałów wideo. W przeciwieństwie do sztywnych, tygodniowych harmonogramów, MyFitnessPlan pozwala definiować własne schematy treningowe dopasowane do Twojego stylu życia — niezależnie od tego, czy jest to 3 dni treningu i 1 dzień przerwy, czy dowolny inny układ.
 
 ## Funkcje
 
