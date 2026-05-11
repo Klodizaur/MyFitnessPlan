@@ -1,10 +1,12 @@
 🇵🇱 Polski: [README.pl.md](README.pl.md)
 
-# MyFitnessPlan
-
-A self-hosted local application for managing custom workout plans with flexible scheduling patterns based on your own video collection.
+<p align="center">
+  <img src="client/public/logo.png" alt="MyFitnessPlan Logo" width="120"/>
+</p>
+<h1 align="center">MyFitnessPlan - Open Source Self-Hosted Home Video Workout Planner</h1>
 
 ## About
+An open source, self-hosted local application for managing custom workout plans with flexible scheduling patterns based on your own video collection.
 
 MyFitnessPlan is a personal workout planning tool designed to help you organize and track workout routines using your own video resources. Unlike rigid, predefined weekly schedules, MyFitnessPlan lets you define custom workout patterns that fit your lifestyle—whether that's 3 days on, 1 day off, or any other pattern you prefer.
 
