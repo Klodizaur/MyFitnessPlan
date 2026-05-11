@@ -50,7 +50,10 @@ export default function Dashboard() {
 
   const firstPendingVideo = todaySchedule?.workout?.videos.find(v => !v.isCompleted) || todaySchedule?.workout?.videos[0];
 
-  const workoutNameParts = todaySchedule?.workout?.name.split(/(\s+\(\d+\s+min\)\s*)/).filter(Boolean) || [];
+  const workoutNameParts = (todaySchedule?.workout?.name || '')
+    .split(/\n+/) // preserve separate lines from uploaded TSVs
+    .flatMap(part => part.split(/(\s+\(\d+\s+min\)\s*)/))
+    .filter(Boolean) || [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }} className="animate-fade-in">

@@ -42,7 +42,10 @@ function CalendarCard({ day, calendarView, navigate }: { day: ScheduleDay, calen
     setCurrentIndex((prev) => (prev - 1 + videos.length) % videos.length);
   };
 
-  const workoutNameParts = day.workout?.name.split(/(\s+\(\d+\s+min\)\s*)/).filter(Boolean) || [];
+  const workoutNameParts = (day.workout?.name || '')
+    .split(/\n+/) // preserve separate lines from uploaded TSVs
+    .flatMap(part => part.split(/(\s+\(\d+\s+min\)\s*)/))
+    .filter(Boolean) || [];
 
   return (
     <div 
