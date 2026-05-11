@@ -139,10 +139,10 @@
     "non_commercial": "To jest darmowy, otwartoźródłowy projekt self-hosted. Zapraszamy do korzystania z niego i ",
     "contribute": "wspierania go na GitHubie.",
     "features": "Główne cechy",
-    "feature_custom_patterns": "Zdefiniuj własne niestandardowe wzory treningów",
-    "feature_local_videos": "Łącz się ze swoimi lokalnymi plikami wideo",
-    "feature_csv_import": "Importuj treningi za pomocą plików CSV/TSV",
-    "feature_themes": "Dostosuj swój motyw kolorów",
+    "feature_custom_patterns": "Dostosuj częstotliwość treningów do siebie",
+    "feature_local_videos": "Dodaj własne lokalne pliki wideo",
+    "feature_csv_import": "Importuj plany treningowe za pomocą plików CSV/TSV",
+    "feature_themes": "Wybierz swój motyw kolorów",
     "feature_privacy": "100% prywatne - dane pozostają na Twoim komputerze"
   }
 }
