@@ -5,6 +5,7 @@
 </p>
 <h1 align="center">MyFitnessPlan - Open Source Self-Hosted Home Video Workout Planner</h1>
 
+![](./screenshots/7.%20dashboard.jpg)
 An open source, self-hosted local application for managing custom workout plans with flexible scheduling patterns based on your own video collection.
 
 MyFitnessPlan is a personal workout planning tool designed to help you organize and track workout routines using your own video resources. Unlike rigid, predefined weekly schedules, MyFitnessPlan lets you define custom workout patterns that fit your lifestyle—whether that's 3 days on, 1 day off, or any other pattern you prefer.
