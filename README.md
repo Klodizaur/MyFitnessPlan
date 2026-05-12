@@ -222,14 +222,9 @@ This project is licensed under a **Non-Commercial Use License**.
 - Sell access to this software or its features
 - Use it as part of a paid service offering
 
-### Commercial Use
-If you wish to use WorkoutPlanner for commercial purposes, please contact for a commercial license agreement.
+For more details, see the [LICENSE](LICENSE) file.
 
 ---
-
-**Copyright © 2026 Klaudia Krzos, Big Deck IT LTD**
-
-For more details, see the [LICENSE](LICENSE) file.
 
 **Created by:** [Klaudia Krzos](https://www.linkedin.com/in/klaudiacreativestuff/)  
 **Company:** Big Deck IT LTD

@@ -244,14 +244,6 @@ Projekt jest objęty licencją **Non-Commercial Use License**.
 - sprzedawać dostępu do aplikacji
 - wykorzystywać projektu do generowania przychodu
 
-### Użytek komercyjny
-
-W celu uzyskania licencji komercyjnej skontaktuj się ze mną.
-
----
-
-**Copyright © 2026 Klaudia Krzos, Big Deck IT LTD**
-
 Więcej informacji znajduje się w pliku [LICENSE](LICENSE).
 
 **Autor:** [Klaudia Krzos](https://www.linkedin.com/in/klaudiacreativestuff/)  
