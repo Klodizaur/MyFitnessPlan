@@ -27,7 +27,7 @@ export default function AlbumCard({ albumKey, title, cover, count, onClick, onIm
   };
 
   return (
-    <div style={{ width: 220, margin: '8px' }}>
+    <div style={{ width: 220, margin: '12px' }}>
       <div
         onClick={onClick}
         onMouseEnter={() => setHover(true)}
@@ -52,11 +52,12 @@ export default function AlbumCard({ albumKey, title, cover, count, onClick, onIm
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><path d="M12 15V3"/></svg>
             </button>
           </div>
+          {/* title overlay */}
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 70%)' }}>
+            <div style={{ color: 'white', fontWeight: 600, fontSize: '0.98rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textShadow: '0 1px 2px rgba(0,0,0,0.6)', fontFamily: 'var(--font-family)', letterSpacing: '-0.01em' }}>{title}</div>
+          </div>
         </div>
 
-        <div style={{ padding: '10px 12px', background: 'var(--surface-color)' }}>
-          <div style={{ fontWeight: 700, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
-        </div>
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
