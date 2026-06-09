@@ -107,6 +107,28 @@
   padding: 0;
 }
 
+/* Ensure form controls and icon svgs follow theme colors */
+input, select, textarea {
+  color: var(--text-primary);
+  background: transparent;
+  caret-color: var(--accent-color);
+}
+
+/* Icon buttons and inline svgs should inherit text color (SVGs use stroke="currentColor") */
+button, label {
+  color: var(--text-primary);
+}
+
+button svg, svg {
+  color: currentColor;
+}
+
+/* Make select option text visible in most browsers */
+option {
+  color: var(--text-primary);
+  background: var(--surface-color);
+}
+
 body {
   background-color: var(--bg-color);
   color: var(--text-primary);

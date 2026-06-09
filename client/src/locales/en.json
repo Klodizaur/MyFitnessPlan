@@ -4,7 +4,8 @@
     "plans": "Plans",
     "calendar": "Calendar",
     "settings": "Settings",
-    "about": "About"
+    "about": "About",
+    "library": "Library"
   },
   "dashboard": {
     "todays_workout": "Today's Workout",
@@ -32,6 +33,7 @@
     "keep_going": "Keep going, you're doing great!",
     "upcoming": "Upcoming",
     "view_all": "VIEW ALL",
+    "your_collection": "Your collection",
     "no_upcoming": "No more upcoming workouts scheduled."
   },
   "plans": {

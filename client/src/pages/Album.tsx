@@ -1,0 +1,159 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+
+type Video = { id: string; filename: string; relative_path: string; thumbnail_path?: string | null };
+
+export default function Album() {
+  const { albumId } = useParams();
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [albumKey, setAlbumKey] = useState<string>('');
+  const [imgHover, setImgHover] = useState(false);
+  const [q, setQ] = useState('');
+  const [sortMode, setSortMode] = useState<'alpha' | 'alpha_desc'>('alpha');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    setAlbumKey(albumId ? decodeURIComponent(albumId) : '');
+    fetch('http://localhost:3000/api/library/videos')
+      .then(r => r.json())
+      .then((data: Video[]) => setVideos(data || []))
+      .catch(err => console.error('Failed to load library videos:', err));
+  }, [albumId]);
+
+  // Read nested path from query (supports deep nesting): ?path=sub1%2Fsub2
+  const searchParams = new URLSearchParams(location.search);
+  const pathParam = searchParams.get('path');
+  const currentSub = pathParam ? decodeURIComponent(pathParam) : null;
+
+  // Determine base prefix for this view (main album or a deeper nested folder)
+  const basePrefix = currentSub ? (albumKey === '.' ? currentSub : `${albumKey}/${currentSub}`) : (albumKey === '.' ? '' : albumKey);
+
+  const isUnderBase = (rel: string) => {
+    if (!basePrefix) return !rel.includes('/');
+    return rel.startsWith(basePrefix + '/');
+  };
+
+  // Build subfolder map and mainVideos under current base
+  const subMap = new Map<string, { key: string; count: number; sample?: Video }>();
+  const mainVideos = videos.filter(v => isUnderBase(v.relative_path || ''));
+  for (const v of videos) {
+    const rel = v.relative_path || '';
+    const prefix = basePrefix ? basePrefix + '/' : '';
+    if (!rel.startsWith(prefix)) continue;
+    const remainder = rel.slice(prefix.length);
+    const parts = remainder.split('/');
+    const sub = parts.length > 1 ? parts[0] : '.'; // '.' files directly under base
+    const cur = subMap.get(sub) || { key: sub, count: 0, sample: undefined };
+    cur.count += 1;
+    if (!cur.sample) cur.sample = v;
+    subMap.set(sub, cur);
+  }
+
+  const subfolders = Array.from(subMap.entries()).filter(([k]) => k !== '.').map(([, v]) => v).sort((a, b) => b.count - a.count);
+
+  // Videos to display
+  const filtered = mainVideos.filter(v => (!q.trim() || v.filename.toLowerCase().includes(q.trim().toLowerCase())));
+  const shown = filtered.slice();
+  shown.sort((a, b) => (sortMode === 'alpha' ? a.filename.localeCompare(b.filename) : b.filename.localeCompare(a.filename)));
+
+  const albumImage = localStorage.getItem(`albumImage:${albumKey}`) || (mainVideos[0]?.thumbnail_path ? `http://localhost:3000/thumbnails/${mainVideos[0].thumbnail_path}` : null);
+  const setImage = (d: string | null) => {
+    if (d) localStorage.setItem(`albumImage:${albumKey}`, d);
+    else localStorage.removeItem(`albumImage:${albumKey}`);
+  };
+
+  return (
+    <div style={{ padding: '1.5rem' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => navigate(-1)} aria-label="Back" title="Back" style={{ width: 40, height: 40, borderRadius: 10, border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div>
+            <h1 style={{ display: 'inline-block', margin: 0 }}>{albumKey === '.' ? 'Root' : albumKey}</h1>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{mainVideos.length} videos in this collection</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '8px 12px', borderRadius: 10, border: '1px solid var(--glass-border)', width: 360 }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input placeholder="Search subfolders & videos..." value={q} onChange={(e) => setQ(e.target.value)} style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%' }} />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '6px 10px', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 10h-6"/><path d="M3 6h6"/><path d="M3 14h6"/><path d="M21 18h-6"/></svg>
+            <select value={sortMode} onChange={(e) => setSortMode(e.target.value as any)} style={{ border: 'none', background: 'transparent', outline: 'none' }}>
+              <option value="alpha">Alphabetical A→Z</option>
+              <option value="alpha_desc">Alphabetical Z→A</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Banner */}
+      <div style={{ display: 'flex', marginBottom: '1.25rem', gap: 20, alignItems: 'center' }}>
+        <div onMouseEnter={() => setImgHover(true)} onMouseLeave={() => setImgHover(false)} style={{ position: 'relative', flex: '0 0 360px' }}>
+          {albumImage ? (
+            <img src={albumImage} style={{ width: 360, height: 200, objectFit: 'cover', borderRadius: 12 }} />
+          ) : (
+            <div style={{ width: 360, height: 200, borderRadius: 12, background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>No image</div>
+          )}
+
+          <div style={{ position: 'absolute', right: 8, top: 8, display: 'flex', gap: 8, opacity: imgHover ? 1 : 0, transition: 'opacity 140ms' }}>
+            <label title="Set album image" style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => setImage(r.result as string); r.readAsDataURL(f); }} />
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><path d="M12 15V3"/></svg>
+            </label>
+            <button title="Remove image" onClick={() => setImage(null)} style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0,0,0,0.5)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+        </div>
+
+          <div style={{ flex: 1 }} />
+      </div>
+
+      {/* Subfolders */}
+      {subfolders.length > 0 && (
+        <div style={{ marginBottom: '1rem' }}>
+          <h3 style={{ marginBottom: 12 }}>Subfolders</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 360px)', gap: 16, justifyContent: 'center' }}>
+            {subfolders.filter(s => !q.trim() || s.key.toLowerCase().includes(q.trim().toLowerCase())).map(s => (
+              <div key={s.key} onClick={() => { const next = currentSub ? `${currentSub}/${s.key}` : s.key; navigate(`/library/${encodeURIComponent(albumKey)}?path=${encodeURIComponent(next)}`); }} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ width: '100%', aspectRatio: '16/9', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {s.sample?.thumbnail_path ? <img src={`http://localhost:3000/thumbnails/${s.sample.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 20, color: 'var(--text-secondary)' }}>{s.count} items</div>}
+                </div>
+                <div style={{ padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.key}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{s.count}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All Media / Videos */}
+      <div>
+        <h3 style={{ marginBottom: 12 }}>All Media / Videos</h3>
+        {shown.length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)' }}>No videos in this folder</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 320px))', gap: 12 }}>
+            {shown.map(v => (
+              <div key={v.id} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer' }} onClick={() => navigate(`/player/${v.id}`)}>
+                <div style={{ width: '100%', aspectRatio: '16/9', background: '#111' }}>
+                  {v.thumbnail_path ? <img src={`http://localhost:3000/thumbnails/${v.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 20 }}>{v.filename}</div>}
+                </div>
+                <div style={{ padding: '8px 10px' }}>{v.filename}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

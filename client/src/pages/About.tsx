@@ -11,7 +11,7 @@ export default function About() {
         
         <div className="about-section">
           <h2>{t('about.version')}</h2>
-          <p>1.0.0</p>
+          <p>1.1.0</p>
         </div>
 
         <div className="about-section">
