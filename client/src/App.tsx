@@ -7,6 +7,8 @@ import Calendar from './pages/Calendar';
 import Player from './pages/Player';
 import Plans from './pages/Plans';
 import About from './pages/About';
+import Library from './pages/Library';
+import Album from './pages/Album';
 import LanguageSwitcher from './components/LanguageSwitcher';
 
 function App() {
@@ -39,6 +41,7 @@ function App() {
           <NavLink to="/calendar" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.calendar')}</NavLink>
           <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.settings')}</NavLink>
           <NavLink to="/about" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.about')}</NavLink>
+          <NavLink to="/library" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.library') || 'Library'}</NavLink>
           <LanguageSwitcher />
         </div>
       </nav>
@@ -50,7 +53,11 @@ function App() {
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/about" element={<About />} />
+          <Route path="/library" element={<Library />} />
+          <Route path="/library/:albumId" element={<Album />} />
+          <Route path="/library/:albumId/:subId" element={<Album />} />
           <Route path="/player/:videoId/:workoutId" element={<Player />} />
+          <Route path="/player/:videoId" element={<Player />} />
         </Routes>
       </main>
     </div>

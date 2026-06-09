@@ -10,6 +10,7 @@ export default function Player() {
   const [error, setError] = useState<string | null>(null);
   const [isMarking, setIsMarking] = useState(false);
   const [isDone, setIsDone] = useState(false);
+  const [showMarkDone, setShowMarkDone] = useState(false);
   const [nextVideoId, setNextVideoId] = useState<string | null>(null);
   const [prevVideoId, setPrevVideoId] = useState<string | null>(null);
 
@@ -40,10 +41,12 @@ export default function Player() {
         if (day?.workout) {
           const videos = day.workout.videos || [];
           const currentVideo = videos.find((v: any) => v.id === videoId);
-          if (currentVideo?.isCompleted) {
-            setIsDone(true);
+          if (currentVideo) {
+            if (currentVideo.isCompleted) setIsDone(true); else setIsDone(false);
+            setShowMarkDone(true);
           } else {
             setIsDone(false);
+            setShowMarkDone(false);
           }
           
           const currentIndex = videos.findIndex((v: any) => v.id === videoId);
@@ -144,16 +147,18 @@ export default function Player() {
           <h2 style={{ margin: 0, color: 'white', fontSize: '1.2rem', fontWeight: 600 }}>{filename}</h2>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button 
-            onClick={handleToggleDone} 
-            disabled={isMarking}
-            style={{ 
-              background: isDone ? '#10b981' : 'rgba(255,255,255,0.15)', 
-              color: 'white', border: '1px solid rgba(255,255,255,0.2)', padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', backdropFilter: 'blur(8px)', fontWeight: 600
-            }}
-          >
-            {isDone ? '✓ This Part Done' : 'Mark Part Done'}
-          </button>
+          {showMarkDone && (
+            <button 
+              onClick={handleToggleDone} 
+              disabled={isMarking}
+              style={{ 
+                background: isDone ? '#10b981' : 'rgba(255,255,255,0.15)', 
+                color: 'white', border: '1px solid rgba(255,255,255,0.2)', padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', backdropFilter: 'blur(8px)', fontWeight: 600
+              }}
+            >
+              {isDone ? '✓ This Part Done' : 'Mark Part Done'}
+            </button>
+          )}
           <button 
             onClick={() => navigate(-1)} 
             style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', backdropFilter: 'blur(8px)' }}

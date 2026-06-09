@@ -24,6 +24,7 @@ export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const [todaySchedule, setTodaySchedule] = useState<ScheduleDay | null>(null);
   const [upcomingWorkouts, setUpcomingWorkouts] = useState<ScheduleDay[]>([]);
+  const [libraryPreview, setLibraryPreview] = useState<{ key: string; title: string; cover?: string | null; count: number }[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,6 +49,24 @@ export default function Dashboard() {
       });
   }, []);
 
+  useEffect(() => {
+    fetch('http://localhost:3000/api/library/videos')
+      .then(r => r.json())
+      .then((data: any[]) => {
+        const map = new Map<string, any[]>();
+        for (const v of data || []) {
+          const rel = v.relative_path || '';
+          // Group by top-level folder (first segment) or '.' for root
+          const key = rel.includes('/') ? rel.split('/')[0] : (rel ? rel : '.');
+          const arr = map.get(key) || [];
+          arr.push(v);
+          map.set(key, arr);
+        }
+        const albums = Array.from(map.entries()).slice(0, 4).map(([key, vids]) => ({ key, title: key === '.' ? 'Root' : key, cover: vids[0]?.thumbnail_path ? `http://localhost:3000/thumbnails/${vids[0].thumbnail_path}` : null, count: vids.length }));
+        setLibraryPreview(albums);
+      }).catch(() => {});
+  }, []);
+
   const firstPendingVideo = todaySchedule?.workout?.videos.find(v => !v.isCompleted) || todaySchedule?.workout?.videos[0];
 
   const workoutNameParts = (todaySchedule?.workout?.name || '')
@@ -68,6 +87,8 @@ export default function Dashboard() {
            </span>
         </div>
       </div>
+
+      {/* Library preview (moved to bottom) */}
       
       {/* Hero Section */}
       <div 
@@ -261,6 +282,28 @@ export default function Dashboard() {
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t('dashboard.no_upcoming')}</p>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Library preview (Your collection) - moved to bottom */}
+      <div className="glass-card" style={{ padding: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>📚 {t('dashboard.your_collection')}</h3>
+          <button onClick={() => navigate('/library')} style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>{t('dashboard.view_all')}</button>
+        </div>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {libraryPreview.length > 0 ? (
+            libraryPreview.map(a => (
+              <div key={a.key} style={{ width: 180, cursor: 'pointer' }} onClick={() => navigate(`/library/${encodeURIComponent(a.key)}`)}>
+                <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+                  {a.cover ? <img src={a.cover} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 12 }}>{a.count} videos</div>}
+                </div>
+                <div style={{ marginTop: 8, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</div>
+              </div>
+            ))
+          ) : (
+            <p style={{ color: 'var(--text-secondary)' }}>No scanned videos yet</p>
+          )}
         </div>
       </div>
     </div>

@@ -4,7 +4,8 @@
     "plans": "Plany",
     "calendar": "Kalendarz",
     "settings": "Ustawienia",
-    "about": "O aplikacji"
+    "about": "O aplikacji",
+    "library": "Biblioteka"
   },
   "dashboard": {
     "todays_workout": "Dzisiejszy trening",
@@ -32,6 +33,7 @@
     "keep_going": "Tak trzymaj, idzie Ci świetnie!",
     "upcoming": "Nadchodzące",
     "view_all": "ZOBACZ WSZYSTKO",
+    "your_collection": "Twoja kolekcja",
     "no_upcoming": "Brak zaplanowanych kolejnych treningów."
   },
   "plans": {
