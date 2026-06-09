@@ -10,6 +10,7 @@ export default function Album() {
   const [imgHover, setImgHover] = useState(false);
   const [q, setQ] = useState('');
   const [sortMode, setSortMode] = useState<'alpha' | 'alpha_desc'>('alpha');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -64,9 +65,9 @@ export default function Album() {
   };
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <div style={{ padding: '2.5rem' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => navigate(-1)} aria-label="Back" title="Back" style={{ width: 40, height: 40, borderRadius: 10, border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -83,18 +84,22 @@ export default function Album() {
             <input placeholder="Search subfolders & videos..." value={q} onChange={(e) => setQ(e.target.value)} style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%' }} />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '6px 10px', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 10h-6"/><path d="M3 6h6"/><path d="M3 14h6"/><path d="M21 18h-6"/></svg>
-            <select value={sortMode} onChange={(e) => setSortMode(e.target.value as any)} style={{ border: 'none', background: 'transparent', outline: 'none' }}>
-              <option value="alpha">Alphabetical A→Z</option>
-              <option value="alpha_desc">Alphabetical Z→A</option>
-            </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '6px 10px', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 10h-6"/><path d="M3 6h6"/><path d="M3 14h6"/><path d="M21 18h-6"/></svg>
+              <select value={sortMode} onChange={(e) => setSortMode(e.target.value as any)} style={{ border: 'none', background: 'transparent', outline: 'none' }}>
+                <option value="alpha">Alphabetical A→Z</option>
+                <option value="alpha_desc">Alphabetical Z→A</option>
+              </select>
+            </div>
+
+            
           </div>
         </div>
       </div>
 
       {/* Banner */}
-      <div style={{ display: 'flex', marginBottom: '1.25rem', gap: 20, alignItems: 'center' }}>
+      <div style={{ display: 'flex', marginBottom: '2rem', gap: 20, alignItems: 'center' }}>
         <div onMouseEnter={() => setImgHover(true)} onMouseLeave={() => setImgHover(false)} style={{ position: 'relative', flex: '0 0 360px' }}>
           {albumImage ? (
             <img src={albumImage} style={{ width: 360, height: 200, objectFit: 'cover', borderRadius: 12 }} />
@@ -118,9 +123,9 @@ export default function Album() {
 
       {/* Subfolders */}
       {subfolders.length > 0 && (
-        <div style={{ marginBottom: '1rem' }}>
-          <h3 style={{ marginBottom: 12 }}>Subfolders</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 360px)', gap: 16, justifyContent: 'center' }}>
+        <div style={{ marginBottom: '2.5rem' }}>
+          <h3 style={{ marginBottom: 22 }}>Subfolders</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 360px)', gap: 28, justifyContent: 'center' }}>
             {subfolders.filter(s => !q.trim() || s.key.toLowerCase().includes(q.trim().toLowerCase())).map(s => (
               <div key={s.key} onClick={() => { const next = currentSub ? `${currentSub}/${s.key}` : s.key; navigate(`/library/${encodeURIComponent(albumKey)}?path=${encodeURIComponent(next)}`); }} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ width: '100%', aspectRatio: '16/9', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -136,22 +141,53 @@ export default function Album() {
         </div>
       )}
 
-      {/* All Media / Videos */}
+      {/* All Videos header with view toggle */}
       <div>
-        <h3 style={{ marginBottom: 12 }}>All Media / Videos</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 26 }}>
+          <h3 style={{ margin: 0 }}>All Videos</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px', borderRadius: 8, border: '1px solid var(--glass-border)', background: 'var(--surface-hover)' }}>
+              <button onClick={() => setViewMode('grid')} aria-label="Grid view" title="Grid view" style={{ width: 40, height: 36, borderRadius: 8, border: 'none', background: viewMode === 'grid' ? 'var(--accent-color)' : 'transparent', color: viewMode === 'grid' ? 'white' : 'var(--text-primary)', cursor: 'pointer' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              </button>
+              <button onClick={() => setViewMode('list')} aria-label="List view" title="List view" style={{ width: 40, height: 36, borderRadius: 8, border: 'none', background: viewMode === 'list' ? 'var(--accent-color)' : 'transparent', color: viewMode === 'list' ? 'white' : 'var(--text-primary)', cursor: 'pointer' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
         {shown.length === 0 ? (
           <p style={{ color: 'var(--text-secondary)' }}>No videos in this folder</p>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 320px))', gap: 12 }}>
-            {shown.map(v => (
-              <div key={v.id} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer' }} onClick={() => navigate(`/player/${v.id}`)}>
-                <div style={{ width: '100%', aspectRatio: '16/9', background: '#111' }}>
-                  {v.thumbnail_path ? <img src={`http://localhost:3000/thumbnails/${v.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 20 }}>{v.filename}</div>}
+          viewMode === 'grid' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 320px))', gap: 28 }}>
+              {shown.map(v => (
+                <div key={v.id} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--glass-border)', cursor: 'pointer' }} onClick={() => navigate(`/player/${v.id}`)}>
+                  <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {v.thumbnail_path ? <img src={`http://localhost:3000/thumbnails/${v.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 20 }}>{v.filename}</div>}
+
+                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 70%)' }}>
+                      <div style={{ color: 'white', fontWeight: 600, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-family)', letterSpacing: '-0.01em', textShadow: '0 1px 2px rgba(0,0,0,0.6)' }}>{v.filename}</div>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ padding: '8px 10px' }}>{v.filename}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {shown.map(v => (
+                <div key={v.id} onClick={() => navigate(`/player/${v.id}`)} style={{ display: 'flex', gap: 16, alignItems: 'center', padding: 12, borderRadius: 10, border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer' }}>
+                  <div style={{ width: 240, aspectRatio: '16/9', background: '#111', borderRadius: 8, overflow: 'hidden', flex: '0 0 240px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {v.thumbnail_path ? <img src={`http://localhost:3000/thumbnails/${v.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 12 }}>{v.filename}</div>}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{v.filename}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{v.relative_path}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>

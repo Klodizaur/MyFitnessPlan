@@ -16,7 +16,7 @@ interface Props {
 
 export default function AlbumGrid({ albums, onOpen, onImageChange }: Props) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
       {albums.map(a => (
         <AlbumCard
           key={a.key}
