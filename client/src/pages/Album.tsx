@@ -3,6 +3,8 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 type Video = { id: string; filename: string; relative_path: string; thumbnail_path?: string | null };
 
+const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+
 export default function Album() {
   const { albumId } = useParams();
   const [videos, setVideos] = useState<Video[]>([]);
@@ -56,7 +58,7 @@ export default function Album() {
   // Videos to display
   const filtered = mainVideos.filter(v => (!q.trim() || v.filename.toLowerCase().includes(q.trim().toLowerCase())));
   const shown = filtered.slice();
-  shown.sort((a, b) => (sortMode === 'alpha' ? a.filename.localeCompare(b.filename) : b.filename.localeCompare(a.filename)));
+  shown.sort((a, b) => (sortMode === 'alpha' ? naturalCompare(a.filename, b.filename) : naturalCompare(b.filename, a.filename)));
 
   const albumImage = localStorage.getItem(`albumImage:${albumKey}`) || (mainVideos[0]?.thumbnail_path ? `http://localhost:3000/thumbnails/${mainVideos[0].thumbnail_path}` : null);
   const setImage = (d: string | null) => {

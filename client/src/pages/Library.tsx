@@ -4,6 +4,8 @@ import AlbumGrid from '../components/AlbumGrid';
 
 type Video = { id: string; filename: string; relative_path: string; thumbnail_path?: string | null };
 
+const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+
 function albumKeyFromPath(rel: string) {
   if (!rel) return '.';
   const parts = rel.split('/');
@@ -41,9 +43,9 @@ export default function Library() {
       const cover = stored || (vids[0]?.thumbnail_path ? `http://localhost:3000/thumbnails/${vids[0].thumbnail_path}` : null);
       return { key, title: key === '.' ? 'Root' : key, cover, count: vids.length };
     });
-    // apply simple sort
-    if (sort === 'alpha') result.sort((a, b) => a.title.localeCompare(b.title));
-    else result.sort((a, b) => b.title.localeCompare(a.title));
+    // apply natural sort for numbered folder titles
+    if (sort === 'alpha') result.sort((a, b) => naturalCompare(a.title, b.title));
+    else result.sort((a, b) => naturalCompare(b.title, a.title));
     setAlbums(result);
   }, [videos, sort]);
 
