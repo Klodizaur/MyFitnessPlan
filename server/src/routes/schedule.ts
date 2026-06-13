@@ -29,8 +29,21 @@ export default async function (fastify: FastifyInstance) {
       ORDER BY w.sequence_order ASC
     `).all(plan.id) as any[];
 
-    const allVideos = db.prepare('SELECT id, filename, relative_path, thumbnail_path FROM videos').all() as any[];
-    const videoMap = new Map(allVideos.map(v => [v.id, { filename: v.filename, path: v.relative_path, thumbnail: v.thumbnail_path }]));
+    const allVideos = db.prepare('SELECT id, filename, relative_path, thumbnail_path, description, equipment FROM videos').all() as any[];
+    const videoMap = new Map(allVideos.map(v => [v.id, {
+      filename: v.filename,
+      path: v.relative_path,
+      thumbnail: v.thumbnail_path,
+      description: v.description || '',
+      equipment: (() => {
+        try {
+          const parsed = JSON.parse(v.equipment || '[]');
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })(),
+    }]));
     
     // Get history (both workout-level and video-level)
     const history = db.prepare('SELECT workout_id, video_id FROM history').all() as any[];
@@ -50,6 +63,8 @@ export default async function (fastify: FastifyInstance) {
           filename: videoInfo.filename,
           path: videoInfo.path,
           thumbnail: videoInfo.thumbnail,
+          description: videoInfo.description,
+          equipment: videoInfo.equipment,
           isCompleted: completedVideos.has(`${w.id}:${vid}`)
         } : null;
       }).filter((v: any) => v !== null);

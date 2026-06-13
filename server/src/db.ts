@@ -79,4 +79,15 @@ const hasVideoId = historyInfo.some(col => col.name === 'video_id');
 if (!hasVideoId) {
   db.exec('ALTER TABLE history ADD COLUMN video_id TEXT');
 }
+
+const hasDescription = videoInfo.some(col => col.name === 'description');
+if (!hasDescription) {
+  db.exec('ALTER TABLE videos ADD COLUMN description TEXT');
+}
+
+const hasEquipment = videoInfo.some(col => col.name === 'equipment');
+if (!hasEquipment) {
+  db.exec('ALTER TABLE videos ADD COLUMN equipment TEXT');
+}
+
 export default db;

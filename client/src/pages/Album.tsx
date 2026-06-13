@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-
-type Video = { id: string; filename: string; relative_path: string; thumbnail_path?: string | null };
+import VideoCard from '../components/VideoCard';
+import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
@@ -64,6 +64,10 @@ export default function Album() {
   const setImage = (d: string | null) => {
     if (d) localStorage.setItem(`albumImage:${albumKey}`, d);
     else localStorage.removeItem(`albumImage:${albumKey}`);
+  };
+
+  const updateVideo = (updated: Video) => {
+    setVideos(prev => prev.map(v => (v.id === updated.id ? updated : v)));
   };
 
   return (
@@ -164,29 +168,13 @@ export default function Album() {
           viewMode === 'grid' ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 320px))', gap: 28 }}>
               {shown.map(v => (
-                <div key={v.id} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--glass-border)', cursor: 'pointer' }} onClick={() => navigate(`/player/${v.id}`)}>
-                  <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {v.thumbnail_path ? <img src={`http://localhost:3000/thumbnails/${v.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 20 }}>{v.filename}</div>}
-
-                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 70%)' }}>
-                      <div style={{ color: 'white', fontWeight: 600, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-family)', letterSpacing: '-0.01em', textShadow: '0 1px 2px rgba(0,0,0,0.6)' }}>{v.filename}</div>
-                    </div>
-                  </div>
-                </div>
+                <VideoCard key={v.id} video={v} viewMode="grid" onUpdate={updateVideo} />
               ))}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {shown.map(v => (
-                <div key={v.id} onClick={() => navigate(`/player/${v.id}`)} style={{ display: 'flex', gap: 16, alignItems: 'center', padding: 12, borderRadius: 10, border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer' }}>
-                  <div style={{ width: 240, aspectRatio: '16/9', background: '#111', borderRadius: 8, overflow: 'hidden', flex: '0 0 240px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {v.thumbnail_path ? <img src={`http://localhost:3000/thumbnails/${v.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 12 }}>{v.filename}</div>}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{v.filename}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{v.relative_path}</div>
-                  </div>
-                </div>
+                <VideoCard key={v.id} video={v} viewMode="list" onUpdate={updateVideo} />
               ))}
             </div>
           )
