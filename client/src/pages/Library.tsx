@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AlbumGrid from '../components/AlbumGrid';
-
-type Video = { id: string; filename: string; relative_path: string; thumbnail_path?: string | null };
+import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 

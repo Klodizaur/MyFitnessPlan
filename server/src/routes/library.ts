@@ -13,6 +13,47 @@ const THUMB_DIR = path.join(process.cwd(), 'data', 'thumbnails');
 // Supported video extensions
 const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.webm'];
 
+export const VALID_EQUIPMENT = [
+  'dumbbells',
+  'mat',
+  'gym_ball',
+  'resistance_bands',
+  'pilates_ball',
+  'pilates_bar',
+  'kettlebell',
+] as const;
+
+function parseEquipment(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string =>
+      typeof item === 'string' && VALID_EQUIPMENT.includes(item as typeof VALID_EQUIPMENT[number])
+    );
+  } catch {
+    return [];
+  }
+}
+
+function formatVideoRow(row: {
+  id: string;
+  filename: string;
+  relative_path: string;
+  thumbnail_path?: string | null;
+  description?: string | null;
+  equipment?: string | null;
+}) {
+  return {
+    id: row.id,
+    filename: row.filename,
+    relative_path: row.relative_path,
+    thumbnail_path: row.thumbnail_path,
+    description: row.description || '',
+    equipment: parseEquipment(row.equipment),
+  };
+}
+
 function scanDirectory(dir: string, excludePaths: string[], fileList: string[] = []): string[] {
   try {
     const normalizedDir = path.resolve(dir);
@@ -128,7 +169,35 @@ export default async function (fastify: FastifyInstance) {
   });
 
   fastify.get('/videos', async (request, reply) => {
-    const videos = db.prepare('SELECT id, filename, relative_path, thumbnail_path FROM videos').all();
-    return reply.send(videos);
+    const videos = db.prepare(
+      'SELECT id, filename, relative_path, thumbnail_path, description, equipment FROM videos'
+    ).all() as any[];
+    return reply.send(videos.map(formatVideoRow));
+  });
+
+  fastify.patch('/videos/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as { description?: string; equipment?: string[] };
+
+    const existing = db.prepare('SELECT id FROM videos WHERE id = ?').get(id);
+    if (!existing) {
+      return reply.code(404).send({ error: 'Video not found' });
+    }
+
+    const description = typeof body.description === 'string' ? body.description.trim() : '';
+    const equipment = Array.isArray(body.equipment)
+      ? body.equipment.filter((item): item is string =>
+          typeof item === 'string' && VALID_EQUIPMENT.includes(item as typeof VALID_EQUIPMENT[number])
+        )
+      : [];
+
+    db.prepare('UPDATE videos SET description = ?, equipment = ? WHERE id = ?')
+      .run(description, JSON.stringify(equipment), id);
+
+    const updated = db.prepare(
+      'SELECT id, filename, relative_path, thumbnail_path, description, equipment FROM videos WHERE id = ?'
+    ).get(id) as any;
+
+    return reply.send(formatVideoRow(updated));
   });
 }
