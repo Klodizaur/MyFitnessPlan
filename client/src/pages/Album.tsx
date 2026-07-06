@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import VideoCard from '../components/VideoCard';
+import EquipmentPicker from '../components/EquipmentPicker';
+import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, prettyLabel } from '../lib/metadata';
 import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -13,6 +15,10 @@ export default function Album() {
   const [q, setQ] = useState('');
   const [sortMode, setSortMode] = useState<'alpha' | 'alpha_desc'>('alpha');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+  const [selectedTrainingType, setSelectedTrainingType] = useState<string>('');
+  const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
+  const [selectedIntensity, setSelectedIntensity] = useState<string>('');
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -40,6 +46,7 @@ export default function Album() {
   // Build subfolder map and mainVideos under current base
   const subMap = new Map<string, { key: string; count: number; sample?: Video }>();
   const mainVideos = videos.filter(v => isUnderBase(v.relative_path || ''));
+  // apply filters to mainVideos later when showing
   for (const v of videos) {
     const rel = v.relative_path || '';
     const prefix = basePrefix ? basePrefix + '/' : '';
@@ -55,8 +62,21 @@ export default function Album() {
 
   const subfolders = Array.from(subMap.entries()).filter(([k]) => k !== '.').map(([, v]) => v).sort((a, b) => b.count - a.count);
 
-  // Videos to display
-  const filtered = mainVideos.filter(v => (!q.trim() || v.filename.toLowerCase().includes(q.trim().toLowerCase())));
+  // Videos to display (apply all active filters)
+  const filtered = mainVideos.filter(v => {
+    if (q.trim() && !v.filename.toLowerCase().includes(q.trim().toLowerCase())) return false;
+    if (selectedEquipment.length > 0) {
+      const veq = v.equipment || [];
+      if (!veq.some(id => selectedEquipment.includes(id))) return false;
+    }
+    if (selectedTrainingType && v.training_type !== selectedTrainingType) return false;
+    if (selectedIntensity && v.intensity !== selectedIntensity) return false;
+    if (selectedBodyParts.length > 0) {
+      const vparts = v.body_parts || [];
+      if (!vparts.some(bp => selectedBodyParts.includes(bp))) return false;
+    }
+    return true;
+  });
   const shown = filtered.slice();
   shown.sort((a, b) => (sortMode === 'alpha' ? naturalCompare(a.filename, b.filename) : naturalCompare(b.filename, a.filename)));
 
@@ -89,6 +109,8 @@ export default function Album() {
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input placeholder="Search subfolders & videos..." value={q} onChange={(e) => setQ(e.target.value)} style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%' }} />
           </div>
+
+          {/* Equipment filter removed from header; shown below as its own row */}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '6px 10px', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
@@ -146,6 +168,61 @@ export default function Album() {
           </div>
         </div>
       )}
+
+      {/* Equipment filter section */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h3 style={{ margin: '0 0 10px' }}>Filter by equipment</h3>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <EquipmentPicker selected={selectedEquipment} onChange={setSelectedEquipment} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '240px 1fr 180px', gap: 12, alignItems: 'center' }}>
+        <div>
+          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Training Type</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['HIIT','Cardio','Strength','Mobility','Yoga','Pilates'].map(t => {
+              const sel = selectedTrainingType === t;
+              return (
+                <button key={t} onClick={() => setSelectedTrainingType(sel ? '' : t)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={t}>
+                  <TrainingTypeIcon type={t} />
+                  <span style={{ fontSize: '0.9rem' }}>{t}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Body Parts (click to toggle)</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['full_body','upper_body','lower_body','core','back','legs','arms','shoulders'].map(bp => {
+              const sel = selectedBodyParts.includes(bp);
+              return (
+                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(bp)}>
+                  <BodyPartIcon part={bp} />
+                  <span style={{ fontSize: '0.9rem' }}>{prettyLabel(bp)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Intensity</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['low','medium','high'].map(level => {
+              const sel = selectedIntensity === level;
+              return (
+                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(level)}>
+                  <IntensityIcon level={level} />
+                  <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{level}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
       {/* All Videos header with view toggle */}
       <div>

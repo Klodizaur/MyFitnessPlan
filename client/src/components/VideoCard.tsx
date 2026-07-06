@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { EquipmentIcon, getEquipmentItem } from '../lib/equipment';
 import { Video } from '../types/video';
 import VideoMetadataEditor from './VideoMetadataEditor';
+import VideoDetailsModal from './VideoDetailsModal';
 
 type Props = {
   video: Video;
@@ -14,6 +15,7 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
   const navigate = useNavigate();
   const [hovered, setHovered] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const equipment = video.equipment || [];
   const hasMeta = Boolean(video.description?.trim()) || equipment.length > 0;
@@ -36,13 +38,11 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
         pointerEvents: hovered ? 'auto' : 'none',
       }}
     >
+      {/* Edit info removed — use Info → Edit Details instead */}
       <button
         type="button"
-        onClick={e => {
-          e.stopPropagation();
-          setEditing(true);
-        }}
-        title="Edit video info"
+        onClick={e => { e.stopPropagation(); setShowDetails(true); }}
+        title="Details"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -58,21 +58,13 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
           fontWeight: 700,
         }}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-        </svg>
-        Edit info
+        Info
       </button>
     </div>
   );
 
-  const metaBelow = hasMeta && (
+  const metaBelow = (
     <div style={{ padding: '10px 12px', background: 'var(--surface-color)', borderTop: '1px solid var(--glass-border)' }}>
-      {video.description?.trim() && (
-        <p style={{ margin: '0 0 8px', color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.4 }}>
-          {video.description}
-        </p>
-      )}
       {equipment.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {equipment.map(id => (
@@ -144,37 +136,30 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: '1rem' }}>{video.filename}</div>
             <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{video.relative_path}</div>
-            {hasMeta && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-                {video.description?.trim() && (
-                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.4 }}>
-                    {video.description}
-                  </p>
-                )}
-                {equipment.length > 0 && (
-                  <div style={{ display: 'flex', gap: 6, color: 'var(--text-primary)' }}>
-                    {equipment.map(id => (
-                      <span
-                        key={id}
-                        title={getEquipmentItem(id)?.label}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: 30,
-                          height: 30,
-                          borderRadius: 8,
-                          background: 'var(--surface-hover)',
-                          border: '1px solid var(--glass-border)',
-                        }}
-                      >
-                        <EquipmentIcon id={id} size={16} />
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+              {equipment.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, color: 'var(--text-primary)' }}>
+                  {equipment.map(id => (
+                    <span
+                      key={id}
+                      title={getEquipmentItem(id)?.label}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 30,
+                        height: 30,
+                        borderRadius: 8,
+                        background: 'var(--surface-hover)',
+                        border: '1px solid var(--glass-border)',
+                      }}
+                    >
+                      <EquipmentIcon id={id} size={16} />
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -184,6 +169,9 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
             onClose={() => setEditing(false)}
             onSaved={onUpdate}
           />
+        )}
+        {showDetails && (
+          <VideoDetailsModal video={video} onClose={() => setShowDetails(false)} onSaved={onUpdate} onRequestEdit={() => { setShowDetails(false); setEditing(true); }} />
         )}
       </>
     );
@@ -261,6 +249,9 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
           onClose={() => setEditing(false)}
           onSaved={onUpdate}
         />
+      )}
+      {showDetails && (
+        <VideoDetailsModal video={video} onClose={() => setShowDetails(false)} onSaved={onUpdate} onRequestEdit={() => { setShowDetails(false); setEditing(true); }} />
       )}
     </>
   );

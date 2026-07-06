@@ -14,7 +14,7 @@ export default async function (fastify: FastifyInstance) {
     }
 
     // Get active plan
-    const plan = db.prepare('SELECT id, start_date FROM workout_plans WHERE is_active = 1').get() as any;
+    const plan = db.prepare('SELECT id, name, start_date FROM workout_plans WHERE is_active = 1').get() as any;
     if (!plan) {
       return reply.send({ schedule: [] });
     }
@@ -108,7 +108,7 @@ export default async function (fastify: FastifyInstance) {
       patternIndex = (patternIndex + 1) % pattern.length;
     }
 
-    return reply.send({ schedule, pattern, startDate: startDateStr });
+    return reply.send({ schedule, pattern, startDate: startDateStr, planName: plan.name });
   });
 
   fastify.post('/toggle-done', async (request, reply) => {

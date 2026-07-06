@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import EquipmentPicker from './EquipmentPicker';
+import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, prettyLabel } from '../lib/metadata';
 import { Video } from '../types/video';
 
 type Props = {
@@ -8,15 +10,21 @@ type Props = {
   onSaved: (video: Video) => void;
 };
 
-export default function VideoMetadataEditor({ video, onClose, onSaved }: Props) {
+function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
   const [description, setDescription] = useState(video.description || '');
   const [equipment, setEquipment] = useState<string[]>(video.equipment || []);
+  const [trainingType, setTrainingType] = useState<string>(video.training_type || '');
+  const [bodyParts, setBodyParts] = useState<string[]>(video.body_parts || []);
+  const [intensity, setIntensity] = useState<string>(video.intensity || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setDescription(video.description || '');
     setEquipment(video.equipment || []);
+    setTrainingType(video.training_type || '');
+    setBodyParts(video.body_parts || []);
+    setIntensity(video.intensity || '');
   }, [video]);
 
   useEffect(() => {
@@ -34,7 +42,7 @@ export default function VideoMetadataEditor({ video, onClose, onSaved }: Props) 
       const res = await fetch(`http://localhost:3000/api/library/videos/${video.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description, equipment }),
+        body: JSON.stringify({ description, equipment, training_type: trainingType, body_parts: bodyParts, intensity }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
@@ -68,9 +76,9 @@ export default function VideoMetadataEditor({ video, onClose, onSaved }: Props) 
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: 520,
-          padding: '1.5rem',
-          maxHeight: '90vh',
+          maxWidth: 860,
+          padding: '1.75rem',
+          maxHeight: '92vh',
           overflowY: 'auto',
         }}
       >
@@ -106,16 +114,17 @@ export default function VideoMetadataEditor({ video, onClose, onSaved }: Props) 
             value={description}
             onChange={e => setDescription(e.target.value)}
             placeholder="Notes about this video — focus areas, difficulty, etc."
-            rows={4}
+            rows={8}
             style={{
               width: '100%',
-              padding: '12px 14px',
-              borderRadius: 10,
+              minHeight: 220,
+              padding: '14px 16px',
+              borderRadius: 12,
               border: '1px solid var(--glass-border)',
               background: 'var(--surface-hover)',
               color: 'var(--text-primary)',
               fontFamily: 'var(--font-family)',
-              fontSize: '0.95rem',
+              fontSize: '1rem',
               resize: 'vertical',
               boxSizing: 'border-box',
             }}
@@ -125,6 +134,55 @@ export default function VideoMetadataEditor({ video, onClose, onSaved }: Props) 
         <div style={{ marginBottom: '1.5rem' }}>
           <span style={{ display: 'block', fontWeight: 700, marginBottom: 10, fontSize: '0.9rem' }}>Equipment</span>
           <EquipmentPicker selected={equipment} onChange={setEquipment} />
+        </div>
+
+        <div style={{ marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Training Type</span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['HIIT','Cardio','Strength','Mobility','Yoga','Pilates'].map(t => {
+                  const sel = trainingType === t;
+                  return (
+                    <button key={t} onClick={() => setTrainingType(sel ? '' : t)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={t}>
+                      <TrainingTypeIcon type={t} />
+                      <span style={{ fontSize: '0.95rem' }}>{t}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Intensity</span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['low','medium','high'].map(level => {
+                  const sel = intensity === level;
+                  return (
+                    <button key={level} onClick={() => setIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(level)}>
+                      <IntensityIcon level={level} />
+                      <span style={{ fontSize: '0.95rem', textTransform: 'capitalize' }}>{level}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '1.5rem' }}>
+          <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Body Parts</span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['full_body','upper_body','lower_body','core','back','legs','arms','shoulders'].map(bp => {
+              const selected = bodyParts.includes(bp);
+              return (
+                <button key={bp} onClick={() => setBodyParts(selected ? bodyParts.filter(b => b !== bp) : [...bodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: selected ? 'rgba(59,130,246,0.12)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(bp)}>
+                  <BodyPartIcon part={bp} />
+                  <span style={{ fontSize: '0.95rem' }}>{prettyLabel(bp)}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {error && (
@@ -160,4 +218,8 @@ export default function VideoMetadataEditor({ video, onClose, onSaved }: Props) 
       </div>
     </div>
   );
+}
+export default function VideoMetadataEditor(props: Props) {
+  if (typeof document === 'undefined') return <VideoMetadataEditorInner {...props} />;
+  return createPortal(<VideoMetadataEditorInner {...props} />, document.body);
 }

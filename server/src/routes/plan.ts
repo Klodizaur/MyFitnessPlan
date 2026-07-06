@@ -162,6 +162,60 @@ export default async function (fastify: FastifyInstance) {
     });
   });
 
+  fastify.post('/create', async (request, reply) => {
+    const body = request.body as { name?: string; startDate?: string; days?: Array<{ name: string; videoIds: string[] }> };
+    const days = Array.isArray(body.days) ? body.days.filter(day => Array.isArray(day.videoIds) && day.videoIds.length > 0) : [];
+    if (!days.length) {
+      return reply.code(400).send({ error: 'No workouts provided' });
+    }
+
+    const planId = nanoid();
+    const planName = body.name?.trim() || `Custom Plan ${new Date().toISOString().split('T')[0]}`;
+    const startDate = body.startDate || new Date().toISOString().split('T')[0];
+
+    db.transaction(() => {
+      db.prepare('INSERT INTO workout_plans (id, name, is_active, start_date) VALUES (?, ?, 0, ?)').run(planId, planName, startDate);
+      const insertStmt = db.prepare(
+        'INSERT INTO workouts (id, plan_id, name, sequence_order, video_ids) VALUES (?, ?, ?, ?, ?)'
+      );
+      days.forEach((day, index) => {
+        insertStmt.run(nanoid(), planId, day.name || `Day ${index + 1}`, index, JSON.stringify(day.videoIds));
+      });
+    })();
+
+    return reply.send({ success: true, planId, workoutCount: days.length });
+  });
+
+  fastify.put('/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as { name?: string; startDate?: string; days?: Array<{ name: string; videoIds: string[] }> };
+    const days = Array.isArray(body.days) ? body.days.filter(day => Array.isArray(day.videoIds) && day.videoIds.length > 0) : [];
+    if (!days.length) {
+      return reply.code(400).send({ error: 'No workouts provided' });
+    }
+
+    const planName = body.name?.trim() || `Custom Plan ${new Date().toISOString().split('T')[0]}`;
+    const startDate = body.startDate || new Date().toISOString().split('T')[0];
+
+    db.transaction(() => {
+      // Update plan name and start date
+      db.prepare('UPDATE workout_plans SET name = ?, start_date = ? WHERE id = ?').run(planName, startDate, id);
+      
+      // Delete existing workouts for this plan
+      db.prepare('DELETE FROM workouts WHERE plan_id = ?').run(id);
+      
+      // Insert new workouts
+      const insertStmt = db.prepare(
+        'INSERT INTO workouts (id, plan_id, name, sequence_order, video_ids) VALUES (?, ?, ?, ?, ?)'
+      );
+      days.forEach((day, index) => {
+        insertStmt.run(nanoid(), id, day.name || `Day ${index + 1}`, index, JSON.stringify(day.videoIds));
+      });
+    })();
+
+    return reply.send({ success: true, planId: id, workoutCount: days.length });
+  });
+
   fastify.get('/active', async (request, reply) => {
     const plan = db.prepare('SELECT * FROM workout_plans WHERE is_active = 1').get() as any;
     if (!plan) return reply.send({ activePlan: null });
@@ -174,6 +228,18 @@ export default async function (fastify: FastifyInstance) {
   fastify.get('/', async (request, reply) => {
     const plans = db.prepare('SELECT * FROM workout_plans ORDER BY uploaded_at DESC').all();
     return reply.send(plans);
+  });
+
+  fastify.get('/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const plan = db.prepare('SELECT * FROM workout_plans WHERE id = ?').get(id) as any;
+    if (!plan) {
+      return reply.code(404).send({ error: 'Plan not found' });
+    }
+    const workouts = db.prepare(
+      'SELECT id, name, sequence_order, video_ids FROM workouts WHERE plan_id = ? ORDER BY sequence_order ASC'
+    ).all(id);
+    return reply.send({ plan, workouts });
   });
 
   fastify.delete('/:id', async (request, reply) => {
