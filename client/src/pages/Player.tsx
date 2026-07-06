@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useParams, useNavigate } from 'react-router-dom';
 import { EquipmentIcon, getEquipmentItem } from '../lib/equipment';
+import { TrainingTypeIcon, BodyPartIcon, IntensityIcon, prettyLabel } from '../lib/metadata';
 
 export default function Player() {
   const { videoId, workoutId } = useParams();
@@ -10,6 +13,9 @@ export default function Player() {
   const [videoPath, setVideoPath] = useState('');
   const [description, setDescription] = useState('');
   const [equipment, setEquipment] = useState<string[]>([]);
+  const [trainingType, setTrainingType] = useState<string>('');
+  const [bodyParts, setBodyParts] = useState<string[]>([]);
+  const [intensity, setIntensity] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isMarking, setIsMarking] = useState(false);
   const [isDone, setIsDone] = useState(false);
@@ -27,6 +33,9 @@ export default function Player() {
           setVideoPath(vid.relative_path);
           setDescription(vid.description || '');
           setEquipment(vid.equipment || []);
+          setTrainingType(vid.training_type || '');
+          setBodyParts(vid.body_parts || []);
+          setIntensity(vid.intensity || '');
         } else {
           setError('Video not found in library');
         }
@@ -225,18 +234,68 @@ export default function Player() {
       {hasMeta && (
         <div className="glass-card player-details">
           {description.trim() && (
-            <p className="player-details-text">{description}</p>
-          )}
-          {equipment.length > 0 && (
-            <div className="player-details-equipment">
-              {equipment.map(id => (
-                <span key={id} className="player-equipment-tag" title={getEquipmentItem(id)?.label}>
-                  <EquipmentIcon id={id} size={16} />
-                  {getEquipmentItem(id)?.label}
-                </span>
-              ))}
-            </div>
-          )}
+            <div className="player-details-text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown></div>
+              )}
+          
+            {(trainingType || (bodyParts && bodyParts.length) || intensity) && (
+              <div style={{ marginTop: 10 }}>
+                {/* Equipment */}
+                {equipment && equipment.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Equipment</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {Array.from(new Set(equipment)).map(id => (
+                        <div key={id} className="player-meta-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem' }} title={getEquipmentItem(id)?.label}>
+                          <EquipmentIcon id={id} size={16} />
+                          <span style={{ color: 'var(--text-primary)' }}>{getEquipmentItem(id)?.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Training type */}
+                {trainingType && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Training Type</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem', fontWeight: 700 }}>
+                        <TrainingTypeIcon type={trainingType} />
+                        <span>{trainingType}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Body parts */}
+                {bodyParts && bodyParts.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Body Parts</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {Array.from(new Set(bodyParts)).map(bp => (
+                        <div key={bp} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem' }} title={prettyLabel(bp)}>
+                          <BodyPartIcon part={bp} />
+                          <span>{prettyLabel(bp)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Intensity */}
+                {intensity && (
+                  <div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Intensity</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: '0.9rem', color: 'var(--accent-color)', fontWeight: 700 }}>
+                        <IntensityIcon level={intensity} />
+                        <span style={{ textTransform: 'capitalize' }}>{intensity}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
         </div>
       )}
     </div>

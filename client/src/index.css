@@ -328,6 +328,12 @@ body {
   line-height: 1.6;
 }
 
+/* Markdown paragraph spacing inside player and video details */
+.player-details-text p,
+.video-details-text p {
+  margin: 0 0 0.9rem; /* give visible space between paragraphs */
+}
+
 .player-details-equipment {
   display: flex;
   gap: 8px;

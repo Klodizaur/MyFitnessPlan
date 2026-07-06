@@ -44,6 +44,13 @@ function CalendarCard({ day, calendarView, navigate }: { day: ScheduleDay, calen
 
   const workoutNameParts = (day.workout?.name || '')
     .split(/\n+/) // preserve separate lines from uploaded TSVs
+    .filter((line, index) => {
+      // Skip the first line if it matches "Week X - Day Y" pattern
+      if (index === 0 && /^week\s*\d+\s*-\s*day\s*\d+/i.test(line.trim())) {
+        return false;
+      }
+      return true;
+    })
     .flatMap(part => part.split(/(\s+\(\d+\s+min\)\s*)/))
     .filter(Boolean) || [];
 
@@ -298,6 +305,7 @@ export default function Calendar() {
   const { t } = useTranslation();
   const [schedule, setSchedule] = useState<ScheduleDay[]>([]);
   const [calendarView, setCalendarView] = useState('list');
+  const [planName, setPlanName] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -313,6 +321,9 @@ export default function Calendar() {
         if (data.schedule) {
           setSchedule(data.schedule);
         }
+        if (data.planName) {
+          setPlanName(data.planName);
+        }
       });
   }, []);
 
@@ -327,7 +338,7 @@ export default function Calendar() {
 
   return (
     <div className="animate-fade-in">
-      <h1 style={{ marginBottom: '2rem' }}>{t('calendar.workout_calendar')}</h1>
+      <h1 style={{ marginBottom: '2rem' }}>{planName || t('calendar.workout_calendar')}</h1>
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',

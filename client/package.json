@@ -15,7 +15,10 @@
     "react-dom": "^19.0.0",
     "react-i18next": "^17.0.7",
     "react-player": "^3.4.0",
-    "react-router-dom": "^7.1.1"
+    "react-router-dom": "^7.1.1",
+    "react-markdown": "^8.0.5",
+    "remark-gfm": "^3.0.1",
+    "@heroicons/react": "^2.0.18"
   },
   "devDependencies": {
     "@types/react": "^19.0.2",

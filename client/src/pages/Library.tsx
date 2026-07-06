@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AlbumGrid from '../components/AlbumGrid';
+import VideoCard from '../components/VideoCard';
+import EquipmentPicker from '../components/EquipmentPicker';
+import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, prettyLabel } from '../lib/metadata';
 import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -17,7 +20,16 @@ export default function Library() {
   const [albums, setAlbums] = useState<any[]>([]);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'alpha' | 'alpha_desc'>('alpha');
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+  const [selectedTrainingType, setSelectedTrainingType] = useState<string>('');
+  const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
+  const [selectedIntensity, setSelectedIntensity] = useState<string>('');
   const navigate = useNavigate();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  const updateVideo = (updated: Video) => {
+    setVideos(prev => prev.map(v => (v.id === updated.id ? updated : v)));
+  };
 
   useEffect(() => {
     fetch('http://localhost:3000/api/library/videos')
@@ -30,6 +42,15 @@ export default function Library() {
     // Group by top-level folder (main folders)
     const map = new Map<string, Video[]>();
     for (const v of videos) {
+      // Apply combined filters (all active filters must match)
+      const veq = v.equipment || [];
+      if (selectedEquipment.length > 0 && !veq.some(id => selectedEquipment.includes(id))) continue;
+      if (selectedTrainingType && v.training_type !== selectedTrainingType) continue;
+      if (selectedIntensity && v.intensity !== selectedIntensity) continue;
+      if (selectedBodyParts.length > 0) {
+        const vparts = v.body_parts || [];
+        if (!vparts.some(bp => selectedBodyParts.includes(bp))) continue;
+      }
       const rel = v.relative_path || '';
       const top = rel.includes('/') ? rel.split('/')[0] : '.';
       const arr = map.get(top) || [];
@@ -46,7 +67,7 @@ export default function Library() {
     if (sort === 'alpha') result.sort((a, b) => naturalCompare(a.title, b.title));
     else result.sort((a, b) => naturalCompare(b.title, a.title));
     setAlbums(result);
-  }, [videos, sort]);
+  }, [videos, sort, selectedEquipment]);
 
   const visibleAlbums = albums.filter(a => a.title.toLowerCase().includes(query.trim().toLowerCase()));
 
@@ -72,18 +93,110 @@ export default function Library() {
           <input placeholder="Search folders..." value={query} onChange={(e) => setQuery(e.target.value)} style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%' }} />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '6px 10px', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 10h-6"/><path d="M3 6h6"/><path d="M3 14h6"/><path d="M21 18h-6"/></svg>
-          <select value={sort} onChange={(e) => setSort(e.target.value as any)} style={{ border: 'none', background: 'transparent', outline: 'none' }}>
-            <option value="alpha">Alphabetical A→Z</option>
-            <option value="alpha_desc">Alphabetical Z→A</option>
-          </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '6px 10px', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 10h-6"/><path d="M3 6h6"/><path d="M3 14h6"/><path d="M21 18h-6"/></svg>
+            <select value={sort} onChange={(e) => setSort(e.target.value as any)} style={{ border: 'none', background: 'transparent', outline: 'none' }}>
+              <option value="alpha">Alphabetical A→Z</option>
+              <option value="alpha_desc">Alphabetical Z→A</option>
+            </select>
+          </div>
         </div>
       </div>
 
       <div style={{ marginTop: '1rem' }}>
         <AlbumGrid albums={visibleAlbums} onOpen={openAlbum} onImageChange={setAlbumImage} />
       </div>
+
+      <div style={{ marginTop: '1.5rem', padding: '12px 0' }}>
+        <h3 style={{ margin: '0 0 10px' }}>Filter by equipment</h3>
+        <EquipmentPicker selected={selectedEquipment} onChange={setSelectedEquipment} />
+      </div>
+
+      <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '240px 1fr 180px', gap: 12, alignItems: 'center' }}>
+        <div>
+          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Training Type</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['HIIT','Cardio','Strength','Mobility','Yoga','Pilates'].map(t => {
+              const sel = selectedTrainingType === t;
+              return (
+                <button key={t} onClick={() => setSelectedTrainingType(sel ? '' : t)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={t}>
+                  <TrainingTypeIcon type={t} />
+                  <span style={{ fontSize: '0.9rem' }}>{t}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Body Parts (click to toggle)</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['full_body','upper_body','lower_body','core','back','legs','arms','shoulders'].map(bp => {
+              const sel = selectedBodyParts.includes(bp);
+              return (
+                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(bp)}>
+                  <BodyPartIcon part={bp} />
+                  <span style={{ fontSize: '0.9rem' }}>{prettyLabel(bp)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Intensity</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['low','medium','high'].map(level => {
+              const sel = selectedIntensity === level;
+              return (
+                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(level)}>
+                  <IntensityIcon level={level} />
+                  <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{level}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {(selectedEquipment.length > 0 || selectedTrainingType || selectedBodyParts.length > 0 || selectedIntensity) && (
+        <div style={{ marginTop: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ margin: 0 }}>Matching Videos</h3>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setViewMode('grid')} title="Grid" style={{ padding: 8, borderRadius: 8, border: '1px solid var(--glass-border)', background: viewMode === 'grid' ? 'var(--accent-color)' : 'transparent', color: viewMode === 'grid' ? 'white' : 'var(--text-primary)' }}>▦</button>
+              <button onClick={() => setViewMode('list')} title="List" style={{ padding: 8, borderRadius: 8, border: '1px solid var(--glass-border)', background: viewMode === 'list' ? 'var(--accent-color)' : 'transparent', color: viewMode === 'list' ? 'white' : 'var(--text-primary)' }}>☰</button>
+            </div>
+          </div>
+
+          {(() => {
+            const matching = videos.filter(v => {
+              const veq = v.equipment || [];
+              if (selectedEquipment.length > 0 && !veq.some(id => selectedEquipment.includes(id))) return false;
+              if (selectedTrainingType && v.training_type !== selectedTrainingType) return false;
+              if (selectedIntensity && v.intensity !== selectedIntensity) return false;
+              if (selectedBodyParts.length > 0) {
+                const vparts = v.body_parts || [];
+                if (!vparts.some(bp => selectedBodyParts.includes(bp))) return false;
+              }
+              return true;
+            });
+
+            if (matching.length === 0) return <p style={{ color: 'var(--text-secondary)' }}>No videos match the selected equipment.</p>;
+
+            return viewMode === 'grid' ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 320px))', gap: 20 }}>
+                {matching.map(v => <VideoCard key={v.id} video={v} viewMode="grid" onUpdate={updateVideo} />)}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {matching.map(v => <VideoCard key={v.id} video={v} viewMode="list" onUpdate={updateVideo} />)}
+              </div>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }

@@ -23,6 +23,10 @@ export const VALID_EQUIPMENT = [
   'kettlebell',
 ] as const;
 
+export const VALID_TRAINING_TYPES = ['HIIT', 'Cardio', 'Strength', 'Mobility', 'Yoga', 'Pilates'] as const;
+export const VALID_BODY_PARTS = ['full_body', 'upper_body', 'lower_body', 'core', 'back', 'legs', 'arms', 'shoulders'] as const;
+export const VALID_INTENSITIES = ['low', 'medium', 'high'] as const;
+
 function parseEquipment(raw: string | null | undefined): string[] {
   if (!raw) return [];
   try {
@@ -36,6 +40,17 @@ function parseEquipment(raw: string | null | undefined): string[] {
   }
 }
 
+function parseBodyParts(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === 'string' && VALID_BODY_PARTS.includes(item as typeof VALID_BODY_PARTS[number]));
+  } catch {
+    return [];
+  }
+}
+
 function formatVideoRow(row: {
   id: string;
   filename: string;
@@ -43,6 +58,9 @@ function formatVideoRow(row: {
   thumbnail_path?: string | null;
   description?: string | null;
   equipment?: string | null;
+  training_type?: string | null;
+  body_parts?: string | null;
+  intensity?: string | null;
 }) {
   return {
     id: row.id,
@@ -51,6 +69,9 @@ function formatVideoRow(row: {
     thumbnail_path: row.thumbnail_path,
     description: row.description || '',
     equipment: parseEquipment(row.equipment),
+    training_type: row.training_type || '',
+    body_parts: parseBodyParts(row.body_parts),
+    intensity: row.intensity || '',
   };
 }
 
@@ -170,14 +191,14 @@ export default async function (fastify: FastifyInstance) {
 
   fastify.get('/videos', async (request, reply) => {
     const videos = db.prepare(
-      'SELECT id, filename, relative_path, thumbnail_path, description, equipment FROM videos'
+      'SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity FROM videos'
     ).all() as any[];
     return reply.send(videos.map(formatVideoRow));
   });
 
   fastify.patch('/videos/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as { description?: string; equipment?: string[] };
+    const body = request.body as { description?: string; equipment?: string[]; training_type?: string; body_parts?: string[]; intensity?: string };
 
     const existing = db.prepare('SELECT id FROM videos WHERE id = ?').get(id);
     if (!existing) {
@@ -191,11 +212,19 @@ export default async function (fastify: FastifyInstance) {
         )
       : [];
 
-    db.prepare('UPDATE videos SET description = ?, equipment = ? WHERE id = ?')
-      .run(description, JSON.stringify(equipment), id);
+    const training_type = typeof body.training_type === 'string' && (VALID_TRAINING_TYPES as readonly string[]).includes(body.training_type) ? body.training_type : '';
+
+    const body_parts = Array.isArray(body.body_parts)
+      ? body.body_parts.filter((item): item is string => typeof item === 'string' && (VALID_BODY_PARTS as readonly string[]).includes(item))
+      : [];
+
+    const intensity = typeof body.intensity === 'string' && (VALID_INTENSITIES as readonly string[]).includes(body.intensity) ? body.intensity : '';
+
+    db.prepare('UPDATE videos SET description = ?, equipment = ?, training_type = ?, body_parts = ?, intensity = ? WHERE id = ?')
+      .run(description, JSON.stringify(equipment), training_type, JSON.stringify(body_parts), intensity, id);
 
     const updated = db.prepare(
-      'SELECT id, filename, relative_path, thumbnail_path, description, equipment FROM videos WHERE id = ?'
+      'SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity FROM videos WHERE id = ?'
     ).get(id) as any;
 
     return reply.send(formatVideoRow(updated));
