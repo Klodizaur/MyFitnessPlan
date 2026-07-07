@@ -465,7 +465,10 @@ export default function Plans() {
               {bgUrl ? (
                 <div className={`plan-card-bg${plan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
               ) : (
-                <div className="plan-card-bg no-image" />
+                <>
+                  <div className="plan-card-bg no-image" />
+                  <div className="plan-card-logo" />
+                </>
               )}
               <div className="plan-card-overlay" />
 
