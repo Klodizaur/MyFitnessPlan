@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useParams, useNavigate } from 'react-router-dom';
-import { EquipmentIcon, getEquipmentItem } from '../lib/equipment';
-import { TrainingTypeIcon, BodyPartIcon, IntensityIcon, prettyLabel } from '../lib/metadata';
+import { EquipmentIcon } from '../lib/equipment';
+import { TrainingTypeIcon, BodyPartIcon, IntensityIcon } from '../lib/metadata';
+import { useMetaLabels } from '../lib/labels';
 
 export default function Player() {
   const { videoId, workoutId } = useParams();
@@ -13,7 +14,7 @@ export default function Player() {
   const [videoPath, setVideoPath] = useState('');
   const [description, setDescription] = useState('');
   const [equipment, setEquipment] = useState<string[]>([]);
-  const [trainingType, setTrainingType] = useState<string>('');
+  const [trainingType, setTrainingType] = useState<string[]>([]);
   const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [intensity, setIntensity] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +23,7 @@ export default function Player() {
   const [showMarkDone, setShowMarkDone] = useState(false);
   const [nextVideoId, setNextVideoId] = useState<string | null>(null);
   const [prevVideoId, setPrevVideoId] = useState<string | null>(null);
+  const labels = useMetaLabels();
 
   useEffect(() => {
     fetch('http://localhost:3000/api/library/videos')
@@ -33,7 +35,7 @@ export default function Player() {
           setVideoPath(vid.relative_path);
           setDescription(vid.description || '');
           setEquipment(vid.equipment || []);
-          setTrainingType(vid.training_type || '');
+          setTrainingType(vid.training_type || []);
           setBodyParts(vid.body_parts || []);
           setIntensity(vid.intensity || '');
         } else {
@@ -134,7 +136,7 @@ export default function Player() {
   }
 
   const videoUrl = `http://localhost:3000/videos/${videoPath.split('/').map(encodeURIComponent).join('/')}`;
-  const hasMeta = Boolean(description.trim()) || equipment.length > 0;
+  const hasMeta = Boolean(description.trim()) || equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity);
 
   return (
     <div className="player-wrap">
@@ -232,70 +234,78 @@ export default function Player() {
       </div>
 
       {hasMeta && (
-        <div className="glass-card player-details">
-          {description.trim() && (
-            <div className="player-details-text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown></div>
-              )}
-          
-            {(trainingType || (bodyParts && bodyParts.length) || intensity) && (
-              <div style={{ marginTop: 10 }}>
-                {/* Equipment */}
-                {equipment && equipment.length > 0 && (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Equipment</div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {Array.from(new Set(equipment)).map(id => (
-                        <div key={id} className="player-meta-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem' }} title={getEquipmentItem(id)?.label}>
-                          <EquipmentIcon id={id} size={16} />
-                          <span style={{ color: 'var(--text-primary)' }}>{getEquipmentItem(id)?.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Training type */}
-                {trainingType && (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Training Type</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem', fontWeight: 700 }}>
-                        <TrainingTypeIcon type={trainingType} />
-                        <span>{trainingType}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Body parts */}
-                {bodyParts && bodyParts.length > 0 && (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Body Parts</div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {Array.from(new Set(bodyParts)).map(bp => (
-                        <div key={bp} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem' }} title={prettyLabel(bp)}>
-                          <BodyPartIcon part={bp} />
-                          <span>{prettyLabel(bp)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Intensity */}
-                {intensity && (
-                  <div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Intensity</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: '0.9rem', color: 'var(--accent-color)', fontWeight: 700 }}>
-                        <IntensityIcon level={intensity} />
-                        <span style={{ textTransform: 'capitalize' }}>{intensity}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+        <div className="glass-card player-details player-details-grid">
+          {/* Left column: description (~70%) */}
+          <div className="player-details-text">
+            {description.trim() ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
+            ) : (
+              <span style={{ color: 'var(--text-secondary)' }}>{labels.noDescription}</span>
             )}
+          </div>
+
+          {/* Right column: tags (~30%) */}
+          {(equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity)) && (
+            <div className="player-details-tags" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Equipment */}
+              {equipment.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: 6 }}>{labels.sections.equipment}</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {Array.from(new Set(equipment)).map(id => (
+                      <div key={id} className="player-meta-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem' }} title={labels.equipment(id)}>
+                        <EquipmentIcon id={id} size={16} />
+                        <span style={{ color: 'var(--text-primary)' }}>{labels.equipment(id)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Training type */}
+              {trainingType.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: 6 }}>{labels.sections.trainingType}</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {Array.from(new Set(trainingType)).map(tt => (
+                      <div key={tt} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem', fontWeight: 700 }}>
+                        <TrainingTypeIcon type={tt} />
+                        <span>{labels.trainingType(tt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Body parts */}
+              {bodyParts.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: 6 }}>{labels.sections.bodyParts}</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {Array.from(new Set(bodyParts)).map(bp => (
+                      <div key={bp} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem' }} title={labels.bodyPart(bp)}>
+                        <BodyPartIcon part={bp} />
+                        <span>{labels.bodyPart(bp)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Intensity */}
+              {intensity && (
+                <div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: 6 }}>{labels.sections.intensity}</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: '0.9rem', color: 'var(--accent-color)', fontWeight: 700 }}>
+                      <IntensityIcon level={intensity} />
+                      <span style={{ textTransform: 'capitalize' }}>{labels.intensity(intensity)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

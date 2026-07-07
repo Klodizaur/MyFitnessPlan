@@ -59,6 +59,22 @@ fastify.get('/thumbnails/:filename', async (request, reply) => {
   return reply.sendFile(filename, path.join(process.cwd(), 'data', 'thumbnails'));
 });
 
+// Serve custom plan background images
+const planBackgroundsDir = path.join(process.cwd(), 'data', 'plan-backgrounds');
+if (!fs.existsSync(planBackgroundsDir)) {
+  fs.mkdirSync(planBackgroundsDir, { recursive: true });
+}
+fastify.get('/plan-backgrounds/:filename', async (request, reply) => {
+  const { filename } = request.params as { filename: string };
+  const imgPath = path.join(planBackgroundsDir, filename);
+
+  if (!fs.existsSync(imgPath)) {
+    return reply.code(404).send({ error: 'Image not found' });
+  }
+
+  return reply.sendFile(filename, planBackgroundsDir);
+});
+
 // Register routes
 fastify.register(libraryRoutes, { prefix: '/api/library' });
 fastify.register(planRoutes, { prefix: '/api/plan' });

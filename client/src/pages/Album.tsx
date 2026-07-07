@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import VideoCard from '../components/VideoCard';
 import EquipmentPicker from '../components/EquipmentPicker';
-import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, prettyLabel } from '../lib/metadata';
+import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
+import { matchesTags, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
+import { useMetaLabels } from '../lib/labels';
 import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -16,11 +18,13 @@ export default function Album() {
   const [sortMode, setSortMode] = useState<'alpha' | 'alpha_desc'>('alpha');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
-  const [selectedTrainingType, setSelectedTrainingType] = useState<string>('');
+  const [selectedTrainingType, setSelectedTrainingType] = useState<string[]>([]);
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
   const [selectedIntensity, setSelectedIntensity] = useState<string>('');
   const navigate = useNavigate();
   const location = useLocation();
+  const [matchMode, setMatchMode] = useFilterMatchMode();
+  const labels = useMetaLabels();
 
   useEffect(() => {
     setAlbumKey(albumId ? decodeURIComponent(albumId) : '');
@@ -65,16 +69,10 @@ export default function Album() {
   // Videos to display (apply all active filters)
   const filtered = mainVideos.filter(v => {
     if (q.trim() && !v.filename.toLowerCase().includes(q.trim().toLowerCase())) return false;
-    if (selectedEquipment.length > 0) {
-      const veq = v.equipment || [];
-      if (!veq.some(id => selectedEquipment.includes(id))) return false;
-    }
-    if (selectedTrainingType && v.training_type !== selectedTrainingType) return false;
+    if (!matchesTags(v.equipment, selectedEquipment, matchMode)) return false;
+    if (!matchesTags(v.training_type, selectedTrainingType, matchMode)) return false;
     if (selectedIntensity && v.intensity !== selectedIntensity) return false;
-    if (selectedBodyParts.length > 0) {
-      const vparts = v.body_parts || [];
-      if (!vparts.some(bp => selectedBodyParts.includes(bp))) return false;
-    }
+    if (!matchesTags(v.body_parts, selectedBodyParts, matchMode)) return false;
     return true;
   });
   const shown = filtered.slice();
@@ -171,7 +169,10 @@ export default function Album() {
 
       {/* Equipment filter section */}
       <div style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ margin: '0 0 10px' }}>Filter by equipment</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+          <h3 style={{ margin: 0 }}>Filter by equipment</h3>
+          <FilterMatchToggle mode={matchMode} onChange={setMatchMode} />
+        </div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <EquipmentPicker selected={selectedEquipment} onChange={setSelectedEquipment} />
         </div>
@@ -181,12 +182,12 @@ export default function Album() {
         <div>
           <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Training Type</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['HIIT','Cardio','Strength','Mobility','Yoga','Pilates'].map(t => {
-              const sel = selectedTrainingType === t;
+            {TRAINING_TYPES.map(t => {
+              const sel = selectedTrainingType.includes(t);
               return (
-                <button key={t} onClick={() => setSelectedTrainingType(sel ? '' : t)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={t}>
+                <button key={t} onClick={() => setSelectedTrainingType(sel ? selectedTrainingType.filter(x => x !== t) : [...selectedTrainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
                   <TrainingTypeIcon type={t} />
-                  <span style={{ fontSize: '0.9rem' }}>{t}</span>
+                  <span style={{ fontSize: '0.9rem' }}>{labels.trainingType(t)}</span>
                 </button>
               );
             })}
@@ -196,12 +197,12 @@ export default function Album() {
         <div>
           <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Body Parts (click to toggle)</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['full_body','upper_body','lower_body','core','back','legs','arms','shoulders'].map(bp => {
+            {BODY_PARTS.map(bp => {
               const sel = selectedBodyParts.includes(bp);
               return (
-                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(bp)}>
+                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
                   <BodyPartIcon part={bp} />
-                  <span style={{ fontSize: '0.9rem' }}>{prettyLabel(bp)}</span>
+                  <span style={{ fontSize: '0.9rem' }}>{labels.bodyPart(bp)}</span>
                 </button>
               );
             })}
@@ -214,9 +215,9 @@ export default function Album() {
             {['low','medium','high'].map(level => {
               const sel = selectedIntensity === level;
               return (
-                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(level)}>
+                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
                   <IntensityIcon level={level} />
-                  <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{level}</span>
+                  <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{labels.intensity(level)}</span>
                 </button>
               );
             })}

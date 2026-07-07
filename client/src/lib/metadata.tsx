@@ -1,8 +1,36 @@
 import React from 'react';
-import { BoltIcon, HeartIcon, FireIcon, SparklesIcon, ArrowsRightLeftIcon, UserIcon } from '@heroicons/react/24/outline';
+import {
+  BoltIcon,
+  HeartIcon,
+  FireIcon,
+  SparklesIcon,
+  ArrowsRightLeftIcon,
+  UserIcon,
+  TrophyIcon,
+  SunIcon,
+  MoonIcon,
+  ArrowsPointingOutIcon,
+  ArrowUpIcon,
+  NoSymbolIcon,
+  ShieldCheckIcon,
+} from '@heroicons/react/24/outline';
 
-export const TRAINING_TYPES = ['HIIT','Cardio','Strength','Mobility','Yoga','Pilates'] as const;
-export const BODY_PARTS = ['full_body','upper_body','lower_body','core','back','legs','arms','shoulders'] as const;
+export const TRAINING_TYPES = [
+  'HIIT',
+  'Cardio',
+  'Strength',
+  'Mobility',
+  'Yoga',
+  'Pilates',
+  'Functional Strength Training',
+  'Warmup',
+  'Cooldown',
+  'Stretching',
+  'Standing',
+  'No Jumping',
+  'Period-Friendly',
+] as const;
+export const BODY_PARTS = ['full_body','upper_body','lower_body','core','back','legs','arms','shoulders','glutes','chest'] as const;
 export const INTENSITIES = ['low','medium','high'] as const;
 
 export function TrainingTypeIcon({ type }: { type: string }) {
@@ -19,6 +47,20 @@ export function TrainingTypeIcon({ type }: { type: string }) {
       return <UserIcon style={{ width: 18, height: 18 }} />;
     case 'Pilates':
       return <FireIcon style={{ width: 18, height: 18 }} />;
+    case 'Functional Strength Training':
+      return <TrophyIcon style={{ width: 18, height: 18 }} />;
+    case 'Warmup':
+      return <SunIcon style={{ width: 18, height: 18 }} />;
+    case 'Cooldown':
+      return <MoonIcon style={{ width: 18, height: 18 }} />;
+    case 'Stretching':
+      return <ArrowsPointingOutIcon style={{ width: 18, height: 18 }} />;
+    case 'Standing':
+      return <ArrowUpIcon style={{ width: 18, height: 18 }} />;
+    case 'No Jumping':
+      return <NoSymbolIcon style={{ width: 18, height: 18 }} />;
+    case 'Period-Friendly':
+      return <ShieldCheckIcon style={{ width: 18, height: 18 }} />;
     default:
       return null;
   }

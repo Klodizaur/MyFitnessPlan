@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import EquipmentPicker from '../components/EquipmentPicker';
-import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, BODY_PARTS, INTENSITIES, TRAINING_TYPES, prettyLabel } from '../lib/metadata';
+import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, BODY_PARTS, INTENSITIES, TRAINING_TYPES } from '../lib/metadata';
+import { matchesTags, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
+import { useMetaLabels } from '../lib/labels';
 import { Video } from '../types/video';
 
 interface Plan {
@@ -10,7 +13,15 @@ interface Plan {
   uploaded_at: string;
   is_active: number;
   start_date: string;
+  background_image?: string | null;
 }
+
+const API_BASE = 'http://localhost:3000';
+
+const resolveBackgroundUrl = (backgroundImage?: string | null) => {
+  if (!backgroundImage) return null;
+  return backgroundImage.startsWith('http') ? backgroundImage : `${API_BASE}${backgroundImage}`;
+};
 
 interface BuilderDay {
   name: string;
@@ -34,8 +45,8 @@ const createInitialBuilderWeeks = () => [createWeek(1)];
 
 export default function Plans() {
   const { t, i18n } = useTranslation();
+  const labels = useMetaLabels();
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState('');
   const [activationDate, setActivationDate] = useState(new Date().toISOString().split('T')[0]);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
@@ -49,13 +60,21 @@ export default function Plans() {
   const [allVideos, setAllVideos] = useState<Video[]>([]);
   const [videoSearch, setVideoSearch] = useState('');
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
-  const [selectedTrainingType, setSelectedTrainingType] = useState<string>('');
+  const [selectedTrainingType, setSelectedTrainingType] = useState<string[]>([]);
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
   const [selectedIntensity, setSelectedIntensity] = useState<string>('');
+  const [matchMode, setMatchMode] = useFilterMatchMode();
   const [showBuilderFilters, setShowBuilderFilters] = useState(false);
   const [videoViewMode, setVideoViewMode] = useState<'grid' | 'list'>('grid');
   const [builderStatus, setBuilderStatus] = useState('');
   const [builderLoading, setBuilderLoading] = useState(false);
+
+  // Background image picker state (scoped per-plan)
+  const [bgPickerPlanId, setBgPickerPlanId] = useState<string | null>(null);
+  const [bgPickerTab, setBgPickerTab] = useState<'thumbnail' | 'upload'>('thumbnail');
+  const [bgUploading, setBgUploading] = useState(false);
+  const [bgPickerVideos, setBgPickerVideos] = useState<Video[]>([]);
+  const [bgPickerLoading, setBgPickerLoading] = useState(false);
 
   const fetchPlans = async () => {
     const res = await fetch('http://localhost:3000/api/plan');
@@ -67,12 +86,11 @@ export default function Plans() {
     fetchPlans();
   }, []);
 
-  const handleFileUpload = async () => {
-    if (!file) return;
+  const handleFileUpload = async (selectedFile: File) => {
     setStatus(t('plans.uploading_status'));
     const formData = new FormData();
-    formData.append('file', file);
-    
+    formData.append('file', selectedFile);
+
     const res = await fetch('http://localhost:3000/api/plan/upload', {
       method: 'POST',
       body: formData
@@ -83,7 +101,6 @@ export default function Plans() {
     } else {
       setStatus(t('plans.uploaded_status', { count: data.workoutCount }));
       fetchPlans();
-      setFile(null);
     }
   };
 
@@ -299,10 +316,10 @@ export default function Plans() {
     const matchesText = !query || [video.filename, video.relative_path, video.description || '']
       .some(field => field?.toLowerCase().includes(query));
 
-    const matchesEquipment = selectedEquipment.length === 0 || (video.equipment || []).some(id => selectedEquipment.includes(id));
-    const matchesTrainingType = !selectedTrainingType || video.training_type === selectedTrainingType;
+    const matchesEquipment = matchesTags(video.equipment, selectedEquipment, matchMode);
+    const matchesTrainingType = matchesTags(video.training_type, selectedTrainingType, matchMode);
     const matchesIntensity = !selectedIntensity || video.intensity === selectedIntensity;
-    const matchesBodyParts = selectedBodyParts.length === 0 || (video.body_parts || []).some(part => selectedBodyParts.includes(part));
+    const matchesBodyParts = matchesTags(video.body_parts, selectedBodyParts, matchMode);
 
     return matchesText && matchesEquipment && matchesTrainingType && matchesIntensity && matchesBodyParts;
   });
@@ -310,21 +327,114 @@ export default function Plans() {
   const currentWeek = builderWeeks[builderCurrentWeek];
   const currentDay = currentWeek?.days[builderCurrentDay] || currentWeek?.days[0];
 
+  // Opens the background picker for a specific plan, loading only the
+  // videos that actually appear somewhere within that plan's workouts.
+  const openBackgroundPicker = async (planId: string) => {
+    setBgPickerPlanId(planId);
+    setBgPickerTab('thumbnail');
+    setBgPickerLoading(true);
+    setBgPickerVideos([]);
+    try {
+      const res = await fetch(`http://localhost:3000/api/plan/${planId}`);
+      const planData = await res.json();
+
+      const idSet = new Set<string>();
+      (planData.workouts || []).forEach((workout: any) => {
+        try {
+          const ids = JSON.parse(workout.video_ids || '[]');
+          ids.forEach((id: string) => idSet.add(id));
+        } catch (e) {
+          // ignore malformed video_ids
+        }
+      });
+
+      const vRes = await fetch('http://localhost:3000/api/library/videos');
+      const videoList: Video[] = await vRes.json();
+
+      setBgPickerVideos((videoList || []).filter(v => idSet.has(v.id) && v.thumbnail_path));
+    } catch (error) {
+      console.error('Error loading plan videos for background picker:', error);
+      setBgPickerVideos([]);
+    }
+    setBgPickerLoading(false);
+  };
+
+  const closeBackgroundPicker = () => {
+    setBgPickerPlanId(null);
+    setBgPickerVideos([]);
+  };
+
+  const handleSelectThumbnailBackground = async (planId: string, thumbnailPath: string) => {
+    const res = await fetch(`http://localhost:3000/api/plan/${planId}/background`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thumbnailPath })
+    });
+    const data = await res.json();
+    if (data.success) {
+      setPlans(prev => prev.map(p => p.id === planId ? { ...p, background_image: data.backgroundImage } : p));
+      closeBackgroundPicker();
+    }
+  };
+
+  const handleUploadBackground = async (planId: string, imageFile: File) => {
+    setBgUploading(true);
+    const formData = new FormData();
+    formData.append('file', imageFile);
+    const res = await fetch(`http://localhost:3000/api/plan/${planId}/background`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    setBgUploading(false);
+    if (data.success) {
+      setPlans(prev => prev.map(p => p.id === planId ? { ...p, background_image: data.backgroundImage } : p));
+      closeBackgroundPicker();
+    }
+  };
+
+  const handleClearBackground = async (planId: string) => {
+    const res = await fetch(`http://localhost:3000/api/plan/${planId}/background`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (data.success) {
+      setPlans(prev => prev.map(p => p.id === planId ? { ...p, background_image: null } : p));
+    }
+  };
+
+  const bgPickerPlan = plans.find(p => p.id === bgPickerPlanId);
+  const bgPickerCurrentUrl = resolveBackgroundUrl(bgPickerPlan?.background_image);
+
   return (
     <div className="plans-container">
-      <div className="glass-card" style={{ padding: '2rem', marginBottom: '2rem' }}>
-        <h1>{t('plans.manage_plans')}</h1>
-        <p>{t('plans.upload_msg')}</p>
-        
-        <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input 
-            type="file" 
-            accept=".csv, .tsv"
-            onChange={e => setFile(e.target.files?.[0] || null)}
-            style={{ color: 'white' }}
-          />
-          <button className="btn" onClick={handleFileUpload} disabled={!file}>{t('plans.upload_btn')}</button>
-          <button className="btn" style={{ background: '#2d72ff', color: 'white' }} onClick={() => setIsBuilderOpen(true)}>{t('plans.build_btn')}</button>
+      <div className="glass-card plans-hero" style={{ marginBottom: '2rem' }}>
+        <div className="plans-hero-top">
+          <div className="plans-hero-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+          </div>
+          <div>
+            <h1 style={{ marginBottom: '0.35rem' }}>{t('plans.manage_plans')}</h1>
+            <p style={{ margin: 0 }}>{t('plans.upload_msg')}</p>
+          </div>
+        </div>
+
+        <div className="plans-upload-row">
+          <label className="file-picker">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>{t('plans.upload_btn')}</span>
+            <input
+              type="file"
+              accept=".csv, .tsv"
+              onChange={e => {
+                const selected = e.target.files?.[0];
+                if (selected) handleFileUpload(selected);
+                e.target.value = '';
+              }}
+              style={{ display: 'none' }}
+            />
+          </label>
+          <button className="btn btn-secondary" onClick={() => setIsBuilderOpen(true)}>{t('plans.build_btn')}</button>
         </div>
       </div>
 
@@ -334,63 +444,64 @@ export default function Plans() {
         </div>
       )}
 
-      <div className="plans-grid" style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
-        {plans.map(plan => (
-          <div key={plan.id} className={`glass-card plan-card ${plan.is_active ? 'active' : ''}`} style={{ 
-            padding: '1.5rem', 
-            position: 'relative',
-            border: plan.is_active ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)'
-          }}>
-            {plan.is_active === 1 && (
-              <span style={{ 
-                position: 'absolute', 
-                top: '-10px', 
-                right: '20px', 
-                background: 'var(--accent-color)', 
-                color: 'black', 
-                padding: '2px 10px', 
-                borderRadius: '10px',
-                fontSize: '0.8rem',
-                fontWeight: 'bold'
-              }}>{t('plans.active')}</span>
-            )}
-            <h3 style={{ margin: '0 0 0.5rem 0' }}>{plan.name}</h3>
-            <p style={{ fontSize: '0.9rem', color: '#ccc', marginBottom: '1rem' }}>
-              {t('plans.uploaded_on', { date: new Date(plan.uploaded_at).toLocaleDateString(i18n.language) })}
-            </p>
-            
-            {plan.is_active === 1 ? (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <p style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{t('plans.start_date')}: {plan.start_date}</p>
-              </div>
-            ) : (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem' }}>{t('plans.set_start_date')}</label>
-                <input 
-                  type="date" 
-                  value={activationDate}
-                  onChange={e => setActivationDate(e.target.value)}
-                  style={{ 
-                    width: '100%', 
-                    padding: '8px', 
-                    borderRadius: '4px', 
-                    background: 'var(--bg-color)', 
-                    color: 'white', 
-                    border: '1px solid var(--glass-border)' 
-                  }}
-                />
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn" style={{ flex: 1 }} onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
-              {!plan.is_active && (
-                <button className="btn" style={{ flex: 1 }} onClick={() => handleActivate(plan.id)}>{t('plans.activate')}</button>
+      <div className="plans-grid">
+        {plans.map(plan => {
+          const bgUrl = resolveBackgroundUrl(plan.background_image);
+          return (
+            <div key={plan.id} className={`glass-card plan-card ${plan.is_active ? 'active' : ''}`}>
+              {bgUrl ? (
+                <div className="plan-card-bg" style={{ backgroundImage: `url(${bgUrl})` }} />
+              ) : (
+                <div className="plan-card-bg no-image" />
               )}
-              <button className="btn btn-danger" style={{ background: 'rgba(255, 68, 68, 0.2)', color: '#ff4444' }} onClick={() => handleDelete(plan.id)}>{t('plans.delete')}</button>
+              <div className="plan-card-overlay" />
+
+              {plan.is_active === 1 && (
+                <span className="plan-card-badge">{t('plans.active')}</span>
+              )}
+
+              <button
+                type="button"
+                className="plan-card-bg-btn"
+                title={t('plans.set_background') || 'Set background image'}
+                onClick={() => openBackgroundPicker(plan.id)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </button>
+
+              <div className="plan-card-body">
+                <h3 className="plan-card-title">{plan.name}</h3>
+                <p className="plan-card-meta">
+                  {t('plans.uploaded_on', { date: new Date(plan.uploaded_at).toLocaleDateString(i18n.language) })}
+                </p>
+
+                {plan.is_active === 1 ? (
+                  <div className="plan-card-datefield">
+                    <label>{t('plans.start_date')}</label>
+                    <span className="plan-card-static-date">{plan.start_date}</span>
+                  </div>
+                ) : (
+                  <div className="plan-card-datefield">
+                    <label>{t('plans.set_start_date')}</label>
+                    <input
+                      type="date"
+                      value={activationDate}
+                      onChange={e => setActivationDate(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="plan-card-actions">
+                  <button className="btn btn-ghost" onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
+                  {!plan.is_active && (
+                    <button className="btn btn-ghost" onClick={() => handleActivate(plan.id)}>{t('plans.activate')}</button>
+                  )}
+                  <button className="btn btn-danger-ghost" onClick={() => handleDelete(plan.id)}>{t('plans.delete')}</button>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {plans.length === 0 && (
@@ -399,67 +510,121 @@ export default function Plans() {
         </div>
       )}
 
-      {isBuilderOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.55)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
-          zIndex: 1000,
-          padding: '3rem 1.5rem 1.5rem',
-          overflowY: 'auto'
-        }}>
-          <div style={{
-            width: '100%',
-            maxWidth: 960,
-            maxHeight: '95vh',
-            overflowY: 'auto',
-            background: 'rgba(12, 14, 25, 0.96)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 24,
-            padding: '2rem',
-            boxShadow: '0 40px 120px rgba(0,0,0,0.55)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 24 }}>
-              <div>
-                <h2 style={{ margin: 0 }}>{editingPlanId ? 'Edit Plan' : t('plans.builder_title')}</h2>
-                <p style={{ color: 'var(--text-secondary)', marginTop: 8 }}>{t('plans.builder_intro')}</p>
-                <p style={{ color: 'var(--text-secondary)', marginTop: 8, fontSize: '0.95rem' }}>{t('plans.builder_note')}</p>
+      {bgPickerPlanId && createPortal(
+        <div className="bg-picker-overlay" onClick={closeBackgroundPicker}>
+          <div className="bg-picker-panel" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0 }}>{t('plans.set_background') || 'Set background image'}</h3>
+              <button className="btn" style={{ background: 'transparent', border: '1px solid var(--glass-border)', padding: '6px 12px' }} onClick={closeBackgroundPicker}>✕</button>
+            </div>
+
+            <div className="bg-picker-tabs">
+              <button className={`btn ${bgPickerTab === 'thumbnail' ? '' : 'btn-secondary'}`} onClick={() => setBgPickerTab('thumbnail')}>{t('plans.choose_from_library') || 'Choose from this plan'}</button>
+              <button className={`btn ${bgPickerTab === 'upload' ? '' : 'btn-secondary'}`} onClick={() => setBgPickerTab('upload')}>{t('plans.upload_image') || 'Upload image'}</button>
+            </div>
+
+            {bgPickerCurrentUrl && (
+              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '0.85rem' }} onClick={() => bgPickerPlanId && handleClearBackground(bgPickerPlanId)}>
+                  {t('plans.remove_background') || 'Remove background image'}
+                </button>
               </div>
-              <button className="btn" style={{ background: 'transparent', border: '1px solid var(--glass-border)', color: 'white' }} onClick={closeBuilder}>✕</button>
+            )}
+
+            {bgPickerTab === 'thumbnail' ? (
+              bgPickerLoading ? (
+                <p style={{ color: 'var(--text-secondary)' }}>{t('plans.builder_saving')}</p>
+              ) : bgPickerVideos.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)' }}>{t('plans.builder_no_videos')}</p>
+              ) : (
+                <div className="bg-picker-thumb-grid">
+                  {bgPickerVideos.map(video => (
+                    <div
+                      key={video.id}
+                      className="bg-picker-thumb"
+                      title={video.filename}
+                      onClick={() => bgPickerPlanId && handleSelectThumbnailBackground(bgPickerPlanId, video.thumbnail_path as string)}
+                    >
+                      <img src={`http://localhost:3000/thumbnails/${video.thumbnail_path}`} alt={video.filename} />
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+                <label className="file-picker" style={{ justifyContent: 'center' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span>{bgUploading ? t('plans.builder_saving') : (t('plans.upload_image') || 'Upload image')}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    disabled={bgUploading}
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f && bgPickerPlanId) handleUploadBackground(bgPickerPlanId, f);
+                    }}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isBuilderOpen && createPortal(
+        <div className="wb-overlay">
+          <div className="wb-modal">
+            <div className="wb-header">
+              <div>
+                <h2 className="wb-title">{editingPlanId ? 'Edit Plan' : t('plans.builder_title')}</h2>
+                <p className="wb-subtitle">{t('plans.builder_intro')}</p>
+                <p className="wb-subtitle wb-subtitle-sm">{t('plans.builder_note')}</p>
+              </div>
+              <button className="wb-close" onClick={closeBuilder}>✕</button>
             </div>
 
             {builderStep === 1 ? (
-              <div style={{ display: 'grid', gap: 18 }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 700 }}>{t('plans.builder_plan_name')}</label>
-                  <input value={planName} onChange={e => setPlanName(e.target.value)} placeholder={t('plans.builder_plan_name')} style={{ width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--glass-border)', background: 'var(--bg-color)', color: 'white' }} />
+              <div className="wb-form">
+                <div className="wb-field">
+                  <label className="wb-label">{t('plans.builder_plan_name')}</label>
+                  <input className="wb-input" value={planName} onChange={e => setPlanName(e.target.value)} placeholder={t('plans.builder_plan_name')} />
                 </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 700 }}>{t('plans.builder_start_date')}</label>
-                  <input type="date" value={builderStartDate} onChange={e => setBuilderStartDate(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 12, border: '1px solid var(--glass-border)', background: 'var(--bg-color)', color: 'white' }} />
+                <div className="wb-field">
+                  <label className="wb-label">{t('plans.builder_start_date')}</label>
+                  <input className="wb-input" type="date" value={builderStartDate} onChange={e => setBuilderStartDate(e.target.value)} />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                  <button className="btn" style={{ background: 'rgba(255,255,255,0.08)' }} onClick={closeBuilder}>{t('plans.builder_cancel')}</button>
-                  <button className="btn" onClick={() => setBuilderStep(2)}>{t('plans.builder_next')}</button>
+                <div className="wb-actions">
+                  <button className="wb-btn wb-btn-ghost" onClick={closeBuilder}>{t('plans.builder_cancel')}</button>
+                  <button className="wb-btn wb-btn-primary" onClick={() => setBuilderStep(2)}>{t('plans.builder_next')}</button>
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: 18 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#aaa' }}>{t('plans.builder_step', { current: 2, total: 2 })}</p>
-                    <h3 style={{ margin: '8px 0 0' }}>{`${currentWeek.name} - ${currentDay.name}`}</h3>
+              <div className="wb-form">
+                {editingPlanId && (
+                  <div className="wb-field">
+                    <label className="wb-label">{t('plans.builder_plan_name')}</label>
+                    <input
+                      className="wb-input"
+                      value={planName}
+                      onChange={e => setPlanName(e.target.value)}
+                      placeholder={t('plans.builder_plan_name')}
+                    />
                   </div>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <button className="btn" onClick={() => setBuilderStep(1)}>{t('plans.builder_back')}</button>
-                    <button className="btn" onClick={() => setBuilderCurrentWeek(Math.max(builderCurrentWeek - 1, 0))} disabled={builderCurrentWeek === 0}>{t('plans.builder_prev_week')}</button>
-                    <button className="btn" onClick={() => setBuilderCurrentWeek(Math.min(builderCurrentWeek + 1, builderWeeks.length - 1))} disabled={builderCurrentWeek === builderWeeks.length - 1}>{t('plans.builder_next_week')}</button>
-                    <button className="btn" onClick={() => setBuilderWeeks(prev => [...prev, createWeek(prev.length + 1)])}>{t('plans.builder_add_week')}</button>
+                )}
+                <div className="wb-step-header">
+                  <div>
+                    <p className="wb-step-label">{t('plans.builder_step', { current: 2, total: 2 })}</p>
+                    <h3 className="wb-step-title">{`${currentWeek.name} - ${currentDay.name}`}</h3>
+                  </div>
+                  <div className="wb-week-nav">
+                    <button className="wb-btn wb-btn-primary" onClick={() => setBuilderStep(1)}>{t('plans.builder_back')}</button>
+                    <button className="wb-btn wb-btn-primary" onClick={() => setBuilderCurrentWeek(Math.max(builderCurrentWeek - 1, 0))} disabled={builderCurrentWeek === 0}>{t('plans.builder_prev_week')}</button>
+                    <button className="wb-btn wb-btn-primary" onClick={() => setBuilderCurrentWeek(Math.min(builderCurrentWeek + 1, builderWeeks.length - 1))} disabled={builderCurrentWeek === builderWeeks.length - 1}>{t('plans.builder_next_week')}</button>
+                    <button className="wb-btn wb-btn-primary" onClick={() => setBuilderWeeks(prev => [...prev, createWeek(prev.length + 1)])}>{t('plans.builder_add_week')}</button>
                     {builderWeeks.length > 1 && (
-                      <button className="btn" style={{ background: 'rgba(255, 68, 68, 0.2)', color: '#ff4444' }} onClick={() => {
+                      <button className="wb-btn wb-btn-danger" onClick={() => {
                         const newWeeks = renameWeeksAfterDeletion(
                           builderWeeks.filter((_, i) => i !== builderCurrentWeek)
                         );
@@ -470,45 +635,34 @@ export default function Plans() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap', marginTop: 6 }}>
-                  <button className="btn" style={{ flex: 1, minWidth: 180 }} onClick={handleSaveBuilderPlan} disabled={builderLoading || !builderWeeks.some(week => week.days.some(day => day.videoIds.length > 0))}>{builderLoading ? t('plans.builder_saving') : t('plans.builder_save')}</button>
+                <div className="wb-save-row">
+                  <button className="wb-btn wb-btn-primary wb-btn-block" onClick={handleSaveBuilderPlan} disabled={builderLoading || !builderWeeks.some(week => week.days.some(day => day.videoIds.length > 0))}>{builderLoading ? t('plans.builder_saving') : t('plans.builder_save')}</button>
                 </div>
                 {builderStatus && (
-                  <div style={{ color: '#ffb547', fontWeight: 600 }}>{builderStatus}</div>
+                  <div className="wb-status">{builderStatus}</div>
                 )}
 
-                <div style={{ display: 'grid', gap: 12 }}>
+                <div className="wb-day-list">
                   {currentWeek.days.map((day, index) => {
                     const selected = builderCurrentDay === index;
                     return (
-                      <div key={day.name} onClick={() => setBuilderCurrentDay(index)} style={{
-                        cursor: 'pointer',
-                        width: '100%',
-                        padding: 14,
-                        borderRadius: 16,
-                        border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)',
-                        background: selected ? 'rgba(59, 130, 246, 0.12)' : 'var(--surface-hover)',
-                        color: 'white',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 12
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 700 }}>{day.name}</span>
+                      <div key={day.name} className={`wb-day-card${selected ? ' selected' : ''}`} onClick={() => setBuilderCurrentDay(index)}>
+                        <div className="wb-day-card-head">
+                          <span className="wb-day-name">{day.name}</span>
                           {day.videoIds.length > 0 && (
-                            <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>{day.videoIds.length}</span>
+                            <span className="wb-day-count">{day.videoIds.length}</span>
                           )}
                         </div>
                         {day.videoIds.length === 0 ? (
-                          <p style={{ margin: 0, color: '#aaa', fontSize: '0.85rem' }}>{t('plans.builder_no_selected_videos')}</p>
+                          <p className="wb-day-empty">{t('plans.builder_no_selected_videos')}</p>
                         ) : (
-                          <div style={{ display: 'grid', gap: 6 }}>
+                          <div className="wb-day-videos">
                             {day.videoIds.map(id => {
                               const video = allVideos.find(v => v.id === id);
                               return (
-                                <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '8px 10px' }}>
-                                  <span style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video ? video.filename : id}</span>
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); removeVideoFromDay(builderCurrentWeek, index, id); }} style={{ border: 'none', background: 'transparent', color: 'var(--accent-color)', cursor: 'pointer', fontSize: '0.95rem' }}>×</button>
+                                <div key={id} className="wb-day-video">
+                                  <span className="wb-day-video-name">{video ? video.filename : id}</span>
+                                  <button type="button" className="wb-day-video-remove" onClick={(e) => { e.stopPropagation(); removeVideoFromDay(builderCurrentWeek, index, id); }}>×</button>
                                 </div>
                               );
                             })}
@@ -519,115 +673,96 @@ export default function Plans() {
                   })}
                 </div>
 
-                <div style={{ display: 'grid', gap: 12 }}>
-                  <div>
-                    <p style={{ marginBottom: 8, fontWeight: 700 }}>{t('plans.builder_selected_videos')}</p>
+                <div className="wb-lower">
+                  <div className="wb-selected">
+                    <p className="wb-selected-title">{t('plans.builder_selected_videos')}</p>
                     {currentDay.videoIds.length === 0 ? (
-                      <p style={{ color: '#aaa' }}>{t('plans.builder_no_selected_videos')}</p>
+                      <p className="wb-selected-empty">{t('plans.builder_no_selected_videos')}</p>
                     ) : (
-                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      <ul className="wb-selected-list">
                         {currentDay.videoIds.map(id => {
                           const video = allVideos.find(v => v.id === id);
                           return (
-                            <li key={id} style={{ marginBottom: 6 }}>{video ? video.filename : id}</li>
+                            <li key={id}>{video ? video.filename : id}</li>
                           );
                         })}
                       </ul>
                     )}
                   </div>
 
-                  <div style={{ display: 'grid', gap: 12 }}>
-                  <div style={{ display: 'grid', gap: 10, alignItems: 'start' }}>
-                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 700 }}>{t('plans.builder_search')}</label>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <input value={videoSearch} onChange={e => setVideoSearch(e.target.value)} placeholder={t('plans.builder_search')} style={{ flex: 1, minWidth: 220, padding: 12, borderRadius: 12, border: '1px solid var(--glass-border)', background: 'var(--bg-color)', color: 'white' }} />
-                      <button type="button" className="btn" style={{ minWidth: 120 }} onClick={() => setShowBuilderFilters(prev => !prev)}>{t('plans.builder_filters')}</button>
-                      <button type="button" className="btn" style={{ minWidth: 120 }} onClick={() => setVideoViewMode(prev => prev === 'grid' ? 'list' : 'grid')}>{videoViewMode === 'grid' ? t('plans.builder_list_view') : t('plans.builder_grid_view')}</button>
+                  <div className="wb-search-block">
+                  <div className="wb-search-row">
+                    <label className="wb-label">{t('plans.builder_search')}</label>
+                    <div className="wb-search-controls">
+                      <input className="wb-input wb-search-input" value={videoSearch} onChange={e => setVideoSearch(e.target.value)} placeholder={t('plans.builder_search')} />
+                      <button type="button" className="wb-btn wb-btn-primary wb-btn-min" onClick={() => setShowBuilderFilters(prev => !prev)}>{t('plans.builder_filters')}</button>
+                      <button type="button" className="wb-btn wb-btn-primary wb-btn-min" onClick={() => setVideoViewMode(prev => prev === 'grid' ? 'list' : 'grid')}>{videoViewMode === 'grid' ? t('plans.builder_list_view') : t('plans.builder_grid_view')}</button>
                     </div>
                   </div>
 
                   {showBuilderFilters && (
-                    <div style={{ display: 'grid', gap: 16, padding: 16, borderRadius: 18, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                          <p style={{ margin: 0, fontWeight: 700 }}>{t('plans.builder_filter_equipment')}</p>
-                          <button type="button" className="btn" style={{ padding: '6px 10px', minWidth: 'auto' }} onClick={() => {
-                            setSelectedEquipment([]);
-                            setSelectedTrainingType('');
-                            setSelectedIntensity('');
-                            setSelectedBodyParts([]);
-                          }}>{t('plans.builder_clear_filters')}</button>
+                    <div className="wb-filters">
+                      <div className="wb-filter-group">
+                        <div className="wb-filter-head">
+                          <p className="wb-filter-title">{t('plans.builder_filter_equipment')}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                            <FilterMatchToggle
+                              mode={matchMode}
+                              onChange={setMatchMode}
+                              label={t('plans.builder_match_label')}
+                              anyLabel={t('plans.builder_match_any')}
+                              allLabel={t('plans.builder_match_all')}
+                              anyHint={t('plans.builder_match_any_hint')}
+                              allHint={t('plans.builder_match_all_hint')}
+                            />
+                            <button type="button" className="wb-btn wb-btn-primary wb-btn-sm" onClick={() => {
+                              setSelectedEquipment([]);
+                              setSelectedTrainingType([]);
+                              setSelectedIntensity('');
+                              setSelectedBodyParts([]);
+                            }}>{t('plans.builder_clear_filters')}</button>
+                          </div>
                         </div>
                         <EquipmentPicker selected={selectedEquipment} onChange={setSelectedEquipment} />
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
-                        <div>
-                          <p style={{ margin: '0 0 8px', fontWeight: 700 }}>{t('plans.builder_training_type')}</p>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      <div className="wb-filter-cols">
+                        <div className="wb-filter-group">
+                          <p className="wb-filter-title">{t('plans.builder_training_type')}</p>
+                          <div className="wb-chip-row">
                             {TRAINING_TYPES.map(type => {
-                              const selected = selectedTrainingType === type;
+                              const selected = selectedTrainingType.includes(type);
                               return (
-                                <button type="button" key={type} onClick={() => setSelectedTrainingType(selected ? '' : type)} style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  padding: '8px 10px',
-                                  borderRadius: 10,
-                                  border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)',
-                                  background: selected ? 'rgba(59, 130, 246, 0.15)' : 'var(--surface-hover)',
-                                  color: 'white',
-                                  cursor: 'pointer'
-                                }}>
+                                <button type="button" key={type} className={`wb-chip${selected ? ' selected' : ''}`} onClick={() => setSelectedTrainingType(prev => prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type])}>
                                   <TrainingTypeIcon type={type} />
-                                  <span style={{ fontSize: '0.85rem' }}>{type}</span>
+                                  <span>{labels.trainingType(type)}</span>
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                        <div>
-                          <p style={{ margin: '0 0 8px', fontWeight: 700 }}>{t('plans.builder_intensity')}</p>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        <div className="wb-filter-group">
+                          <p className="wb-filter-title">{t('plans.builder_intensity')}</p>
+                          <div className="wb-chip-row">
                             {INTENSITIES.map(level => {
                               const selected = selectedIntensity === level;
                               return (
-                                <button type="button" key={level} onClick={() => setSelectedIntensity(selected ? '' : level)} style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  padding: '8px 10px',
-                                  borderRadius: 10,
-                                  border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)',
-                                  background: selected ? 'rgba(59, 130, 246, 0.15)' : 'var(--surface-hover)',
-                                  color: 'white',
-                                  cursor: 'pointer'
-                                }}>
+                                <button type="button" key={level} className={`wb-chip${selected ? ' selected' : ''}`} onClick={() => setSelectedIntensity(selected ? '' : level)}>
                                   <IntensityIcon level={level} />
-                                  <span style={{ fontSize: '0.85rem', textTransform: 'capitalize' }}>{prettyLabel(level)}</span>
+                                  <span style={{ textTransform: 'capitalize' }}>{labels.intensity(level)}</span>
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                        <div>
-                          <p style={{ margin: '0 0 8px', fontWeight: 700 }}>{t('plans.builder_body_parts')}</p>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        <div className="wb-filter-group">
+                          <p className="wb-filter-title">{t('plans.builder_body_parts')}</p>
+                          <div className="wb-chip-row">
                             {BODY_PARTS.map(part => {
                               const selected = selectedBodyParts.includes(part);
                               return (
-                                <button type="button" key={part} onClick={() => setSelectedBodyParts(prev => prev.includes(part) ? prev.filter(item => item !== part) : [...prev, part])} style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  padding: '8px 10px',
-                                  borderRadius: 10,
-                                  border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)',
-                                  background: selected ? 'rgba(59, 130, 246, 0.15)' : 'var(--surface-hover)',
-                                  color: 'white',
-                                  cursor: 'pointer'
-                                }}>
+                                <button type="button" key={part} className={`wb-chip${selected ? ' selected' : ''}`} onClick={() => setSelectedBodyParts(prev => prev.includes(part) ? prev.filter(item => item !== part) : [...prev, part])}>
                                   <BodyPartIcon part={part} />
-                                  <span style={{ fontSize: '0.85rem' }}>{prettyLabel(part)}</span>
+                                  <span>{labels.bodyPart(part)}</span>
                                 </button>
                               );
                             })}
@@ -638,44 +773,31 @@ export default function Plans() {
                   )}
                 </div>
 
-                <div style={{ display: videoViewMode === 'grid' ? 'grid' : 'block', gap: videoViewMode === 'grid' ? 14 : 0, gridTemplateColumns: videoViewMode === 'grid' ? 'repeat(auto-fit, minmax(220px, 1fr))' : undefined }}>
+                <div className={`wb-videos ${videoViewMode === 'grid' ? 'grid' : 'list'}`}>
                   {builderVideos.length === 0 ? (
-                    <p style={{ color: '#aaa' }}>{t('plans.builder_no_videos')}</p>
+                    <p className="wb-empty">{t('plans.builder_no_videos')}</p>
                   ) : (
                     builderVideos.map(video => {
                       const selected = currentDay.videoIds.includes(video.id);
                       return (
-                        <button key={video.id} type="button" className="btn" onClick={() => toggleVideoForDay(video.id)} style={{
-                          display: 'flex',
-                          flexDirection: videoViewMode === 'grid' ? 'column' : 'row',
-                          justifyContent: 'space-between',
-                          alignItems: videoViewMode === 'grid' ? 'stretch' : 'center',
-                          gap: 10,
-                          textAlign: 'left',
-                          padding: 14,
-                          background: selected ? 'rgba(40, 167, 69, 0.15)' : 'rgba(255,255,255,0.04)',
-                          borderColor: selected ? 'rgba(40, 167, 69, 0.45)' : 'var(--glass-border)',
-                          borderWidth: 1,
-                          borderStyle: 'solid',
-                          minHeight: videoViewMode === 'grid' ? 160 : undefined
-                        }}>
+                        <button key={video.id} type="button" className={`wb-video-card${selected ? ' selected' : ''}`} onClick={() => toggleVideoForDay(video.id)}>
                           {videoViewMode === 'grid' ? (
                             <>
                               {video.thumbnail_path ? (
-                                <img src={`http://localhost:3000/thumbnails/${video.thumbnail_path}`} alt={video.filename} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 14 }} />
+                                <img className="wb-video-thumb" src={`http://localhost:3000/thumbnails/${video.thumbnail_path}`} alt={video.filename} />
                               ) : (
-                                <div style={{ width: '100%', height: 120, borderRadius: 14, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>No thumbnail</div>
+                                <div className="wb-video-thumb wb-video-thumb-empty">No thumbnail</div>
                               )}
-                              <div style={{ display: 'grid', gap: 6 }}>
-                                <span style={{ fontWeight: 700 }}>{video.filename}</span>
-                                <span style={{ fontSize: '0.85rem', color: '#bbb' }}>{video.relative_path}</span>
+                              <div className="wb-video-meta">
+                                <span className="wb-video-name">{video.filename}</span>
+                                <span className="wb-video-path">{video.relative_path}</span>
                               </div>
-                              <span style={{ opacity: 0.8, alignSelf: 'flex-end' }}>{selected ? '✓ Selected' : '+'}</span>
+                              <span className="wb-video-check">{selected ? '✓ Selected' : '+'}</span>
                             </>
                           ) : (
                             <>
-                              <span>{video.filename}</span>
-                              <span style={{ opacity: 0.65 }}>{selected ? '✓' : '+'}</span>
+                              <span className="wb-video-name">{video.filename}</span>
+                              <span className="wb-video-check">{selected ? '✓' : '+'}</span>
                             </>
                           )}
                         </button>
@@ -687,7 +809,8 @@ export default function Plans() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

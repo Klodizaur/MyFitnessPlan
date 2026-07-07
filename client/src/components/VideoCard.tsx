@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EquipmentIcon, getEquipmentItem } from '../lib/equipment';
+import { EquipmentIcon } from '../lib/equipment';
+import { useMetaLabels } from '../lib/labels';
 import { Video } from '../types/video';
 import VideoMetadataEditor from './VideoMetadataEditor';
 import VideoDetailsModal from './VideoDetailsModal';
@@ -16,6 +17,7 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
   const [hovered, setHovered] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const labels = useMetaLabels();
 
   const equipment = video.equipment || [];
   const hasMeta = Boolean(video.description?.trim()) || equipment.length > 0;
@@ -70,7 +72,7 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
           {equipment.map(id => (
             <span
               key={id}
-              title={getEquipmentItem(id)?.label}
+              title={labels.equipment(id)}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -142,7 +144,7 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
                   {equipment.map(id => (
                     <span
                       key={id}
-                      title={getEquipmentItem(id)?.label}
+                      title={labels.equipment(id)}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',

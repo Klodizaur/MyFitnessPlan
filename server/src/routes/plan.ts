@@ -2,6 +2,13 @@ import { FastifyInstance } from 'fastify';
 import db from '../db.js';
 import { nanoid } from 'nanoid';
 import { parse } from 'csv-parse/sync';
+import path from 'path';
+import fs from 'fs';
+
+const planBackgroundsDir = path.join(process.cwd(), 'data', 'plan-backgrounds');
+if (!fs.existsSync(planBackgroundsDir)) {
+  fs.mkdirSync(planBackgroundsDir, { recursive: true });
+}
 
 const DAY_NAMES = new Set([
   'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun',
@@ -276,6 +283,56 @@ export default async function (fastify: FastifyInstance) {
     if (!plan) return reply.code(404).send({ error: 'No active plan' });
     
     rematchPlanWorkouts(plan.id);
+    return reply.send({ success: true });
+  });
+
+  // Upload a custom background image for a plan
+  fastify.post('/:id/background', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const plan = db.prepare('SELECT id FROM workout_plans WHERE id = ?').get(id);
+    if (!plan) return reply.code(404).send({ error: 'Plan not found' });
+
+    const data = await request.file();
+    if (!data) return reply.code(400).send({ error: 'No file uploaded' });
+
+    const allowedExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+    const ext = path.extname(data.filename).toLowerCase();
+    if (!allowedExt.includes(ext)) {
+      return reply.code(400).send({ error: 'Unsupported image format' });
+    }
+
+    const buffer = await data.toBuffer();
+    const savedFilename = `${nanoid()}${ext}`;
+    fs.writeFileSync(path.join(planBackgroundsDir, savedFilename), buffer);
+
+    const backgroundImage = `/plan-backgrounds/${savedFilename}`;
+    db.prepare('UPDATE workout_plans SET background_image = ? WHERE id = ?').run(backgroundImage, id);
+
+    return reply.send({ success: true, backgroundImage });
+  });
+
+  // Set a plan's background image to an existing video thumbnail
+  fastify.put('/:id/background', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { thumbnailPath } = request.body as { thumbnailPath?: string };
+    if (!thumbnailPath) return reply.code(400).send({ error: 'thumbnailPath is required' });
+
+    const plan = db.prepare('SELECT id FROM workout_plans WHERE id = ?').get(id);
+    if (!plan) return reply.code(404).send({ error: 'Plan not found' });
+
+    const backgroundImage = `/thumbnails/${thumbnailPath}`;
+    db.prepare('UPDATE workout_plans SET background_image = ? WHERE id = ?').run(backgroundImage, id);
+
+    return reply.send({ success: true, backgroundImage });
+  });
+
+  // Clear a plan's background image
+  fastify.delete('/:id/background', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const plan = db.prepare('SELECT id FROM workout_plans WHERE id = ?').get(id);
+    if (!plan) return reply.code(404).send({ error: 'Plan not found' });
+
+    db.prepare('UPDATE workout_plans SET background_image = NULL WHERE id = ?').run(id);
     return reply.send({ success: true });
   });
 
