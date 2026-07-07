@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import AlbumGrid from '../components/AlbumGrid';
 import VideoCard from '../components/VideoCard';
 import EquipmentPicker from '../components/EquipmentPicker';
-import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, prettyLabel } from '../lib/metadata';
+import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
+import { matchesTags, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
+import { useMetaLabels } from '../lib/labels';
 import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -21,11 +24,14 @@ export default function Library() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'alpha' | 'alpha_desc'>('alpha');
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
-  const [selectedTrainingType, setSelectedTrainingType] = useState<string>('');
+  const [selectedTrainingType, setSelectedTrainingType] = useState<string[]>([]);
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
   const [selectedIntensity, setSelectedIntensity] = useState<string>('');
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [matchMode, setMatchMode] = useFilterMatchMode();
+  const labels = useMetaLabels();
+  const { t } = useTranslation();
 
   const updateVideo = (updated: Video) => {
     setVideos(prev => prev.map(v => (v.id === updated.id ? updated : v)));
@@ -45,7 +51,10 @@ export default function Library() {
       // Apply combined filters (all active filters must match)
       const veq = v.equipment || [];
       if (selectedEquipment.length > 0 && !veq.some(id => selectedEquipment.includes(id))) continue;
-      if (selectedTrainingType && v.training_type !== selectedTrainingType) continue;
+      if (selectedTrainingType.length > 0) {
+        const vtypes = v.training_type || [];
+        if (!vtypes.some(tt => selectedTrainingType.includes(tt))) continue;
+      }
       if (selectedIntensity && v.intensity !== selectedIntensity) continue;
       if (selectedBodyParts.length > 0) {
         const vparts = v.body_parts || [];
@@ -61,13 +70,13 @@ export default function Library() {
     const result = Array.from(map.entries()).map(([key, vids]) => {
       const stored = localStorage.getItem(`albumImage:${key}`);
       const cover = stored || (vids[0]?.thumbnail_path ? `http://localhost:3000/thumbnails/${vids[0].thumbnail_path}` : null);
-      return { key, title: key === '.' ? 'Root' : key, cover, count: vids.length };
+      return { key, title: key === '.' ? t('library.root_folder') : key, cover, count: vids.length };
     });
     // apply natural sort for numbered folder titles
     if (sort === 'alpha') result.sort((a, b) => naturalCompare(a.title, b.title));
     else result.sort((a, b) => naturalCompare(b.title, a.title));
     setAlbums(result);
-  }, [videos, sort, selectedEquipment]);
+  }, [videos, sort, selectedEquipment, t]);
 
   const visibleAlbums = albums.filter(a => a.title.toLowerCase().includes(query.trim().toLowerCase()));
 
@@ -84,21 +93,21 @@ export default function Library() {
 
   return (
     <div style={{ padding: '1.5rem' }}>
-      <h1>Library</h1>
-      <p style={{ color: 'var(--text-secondary)' }}>Browse scanned videos grouped by top-level folders.</p>
+      <h1>{t('library.title')}</h1>
+      <p style={{ color: 'var(--text-secondary)' }}>{t('library.subtitle')}</p>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: '1rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '8px 12px', borderRadius: 10, border: '1px solid var(--glass-border)', width: 360 }}>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input placeholder="Search folders..." value={query} onChange={(e) => setQuery(e.target.value)} style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%' }} />
+          <input placeholder={t('library.search_placeholder')} value={query} onChange={(e) => setQuery(e.target.value)} style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%' }} />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '6px 10px', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 10h-6"/><path d="M3 6h6"/><path d="M3 14h6"/><path d="M21 18h-6"/></svg>
             <select value={sort} onChange={(e) => setSort(e.target.value as any)} style={{ border: 'none', background: 'transparent', outline: 'none' }}>
-              <option value="alpha">Alphabetical A→Z</option>
-              <option value="alpha_desc">Alphabetical Z→A</option>
+              <option value="alpha">{t('library.sort_az')}</option>
+              <option value="alpha_desc">{t('library.sort_za')}</option>
             </select>
           </div>
         </div>
@@ -109,20 +118,31 @@ export default function Library() {
       </div>
 
       <div style={{ marginTop: '1.5rem', padding: '12px 0' }}>
-        <h3 style={{ margin: '0 0 10px' }}>Filter by equipment</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+          <h3 style={{ margin: 0 }}>{t('library.filter_by_equipment')}</h3>
+          <FilterMatchToggle
+            mode={matchMode}
+            onChange={setMatchMode}
+            label={t('library.match_label')}
+            anyLabel={t('library.match_any')}
+            allLabel={t('library.match_all')}
+            anyHint={t('library.match_any_hint')}
+            allHint={t('library.match_all_hint')}
+          />
+        </div>
         <EquipmentPicker selected={selectedEquipment} onChange={setSelectedEquipment} />
       </div>
 
       <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '240px 1fr 180px', gap: 12, alignItems: 'center' }}>
         <div>
-          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Training Type</label>
+          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>{t('library.training_type')}</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['HIIT','Cardio','Strength','Mobility','Yoga','Pilates'].map(t => {
-              const sel = selectedTrainingType === t;
+            {TRAINING_TYPES.map(t => {
+              const sel = selectedTrainingType.includes(t);
               return (
-                <button key={t} onClick={() => setSelectedTrainingType(sel ? '' : t)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={t}>
+                <button key={t} onClick={() => setSelectedTrainingType(sel ? selectedTrainingType.filter(x => x !== t) : [...selectedTrainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
                   <TrainingTypeIcon type={t} />
-                  <span style={{ fontSize: '0.9rem' }}>{t}</span>
+                  <span style={{ fontSize: '0.9rem' }}>{labels.trainingType(t)}</span>
                 </button>
               );
             })}
@@ -130,14 +150,14 @@ export default function Library() {
         </div>
 
         <div>
-          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Body Parts (click to toggle)</label>
+          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>{t('library.body_parts')}</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['full_body','upper_body','lower_body','core','back','legs','arms','shoulders'].map(bp => {
+            {BODY_PARTS.map(bp => {
               const sel = selectedBodyParts.includes(bp);
               return (
-                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(bp)}>
+                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
                   <BodyPartIcon part={bp} />
-                  <span style={{ fontSize: '0.9rem' }}>{prettyLabel(bp)}</span>
+                  <span style={{ fontSize: '0.9rem' }}>{labels.bodyPart(bp)}</span>
                 </button>
               );
             })}
@@ -145,14 +165,14 @@ export default function Library() {
         </div>
 
         <div>
-          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Intensity</label>
+          <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>{t('library.intensity')}</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {['low','medium','high'].map(level => {
               const sel = selectedIntensity === level;
               return (
-                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(level)}>
+                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
                   <IntensityIcon level={level} />
-                  <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{level}</span>
+                  <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{labels.intensity(level)}</span>
                 </button>
               );
             })}
@@ -160,30 +180,26 @@ export default function Library() {
         </div>
       </div>
 
-      {(selectedEquipment.length > 0 || selectedTrainingType || selectedBodyParts.length > 0 || selectedIntensity) && (
+      {(selectedEquipment.length > 0 || selectedTrainingType.length > 0 || selectedBodyParts.length > 0 || selectedIntensity) && (
         <div style={{ marginTop: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h3 style={{ margin: 0 }}>Matching Videos</h3>
+            <h3 style={{ margin: 0 }}>{t('library.matching_videos')}</h3>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setViewMode('grid')} title="Grid" style={{ padding: 8, borderRadius: 8, border: '1px solid var(--glass-border)', background: viewMode === 'grid' ? 'var(--accent-color)' : 'transparent', color: viewMode === 'grid' ? 'white' : 'var(--text-primary)' }}>▦</button>
-              <button onClick={() => setViewMode('list')} title="List" style={{ padding: 8, borderRadius: 8, border: '1px solid var(--glass-border)', background: viewMode === 'list' ? 'var(--accent-color)' : 'transparent', color: viewMode === 'list' ? 'white' : 'var(--text-primary)' }}>☰</button>
+              <button onClick={() => setViewMode('grid')} title={t('library.grid_view')} style={{ padding: 8, borderRadius: 8, border: '1px solid var(--glass-border)', background: viewMode === 'grid' ? 'var(--accent-color)' : 'transparent', color: viewMode === 'grid' ? 'white' : 'var(--text-primary)' }}>▦</button>
+              <button onClick={() => setViewMode('list')} title={t('library.list_view')} style={{ padding: 8, borderRadius: 8, border: '1px solid var(--glass-border)', background: viewMode === 'list' ? 'var(--accent-color)' : 'transparent', color: viewMode === 'list' ? 'white' : 'var(--text-primary)' }}>☰</button>
             </div>
           </div>
 
           {(() => {
             const matching = videos.filter(v => {
-              const veq = v.equipment || [];
-              if (selectedEquipment.length > 0 && !veq.some(id => selectedEquipment.includes(id))) return false;
-              if (selectedTrainingType && v.training_type !== selectedTrainingType) return false;
+              if (!matchesTags(v.equipment, selectedEquipment, matchMode)) return false;
+              if (!matchesTags(v.training_type, selectedTrainingType, matchMode)) return false;
               if (selectedIntensity && v.intensity !== selectedIntensity) return false;
-              if (selectedBodyParts.length > 0) {
-                const vparts = v.body_parts || [];
-                if (!vparts.some(bp => selectedBodyParts.includes(bp))) return false;
-              }
+              if (!matchesTags(v.body_parts, selectedBodyParts, matchMode)) return false;
               return true;
             });
 
-            if (matching.length === 0) return <p style={{ color: 'var(--text-secondary)' }}>No videos match the selected equipment.</p>;
+            if (matching.length === 0) return <p style={{ color: 'var(--text-secondary)' }}>{t('library.no_match')}</p>;
 
             return viewMode === 'grid' ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 320px))', gap: 20 }}>

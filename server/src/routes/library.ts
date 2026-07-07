@@ -23,8 +23,8 @@ export const VALID_EQUIPMENT = [
   'kettlebell',
 ] as const;
 
-export const VALID_TRAINING_TYPES = ['HIIT', 'Cardio', 'Strength', 'Mobility', 'Yoga', 'Pilates'] as const;
-export const VALID_BODY_PARTS = ['full_body', 'upper_body', 'lower_body', 'core', 'back', 'legs', 'arms', 'shoulders'] as const;
+export const VALID_TRAINING_TYPES = ['HIIT', 'Cardio', 'Strength', 'Mobility', 'Yoga', 'Pilates', 'Functional Strength Training', 'Warmup', 'Cooldown', 'Stretching', 'Standing', 'No Jumping', 'Period-Friendly'] as const;
+export const VALID_BODY_PARTS = ['full_body', 'upper_body', 'lower_body', 'core', 'back', 'legs', 'arms', 'shoulders', 'glutes', 'chest'] as const;
 export const VALID_INTENSITIES = ['low', 'medium', 'high'] as const;
 
 function parseEquipment(raw: string | null | undefined): string[] {
@@ -51,6 +51,25 @@ function parseBodyParts(raw: string | null | undefined): string[] {
   }
 }
 
+// training_type used to be stored as a bare string (e.g. "HIIT"). It is now a
+// multi-select stored as a JSON array like body_parts/equipment. This parser
+// tolerates both: JSON arrays (new), and legacy bare strings (old rows that
+// were never re-saved).
+function parseTrainingTypes(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  const whitelist = (item: unknown): item is string =>
+    typeof item === 'string' && (VALID_TRAINING_TYPES as readonly string[]).includes(item);
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter(whitelist);
+    // Non-array JSON (e.g. a JSON-encoded string) -> treat as a single value
+    return whitelist(parsed) ? [parsed] : [];
+  } catch {
+    // Legacy bare string that isn't valid JSON, e.g. HIIT
+    return whitelist(raw) ? [raw] : [];
+  }
+}
+
 function formatVideoRow(row: {
   id: string;
   filename: string;
@@ -69,7 +88,7 @@ function formatVideoRow(row: {
     thumbnail_path: row.thumbnail_path,
     description: row.description || '',
     equipment: parseEquipment(row.equipment),
-    training_type: row.training_type || '',
+    training_type: parseTrainingTypes(row.training_type),
     body_parts: parseBodyParts(row.body_parts),
     intensity: row.intensity || '',
   };
@@ -198,7 +217,7 @@ export default async function (fastify: FastifyInstance) {
 
   fastify.patch('/videos/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as { description?: string; equipment?: string[]; training_type?: string; body_parts?: string[]; intensity?: string };
+    const body = request.body as { description?: string; equipment?: string[]; training_type?: string[]; body_parts?: string[]; intensity?: string };
 
     const existing = db.prepare('SELECT id FROM videos WHERE id = ?').get(id);
     if (!existing) {
@@ -212,7 +231,9 @@ export default async function (fastify: FastifyInstance) {
         )
       : [];
 
-    const training_type = typeof body.training_type === 'string' && (VALID_TRAINING_TYPES as readonly string[]).includes(body.training_type) ? body.training_type : '';
+    const training_type = Array.isArray(body.training_type)
+      ? body.training_type.filter((item): item is string => typeof item === 'string' && (VALID_TRAINING_TYPES as readonly string[]).includes(item))
+      : [];
 
     const body_parts = Array.isArray(body.body_parts)
       ? body.body_parts.filter((item): item is string => typeof item === 'string' && (VALID_BODY_PARTS as readonly string[]).includes(item))
@@ -221,7 +242,7 @@ export default async function (fastify: FastifyInstance) {
     const intensity = typeof body.intensity === 'string' && (VALID_INTENSITIES as readonly string[]).includes(body.intensity) ? body.intensity : '';
 
     db.prepare('UPDATE videos SET description = ?, equipment = ?, training_type = ?, body_parts = ?, intensity = ? WHERE id = ?')
-      .run(description, JSON.stringify(equipment), training_type, JSON.stringify(body_parts), intensity, id);
+      .run(description, JSON.stringify(equipment), JSON.stringify(training_type), JSON.stringify(body_parts), intensity, id);
 
     const updated = db.prepare(
       'SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity FROM videos WHERE id = ?'

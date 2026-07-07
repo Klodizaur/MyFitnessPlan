@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import EquipmentPicker from './EquipmentPicker';
-import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, prettyLabel } from '../lib/metadata';
+import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
+import { useMetaLabels } from '../lib/labels';
 import { Video } from '../types/video';
 
 type Props = {
@@ -10,19 +12,73 @@ type Props = {
   onSaved: (video: Video) => void;
 };
 
+const listIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3.5" y1="6" x2="3.51" y2="6" /><line x1="3.5" y1="12" x2="3.51" y2="12" /><line x1="3.5" y1="18" x2="3.51" y2="18" />
+  </svg>
+);
+
+const quoteIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="4" x2="5" y2="20" /><line x1="10" y1="8" x2="19" y2="8" /><line x1="10" y1="16" x2="19" y2="16" />
+  </svg>
+);
+
+const linkIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </svg>
+);
+
+function MdButton({ title, onClick, children }: { title: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onMouseDown={e => e.preventDefault()}
+      onClick={onClick}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(120,120,120,0.18)'; e.currentTarget.style.borderColor = 'var(--glass-border)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
+      style={{
+        minWidth: 32,
+        height: 30,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '0 8px',
+        borderRadius: 6,
+        border: '1px solid transparent',
+        background: 'transparent',
+        color: 'var(--text-primary)',
+        cursor: 'pointer',
+        fontSize: '0.95rem',
+        lineHeight: 1,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
   const [description, setDescription] = useState(video.description || '');
   const [equipment, setEquipment] = useState<string[]>(video.equipment || []);
-  const [trainingType, setTrainingType] = useState<string>(video.training_type || '');
+  const [trainingType, setTrainingType] = useState<string[]>(video.training_type || []);
   const [bodyParts, setBodyParts] = useState<string[]>(video.body_parts || []);
   const [intensity, setIntensity] = useState<string>(video.intensity || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const labels = useMetaLabels();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingSelection = useRef<[number, number] | null>(null);
 
   useEffect(() => {
     setDescription(video.description || '');
     setEquipment(video.equipment || []);
-    setTrainingType(video.training_type || '');
+    setTrainingType(video.training_type || []);
     setBodyParts(video.body_parts || []);
     setIntensity(video.intensity || '');
   }, [video]);
@@ -34,6 +90,63 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
+
+  // Restore the caret/selection after a formatting action mutates the value.
+  useEffect(() => {
+    if (pendingSelection.current && textareaRef.current) {
+      const [start, end] = pendingSelection.current;
+      pendingSelection.current = null;
+      const ta = textareaRef.current;
+      ta.focus();
+      ta.setSelectionRange(start, end);
+    }
+  });
+
+  // Wrap the current selection with inline markers (e.g. **bold**).
+  const applyWrap = (prefix: string, suffix: string, placeholder: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = end > start ? description.slice(start, end) : placeholder;
+    const next = description.slice(0, start) + prefix + selected + suffix + description.slice(end);
+    setDescription(next);
+    const selStart = start + prefix.length;
+    pendingSelection.current = [selStart, selStart + selected.length];
+  };
+
+  // Prefix each selected line (e.g. "- ", "> ", "1. ") for block formatting.
+  const applyLinePrefix = (prefixFor: (index: number) => string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const lineStart = description.lastIndexOf('\n', start - 1) + 1;
+    let lineEnd = description.indexOf('\n', end);
+    if (lineEnd === -1) lineEnd = description.length;
+    const transformed = description
+      .slice(lineStart, lineEnd)
+      .split('\n')
+      .map((line, i) => prefixFor(i) + line)
+      .join('\n');
+    const next = description.slice(0, lineStart) + transformed + description.slice(lineEnd);
+    setDescription(next);
+    pendingSelection.current = [lineStart, lineStart + transformed.length];
+  };
+
+  // Insert a markdown link, selecting the "url" placeholder for quick editing.
+  const insertLink = () => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const label = end > start ? description.slice(start, end) : 'text';
+    const snippet = `[${label}](url)`;
+    const next = description.slice(0, start) + snippet + description.slice(end);
+    setDescription(next);
+    const urlStart = start + label.length + 3;
+    pendingSelection.current = [urlStart, urlStart + 3];
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -108,28 +221,67 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
           </button>
         </div>
 
-        <label style={{ display: 'block', marginBottom: '1.25rem' }}>
+        <div style={{ marginBottom: '1.25rem' }}>
           <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Description</span>
-          <textarea
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Notes about this video — focus areas, difficulty, etc."
-            rows={8}
-            style={{
-              width: '100%',
-              minHeight: 220,
-              padding: '14px 16px',
-              borderRadius: 12,
-              border: '1px solid var(--glass-border)',
-              background: 'var(--surface-hover)',
-              color: 'var(--text-primary)',
-              fontFamily: 'var(--font-family)',
-              fontSize: '1rem',
-              resize: 'vertical',
-              boxSizing: 'border-box',
-            }}
-          />
-        </label>
+          <div style={{ border: '1px solid var(--glass-border)', borderRadius: 12, background: 'var(--surface-hover)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, padding: '6px 8px', borderBottom: '1px solid var(--glass-border)' }}>
+              <MdButton title="Bold (Ctrl/Cmd+B)" onClick={() => applyWrap('**', '**', 'bold text')}>
+                <span style={{ fontWeight: 800 }}>B</span>
+              </MdButton>
+              <MdButton title="Italic (Ctrl/Cmd+I)" onClick={() => applyWrap('*', '*', 'italic text')}>
+                <span style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>I</span>
+              </MdButton>
+              <MdButton title="Strikethrough" onClick={() => applyWrap('~~', '~~', 'strikethrough')}>
+                <span style={{ textDecoration: 'line-through' }}>S</span>
+              </MdButton>
+              <MdButton title="Inline code" onClick={() => applyWrap('`', '`', 'code')}>
+                <span style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{'</>'}</span>
+              </MdButton>
+              <span style={{ width: 1, alignSelf: 'stretch', margin: '2px 5px', background: 'var(--glass-border)' }} />
+              <MdButton title="Heading" onClick={() => applyLinePrefix(() => '## ')}>
+                <span style={{ fontWeight: 800 }}>H</span>
+              </MdButton>
+              <MdButton title="Bulleted list" onClick={() => applyLinePrefix(() => '- ')}>{listIcon}</MdButton>
+              <MdButton title="Numbered list" onClick={() => applyLinePrefix(i => `${i + 1}. `)}>
+                <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', fontWeight: 700 }}>1.</span>
+              </MdButton>
+              <MdButton title="Quote" onClick={() => applyLinePrefix(() => '> ')}>{quoteIcon}</MdButton>
+              <span style={{ width: 1, alignSelf: 'stretch', margin: '2px 5px', background: 'var(--glass-border)' }} />
+              <MdButton title="Link" onClick={insertLink}>{linkIcon}</MdButton>
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              onKeyDown={e => {
+                if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+                  const key = e.key.toLowerCase();
+                  if (key === 'b') { e.preventDefault(); applyWrap('**', '**', 'bold text'); }
+                  else if (key === 'i') { e.preventDefault(); applyWrap('*', '*', 'italic text'); }
+                }
+              }}
+              placeholder="Notes about this video — focus areas, difficulty, etc."
+              rows={8}
+              style={{
+                display: 'block',
+                width: '100%',
+                minHeight: 200,
+                padding: '14px 16px',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-family)',
+                fontSize: '1rem',
+                resize: 'vertical',
+                boxSizing: 'border-box',
+                outline: 'none',
+              }}
+            />
+          </div>
+          <span style={{ display: 'block', marginTop: 6, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+            Supports Markdown formatting.
+          </span>
+        </div>
 
         <div style={{ marginBottom: '1.5rem' }}>
           <span style={{ display: 'block', fontWeight: 700, marginBottom: 10, fontSize: '0.9rem' }}>Equipment</span>
@@ -141,12 +293,12 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
             <div style={{ minWidth: 0 }}>
               <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Training Type</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {['HIIT','Cardio','Strength','Mobility','Yoga','Pilates'].map(t => {
-                  const sel = trainingType === t;
+                {TRAINING_TYPES.map(t => {
+                  const sel = trainingType.includes(t);
                   return (
-                    <button key={t} onClick={() => setTrainingType(sel ? '' : t)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={t}>
+                    <button key={t} onClick={() => setTrainingType(sel ? trainingType.filter(x => x !== t) : [...trainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
                       <TrainingTypeIcon type={t} />
-                      <span style={{ fontSize: '0.95rem' }}>{t}</span>
+                      <span style={{ fontSize: '0.95rem' }}>{labels.trainingType(t)}</span>
                     </button>
                   );
                 })}
@@ -159,9 +311,9 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
                 {['low','medium','high'].map(level => {
                   const sel = intensity === level;
                   return (
-                    <button key={level} onClick={() => setIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(level)}>
+                    <button key={level} onClick={() => setIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
                       <IntensityIcon level={level} />
-                      <span style={{ fontSize: '0.95rem', textTransform: 'capitalize' }}>{level}</span>
+                      <span style={{ fontSize: '0.95rem', textTransform: 'capitalize' }}>{labels.intensity(level)}</span>
                     </button>
                   );
                 })}
@@ -173,12 +325,12 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
         <div style={{ marginBottom: '1.5rem' }}>
           <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Body Parts</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['full_body','upper_body','lower_body','core','back','legs','arms','shoulders'].map(bp => {
+            {BODY_PARTS.map(bp => {
               const selected = bodyParts.includes(bp);
               return (
-                <button key={bp} onClick={() => setBodyParts(selected ? bodyParts.filter(b => b !== bp) : [...bodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: selected ? 'rgba(59,130,246,0.12)' : 'var(--surface-hover)', cursor: 'pointer' }} title={prettyLabel(bp)}>
+                <button key={bp} onClick={() => setBodyParts(selected ? bodyParts.filter(b => b !== bp) : [...bodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: selected ? 'rgba(59,130,246,0.12)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
                   <BodyPartIcon part={bp} />
-                  <span style={{ fontSize: '0.95rem' }}>{prettyLabel(bp)}</span>
+                  <span style={{ fontSize: '0.95rem' }}>{labels.bodyPart(bp)}</span>
                 </button>
               );
             })}

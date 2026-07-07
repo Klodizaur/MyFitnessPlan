@@ -69,6 +69,11 @@
     "builder_intensity": "Intensity",
     "builder_body_parts": "Body Parts",
     "builder_clear_filters": "Clear Filters",
+    "builder_match_label": "Match",
+    "builder_match_any": "Any",
+    "builder_match_all": "All",
+    "builder_match_any_hint": "Show videos with at least one selected filter tag",
+    "builder_match_all_hint": "Show only videos that have every selected filter tag",
     "builder_add_week": "Add Another Week",
     "builder_remove_week": "Remove Week",
     "builder_prev_week": "Previous Week",
@@ -93,7 +98,11 @@
     "set_start_date": "Set Start Date:",
     "activate": "Activate",
     "edit": "Edit",
-    "no_plans": "No plans found. Upload your first plan above!"
+    "no_plans": "No plans found. Upload your first plan above!",
+    "set_background": "Set background image",
+    "choose_from_library": "Choose from library",
+    "upload_image": "Upload image",
+    "remove_background": "Remove background image"
   },
   "calendar": {
     "today": "Today",
@@ -179,6 +188,27 @@
     "feature_csv_import": "Import workouts via CSV/TSV files",
     "feature_themes": "Choose your favourite color theme",
     "feature_privacy": "100% private - data stays on your computer"
+  },
+  "library": {
+    "title": "Library",
+    "subtitle": "Browse scanned videos grouped by top-level folders.",
+    "search_placeholder": "Search folders...",
+    "sort_az": "Alphabetical A→Z",
+    "sort_za": "Alphabetical Z→A",
+    "filter_by_equipment": "Filter by equipment",
+    "training_type": "Training Type",
+    "body_parts": "Body Parts",
+    "intensity": "Intensity",
+    "match_label": "Match",
+    "match_any": "Any",
+    "match_all": "All",
+    "match_any_hint": "Show videos with at least one selected filter tag",
+    "match_all_hint": "Show only videos that have every selected filter tag",
+    "matching_videos": "Matching Videos",
+    "grid_view": "Grid",
+    "list_view": "List",
+    "no_match": "No videos match the selected filters.",
+    "root_folder": "Root"
   }
 }
 

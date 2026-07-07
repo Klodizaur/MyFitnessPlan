@@ -1,4 +1,54 @@
 {
+  "metadata": {
+    "sections": {
+      "equipment": "Sprzęt",
+      "training_type": "Typ treningu",
+      "body_parts": "Części ciała",
+      "intensity": "Intensywność"
+    },
+    "no_description": "Brak opisu.",
+    "equipment": {
+      "dumbbells": "Hantle",
+      "mat": "Mata",
+      "gym_ball": "Piłka gimnastyczna",
+      "resistance_bands": "Gumy oporowe",
+      "pilates_ball": "Piłka do pilatesu",
+      "pilates_bar": "Drążek do pilatesu",
+      "kettlebell": "Kettlebell"
+    },
+    "training_type": {
+      "HIIT": "HIIT",
+      "Cardio": "Cardio",
+      "Strength": "Siła",
+      "Mobility": "Mobilność",
+      "Yoga": "Joga",
+      "Pilates": "Pilates",
+      "Functional Strength Training": "Funkcjonalny trening siłowy",
+      "Warmup": "Rozgrzewka",
+      "Cooldown": "Wyciszenie",
+      "Stretching": "Rozciąganie",
+      "Standing": "Na stojąco",
+      "No Jumping": "Bez skakania",
+      "Period-Friendly": "Na okres"
+    },
+    "body_part": {
+      "full_body": "Całe ciało",
+      "upper_body": "Górna część ciała",
+      "lower_body": "Dolna część ciała",
+      "core": "Brzuch",
+      "back": "Plecy",
+      "legs": "Nogi",
+      "arms": "Ramiona",
+      "shoulders": "Barki",
+      "glutes": "Pośladki",
+      "chest": "Klatka piersiowa"
+    },
+    "intensity": {
+      "low": "Niska",
+      "medium": "Średnia",
+      "high": "Wysoka"
+    }
+  },
   "nav": {
     "dashboard": "Panel główny",
     "plans": "Plany",
@@ -69,6 +119,11 @@
     "builder_intensity": "Intensywność",
     "builder_body_parts": "Części ciała",
     "builder_clear_filters": "Wyczyść filtry",
+    "builder_match_label": "Dopasuj",
+    "builder_match_any": "Dowolny",
+    "builder_match_all": "Wszystkie",
+    "builder_match_any_hint": "Pokaż filmy z co najmniej jednym wybranym tagiem",
+    "builder_match_all_hint": "Pokaż tylko filmy, które mają wszystkie wybrane tagi",
     "builder_add_week": "Dodaj kolejny tydzień",
     "builder_remove_week": "Usuń tydzień",
     "builder_prev_week": "Poprzedni tydzień",
@@ -94,7 +149,11 @@
     "set_start_date": "Ustaw datę rozpoczęcia:",
     "activate": "Aktywuj",
     "edit": "Edytuj",
-    "no_plans": "Nie znaleziono żadnych planów. Prześlij swój pierwszy plan powyżej!"
+    "no_plans": "Nie znaleziono żadnych planów. Prześlij swój pierwszy plan powyżej!",
+    "set_background": "Ustaw obraz tła",
+    "choose_from_library": "Wybierz z tego planu",
+    "upload_image": "Wgraj obraz",
+    "remove_background": "Usuń obraz tła"
   },
   "calendar": {
     "today": "Dzisiaj",
@@ -180,6 +239,27 @@
     "feature_csv_import": "Importuj plany treningowe za pomocą plików CSV/TSV",
     "feature_themes": "Wybierz swój motyw kolorów",
     "feature_privacy": "100% prywatne - dane pozostają na Twoim komputerze"
+  },
+  "library": {
+    "title": "Biblioteka",
+    "subtitle": "Przeglądaj zeskanowane filmy pogrupowane według folderów najwyższego poziomu.",
+    "search_placeholder": "Szukaj folderów...",
+    "sort_az": "Alfabetycznie A→Z",
+    "sort_za": "Alfabetycznie Z→A",
+    "filter_by_equipment": "Filtruj według sprzętu",
+    "training_type": "Typ treningu",
+    "body_parts": "Części ciała",
+    "intensity": "Intensywność",
+    "match_label": "Dopasuj",
+    "match_any": "Dowolny",
+    "match_all": "Wszystkie",
+    "match_any_hint": "Pokaż filmy z co najmniej jednym wybranym tagiem",
+    "match_all_hint": "Pokaż tylko filmy, które mają wszystkie wybrane tagi",
+    "matching_videos": "Pasujące filmy",
+    "grid_view": "Siatka",
+    "list_view": "Lista",
+    "no_match": "Żadne filmy nie pasują do wybranych filtrów.",
+    "root_folder": "Katalog główny"
   }
 }
 

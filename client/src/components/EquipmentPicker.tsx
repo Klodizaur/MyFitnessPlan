@@ -1,4 +1,5 @@
 import { EQUIPMENT_ITEMS, EquipmentId } from '../lib/equipment';
+import { useMetaLabels } from '../lib/labels';
 
 type Props = {
   selected: string[];
@@ -6,6 +7,8 @@ type Props = {
 };
 
 export default function EquipmentPicker({ selected, onChange }: Props) {
+  const labels = useMetaLabels();
+
   const toggle = (id: EquipmentId) => {
     if (selected.includes(id)) {
       onChange(selected.filter(item => item !== id));
@@ -23,7 +26,7 @@ export default function EquipmentPicker({ selected, onChange }: Props) {
             key={item.id}
             type="button"
             onClick={() => toggle(item.id)}
-            title={item.label}
+            title={labels.equipment(item.id)}
             style={{
               display: 'flex',
               flexDirection: 'column',
@@ -43,7 +46,7 @@ export default function EquipmentPicker({ selected, onChange }: Props) {
               {item.icon}
             </span>
             <span style={{ fontSize: '0.7rem', fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>
-              {item.label}
+              {labels.equipment(item.id)}
             </span>
           </button>
         );

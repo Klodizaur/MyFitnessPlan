@@ -90,7 +90,7 @@ if (!hasEquipment) {
   db.exec('ALTER TABLE videos ADD COLUMN equipment TEXT');
 }
 
-// New metadata columns: training_type (string), body_parts (JSON array), intensity (string)
+// New metadata columns: training_type (JSON array), body_parts (JSON array), intensity (string)
 const hasTrainingType = videoInfo.some(col => col.name === 'training_type');
 if (!hasTrainingType) {
   db.exec("ALTER TABLE videos ADD COLUMN training_type TEXT");
@@ -104,6 +104,12 @@ if (!hasBodyParts) {
 const hasIntensity = videoInfo.some(col => col.name === 'intensity');
 if (!hasIntensity) {
   db.exec("ALTER TABLE videos ADD COLUMN intensity TEXT");
+}
+
+const planInfo = db.pragma("table_info('workout_plans')") as any[];
+const hasBackgroundImage = planInfo.some(col => col.name === 'background_image');
+if (!hasBackgroundImage) {
+  db.exec('ALTER TABLE workout_plans ADD COLUMN background_image TEXT');
 }
 
 export default db;

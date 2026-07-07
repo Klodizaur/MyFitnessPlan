@@ -5,7 +5,8 @@ import remarkGfm from 'remark-gfm';
 import VideoMetadataEditor from './VideoMetadataEditor';
 import { Video } from '../types/video';
 import { useNavigate } from 'react-router-dom';
-import { EquipmentIcon, getEquipmentItem } from '../lib/equipment';
+import { EquipmentIcon } from '../lib/equipment';
+import { useMetaLabels } from '../lib/labels';
 
 type Props = {
   video: Video;
@@ -16,6 +17,7 @@ type Props = {
 
 export default function VideoDetailsModal({ video, onClose, onSaved, onRequestEdit }: Props) {
   const navigate = useNavigate();
+  const labels = useMetaLabels();
 
   const handlePlay = () => {
     navigate(`/player/${video.id}`);
@@ -58,7 +60,7 @@ export default function VideoDetailsModal({ video, onClose, onSaved, onRequestEd
                 </div>
               </div>
 
-              <div style={{ marginTop: 14, color: 'var(--text-primary)', lineHeight: 1.6 }}>
+              <div className="video-details-text" style={{ marginTop: 14, color: 'var(--text-primary)', lineHeight: 1.6 }}>
                 {video.description?.trim() ? (
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{video.description}</ReactMarkdown>
                 ) : (
@@ -69,26 +71,26 @@ export default function VideoDetailsModal({ video, onClose, onSaved, onRequestEd
               {video.equipment && video.equipment.length > 0 && (
                 <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {video.equipment.map(id => (
-                    <div key={id} style={{ display: 'inline-flex', gap: 8, alignItems: 'center', padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem' }} title={getEquipmentItem(id)?.label || id}>
+                    <div key={id} style={{ display: 'inline-flex', gap: 8, alignItems: 'center', padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.9rem' }} title={labels.equipment(id)}>
                       <EquipmentIcon id={id} size={16} />
-                      <span style={{ color: 'var(--text-primary)' }}>{getEquipmentItem(id)?.label || id}</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{labels.equipment(id)}</span>
                     </div>
                   ))}
                 </div>
               )}
 
-              {(video.training_type || (video.body_parts && video.body_parts.length) || video.intensity) && (
+              {((video.training_type && video.training_type.length > 0) || (video.body_parts && video.body_parts.length) || video.intensity) && (
                 <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {video.training_type && (
-                    <div style={{ padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.85rem', fontWeight: 700 }}>{video.training_type}</div>
-                  )}
+                  {video.training_type && video.training_type.length > 0 && video.training_type.map(tt => (
+                    <div key={tt} style={{ padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.85rem', fontWeight: 700 }}>{labels.trainingType(tt)}</div>
+                  ))}
 
                   {video.body_parts && video.body_parts.length > 0 && video.body_parts.map(bp => (
-                    <div key={bp} style={{ padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.85rem' }}>{bp.replace('_', ' ')}</div>
+                    <div key={bp} style={{ padding: '6px 10px', borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)', fontSize: '0.85rem' }}>{labels.bodyPart(bp)}</div>
                   ))}
 
                   {video.intensity && (
-                    <div style={{ padding: '6px 10px', borderRadius: 999, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: '0.85rem', color: 'var(--accent-color)', fontWeight: 700 }}>{video.intensity}</div>
+                    <div style={{ padding: '6px 10px', borderRadius: 999, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: '0.85rem', color: 'var(--accent-color)', fontWeight: 700 }}>{labels.intensity(video.intensity)}</div>
                   )}
                 </div>
               )}
