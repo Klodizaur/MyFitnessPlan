@@ -608,6 +608,17 @@ nav .nav-links a:hover, nav .nav-links a.active {
   opacity: 0.4;
 }
 
+/* Default plan cards (no custom image) show the app logo centered over the gradient.
+   Kept as a separate layer so the gradient's opacity doesn't fade the logo. */
+.plan-card-logo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url('/logo.png') left 16px top 16px / 18% auto no-repeat;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
 /* Slight blur to smooth out low-resolution / pixelated background images.
    The small scale-up hides the transparent edges the blur would otherwise create,
    since .plan-card clips overflow. */
