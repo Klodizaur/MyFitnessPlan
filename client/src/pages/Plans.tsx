@@ -14,6 +14,7 @@ interface Plan {
   is_active: number;
   start_date: string;
   background_image?: string | null;
+  background_blur?: number;
 }
 
 const API_BASE = 'http://localhost:3000';
@@ -44,7 +45,7 @@ const createWeek = (weekNumber: number): BuilderWeek => ({
 const createInitialBuilderWeeks = () => [createWeek(1)];
 
 export default function Plans() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const labels = useMetaLabels();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [status, setStatus] = useState('');
@@ -403,6 +404,18 @@ export default function Plans() {
     }
   };
 
+  const handleToggleBackgroundBlur = async (planId: string, blur: boolean) => {
+    const res = await fetch(`http://localhost:3000/api/plan/${planId}/background-blur`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blur })
+    });
+    const data = await res.json();
+    if (data.success) {
+      setPlans(prev => prev.map(p => p.id === planId ? { ...p, background_blur: data.backgroundBlur } : p));
+    }
+  };
+
   const bgPickerPlan = plans.find(p => p.id === bgPickerPlanId);
   const bgPickerCurrentUrl = resolveBackgroundUrl(bgPickerPlan?.background_image);
 
@@ -450,7 +463,7 @@ export default function Plans() {
           return (
             <div key={plan.id} className={`glass-card plan-card ${plan.is_active ? 'active' : ''}`}>
               {bgUrl ? (
-                <div className="plan-card-bg" style={{ backgroundImage: `url(${bgUrl})` }} />
+                <div className={`plan-card-bg${plan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
               ) : (
                 <div className="plan-card-bg no-image" />
               )}
@@ -471,9 +484,6 @@ export default function Plans() {
 
               <div className="plan-card-body">
                 <h3 className="plan-card-title">{plan.name}</h3>
-                <p className="plan-card-meta">
-                  {t('plans.uploaded_on', { date: new Date(plan.uploaded_at).toLocaleDateString(i18n.language) })}
-                </p>
 
                 {plan.is_active === 1 ? (
                   <div className="plan-card-datefield">
@@ -524,7 +534,16 @@ export default function Plans() {
             </div>
 
             {bgPickerCurrentUrl && (
-              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!bgPickerPlan?.background_blur}
+                    onChange={e => bgPickerPlanId && handleToggleBackgroundBlur(bgPickerPlanId, e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: 'var(--accent-color)', cursor: 'pointer' }}
+                  />
+                  {t('plans.blur_background') || 'Blur background'}
+                </label>
                 <button className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '0.85rem' }} onClick={() => bgPickerPlanId && handleClearBackground(bgPickerPlanId)}>
                   {t('plans.remove_background') || 'Remove background image'}
                 </button>

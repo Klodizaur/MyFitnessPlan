@@ -336,6 +336,18 @@ export default async function (fastify: FastifyInstance) {
     return reply.send({ success: true });
   });
 
+  // Toggle a slight blur on the plan's background image
+  fastify.put('/:id/background-blur', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { blur } = request.body as { blur?: boolean };
+    const plan = db.prepare('SELECT id FROM workout_plans WHERE id = ?').get(id);
+    if (!plan) return reply.code(404).send({ error: 'Plan not found' });
+
+    const value = blur ? 1 : 0;
+    db.prepare('UPDATE workout_plans SET background_blur = ? WHERE id = ?').run(value, id);
+    return reply.send({ success: true, backgroundBlur: value });
+  });
+
   fastify.post('/rematch-all', async (request, reply) => {
     const plans = db.prepare('SELECT id FROM workout_plans').all() as { id: string }[];
     for (const plan of plans) {

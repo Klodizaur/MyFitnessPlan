@@ -112,4 +112,9 @@ if (!hasBackgroundImage) {
   db.exec('ALTER TABLE workout_plans ADD COLUMN background_image TEXT');
 }
 
+const hasBackgroundBlur = planInfo.some(col => col.name === 'background_blur');
+if (!hasBackgroundBlur) {
+  db.exec('ALTER TABLE workout_plans ADD COLUMN background_blur INTEGER DEFAULT 0');
+}
+
 export default db;

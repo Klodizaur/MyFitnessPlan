@@ -145,7 +145,6 @@
     "failed_delete": "Nie udało się usunąć planu.",
     "delete_confirm": "Czy na pewno chcesz usunąć ten plan? Wszystkie powiązane treningi i historia tego planu zostaną usunięte.",
     "active": "AKTYWNY",
-    "uploaded_on": "Przesłano: {{date}}",
     "set_start_date": "Ustaw datę rozpoczęcia:",
     "activate": "Aktywuj",
     "edit": "Edytuj",
@@ -153,7 +152,8 @@
     "set_background": "Ustaw obraz tła",
     "choose_from_library": "Wybierz z tego planu",
     "upload_image": "Wgraj obraz",
-    "remove_background": "Usuń obraz tła"
+    "remove_background": "Usuń obraz tła",
+    "blur_background": "Rozmyj tło"
   },
   "calendar": {
     "today": "Dzisiaj",

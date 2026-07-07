@@ -608,6 +608,14 @@ nav .nav-links a:hover, nav .nav-links a.active {
   opacity: 0.4;
 }
 
+/* Slight blur to smooth out low-resolution / pixelated background images.
+   The small scale-up hides the transparent edges the blur would otherwise create,
+   since .plan-card clips overflow. */
+.plan-card-bg.blurred {
+  filter: blur(3px);
+  transform: scale(1.06);
+}
+
 .plan-card-overlay {
   position: absolute;
   inset: 0;
