@@ -8,6 +8,7 @@ import db from './db.js';
 import libraryRoutes from './routes/library.js';
 import planRoutes from './routes/plan.js';
 import scheduleRoutes from './routes/schedule.js';
+import profileRoutes from './routes/profile.js';
 
 const fastify = Fastify({ logger: true });
 
@@ -79,6 +80,7 @@ fastify.get('/plan-backgrounds/:filename', async (request, reply) => {
 fastify.register(libraryRoutes, { prefix: '/api/library' });
 fastify.register(planRoutes, { prefix: '/api/plan' });
 fastify.register(scheduleRoutes, { prefix: '/api/schedule' });
+fastify.register(profileRoutes, { prefix: '/api/profile' });
 
 // Generic settings route
 fastify.get('/api/settings', async (request, reply) => {

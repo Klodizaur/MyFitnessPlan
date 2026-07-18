@@ -76,7 +76,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }} className="animate-fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ marginBottom: '0.5rem' }}>{t('dashboard.welcome_back')}</h1>
           <p style={{ fontSize: '1.1rem' }}>{t('dashboard.on_the_menu')}</p>
@@ -117,10 +117,9 @@ export default function Dashboard() {
               transform: 'scale(1.1)'
             }} />
 
-            <div style={{ 
+            <div className="dashboard-hero-inner" style={{ 
               position: 'relative', 
               zIndex: 1, 
-              padding: '3rem', 
               width: '100%', 
               display: 'flex', 
               flexDirection: 'column',
@@ -188,7 +187,7 @@ export default function Dashboard() {
                   }}>
                     {t('dashboard.rest_recovery')}
                   </span>
-                  <h1 style={{ fontSize: '5rem', color: 'white', margin: '1rem 0' }}>{t('dashboard.recharge')}</h1>
+                  <h1 className="dashboard-rest-title" style={{ color: 'white', margin: '1rem 0' }}>{t('dashboard.recharge')}</h1>
                   <p style={{ fontSize: '1.4rem', color: 'rgba(255,255,255,0.7)', maxWidth: '600px', margin: '0 auto' }}>
                     {t('dashboard.rest_msg')}
                   </p>
@@ -197,7 +196,7 @@ export default function Dashboard() {
             </div>
 
             {todaySchedule.isWorkoutDay && firstPendingVideo?.thumbnail && (
-               <div style={{ 
+               <div className="dashboard-hero-thumb" style={{ 
                  position: 'absolute', right: '5%', top: '50%', transform: 'translateY(-50%)', width: '280px', aspectRatio: '16/9', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', zIndex: 2
                }}>
                   <img src={`http://localhost:3000/thumbnails/${firstPendingVideo.thumbnail}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -291,7 +290,7 @@ export default function Dashboard() {
           <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>📚 {t('dashboard.your_collection')}</h3>
           <button onClick={() => navigate('/library')} style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>{t('dashboard.view_all')}</button>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
           {libraryPreview.length > 0 ? (
             libraryPreview.map(a => (
               <div key={a.key} style={{ width: 180, cursor: 'pointer' }} onClick={() => navigate(`/library/${encodeURIComponent(a.key)}`)}>

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, BODY_PARTS, INTENSITIES, TRAINING_TYPES } from '../lib/metadata';
-import { matchesTags, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
+import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
 import { Video } from '../types/video';
 
@@ -301,6 +301,63 @@ export default function Plans() {
     }));
   };
 
+  // Advance to the next day. Rolls over to the next week's first day at the end
+  // of a week, creating that week automatically when it doesn't exist yet.
+  const goToNextDay = () => {
+    const week = builderWeeks[builderCurrentWeek];
+    if (!week) return;
+    if (builderCurrentDay < week.days.length - 1) {
+      setBuilderCurrentDay(builderCurrentDay + 1);
+      return;
+    }
+    if (builderCurrentWeek < builderWeeks.length - 1) {
+      setBuilderCurrentWeek(builderCurrentWeek + 1);
+      setBuilderCurrentDay(0);
+      return;
+    }
+    setBuilderWeeks(prev => [...prev, createWeek(prev.length + 1)]);
+    setBuilderCurrentWeek(builderCurrentWeek + 1);
+    setBuilderCurrentDay(0);
+  };
+
+  // Renders a single day card. `pinned` cards live inside the sticky header
+  // (the day currently being edited) and are not clickable to re-select.
+  const renderDayCard = (day: BuilderDay, index: number, pinned = false) => {
+    const isSelected = builderCurrentDay === index;
+    return (
+      <div
+        key={day.name}
+        className={`wb-day-card${isSelected ? ' selected' : ''}${pinned ? ' pinned' : ''}`}
+        onClick={pinned ? undefined : () => setBuilderCurrentDay(index)}
+      >
+        <div className="wb-day-card-head">
+          <span className="wb-day-name">
+            {pinned && <span className="wb-day-badge">{t('plans.builder_currently_selected')}</span>}
+            {day.name}
+          </span>
+          {day.videoIds.length > 0 && (
+            <span className="wb-day-count">{day.videoIds.length}</span>
+          )}
+        </div>
+        {day.videoIds.length === 0 ? (
+          <p className="wb-day-empty">{t('plans.builder_no_selected_videos')}</p>
+        ) : (
+          <div className="wb-day-videos">
+            {day.videoIds.map(id => {
+              const video = allVideos.find(v => v.id === id);
+              return (
+                <div key={id} className="wb-day-video">
+                  <span className="wb-day-video-name">{video ? video.filename : id}</span>
+                  <button type="button" className="wb-day-video-remove" onClick={(e) => { e.stopPropagation(); removeVideoFromDay(builderCurrentWeek, index, id); }}>×</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const closeBuilder = () => {
     setIsBuilderOpen(false);
     setEditingPlanId(null);
@@ -313,9 +370,7 @@ export default function Plans() {
   };
 
   const builderVideos = allVideos.filter(video => {
-    const query = videoSearch.trim().toLowerCase();
-    const matchesText = !query || [video.filename, video.relative_path, video.description || '']
-      .some(field => field?.toLowerCase().includes(query));
+    const matchesText = matchesQuery([video.filename, video.description], videoSearch);
 
     const matchesEquipment = matchesTags(video.equipment, selectedEquipment, matchMode);
     const matchesTrainingType = matchesTags(video.training_type, selectedTrainingType, matchMode);
@@ -635,83 +690,51 @@ export default function Plans() {
                     />
                   </div>
                 )}
-                <div className="wb-step-header">
-                  <div>
-                    <p className="wb-step-label">{t('plans.builder_step', { current: 2, total: 2 })}</p>
-                    <h3 className="wb-step-title">{`${currentWeek.name} - ${currentDay.name}`}</h3>
+                <div className="wb-sticky-head">
+                  <div className="wb-step-header">
+                    <div>
+                      <p className="wb-step-label">{t('plans.builder_step', { current: 2, total: 2 })}</p>
+                      <div className="wb-step-title-row">
+                        <h3 className="wb-step-title">{`${currentWeek.name} - ${currentDay.name}`}</h3>
+                        <button type="button" className="wb-btn wb-btn-primary wb-btn-sm wb-next-day" onClick={goToNextDay}>{t('plans.builder_next_day')} →</button>
+                      </div>
+                    </div>
+                    <div className="wb-week-nav">
+                      <button className="wb-btn wb-btn-primary" onClick={() => setBuilderStep(1)}>{t('plans.builder_back')}</button>
+                      <button className="wb-btn wb-btn-primary" onClick={() => setBuilderCurrentWeek(Math.max(builderCurrentWeek - 1, 0))} disabled={builderCurrentWeek === 0}>{t('plans.builder_prev_week')}</button>
+                      <button className="wb-btn wb-btn-primary" onClick={() => setBuilderCurrentWeek(Math.min(builderCurrentWeek + 1, builderWeeks.length - 1))} disabled={builderCurrentWeek === builderWeeks.length - 1}>{t('plans.builder_next_week')}</button>
+                      <button className="wb-btn wb-btn-primary" onClick={() => setBuilderWeeks(prev => [...prev, createWeek(prev.length + 1)])}>{t('plans.builder_add_week')}</button>
+                      {builderWeeks.length > 1 && (
+                        <button className="wb-btn wb-btn-danger" onClick={() => {
+                          const newWeeks = renameWeeksAfterDeletion(
+                            builderWeeks.filter((_, i) => i !== builderCurrentWeek)
+                          );
+                          setBuilderWeeks(newWeeks);
+                          setBuilderCurrentWeek(Math.min(builderCurrentWeek, newWeeks.length - 1));
+                        }}>{t('plans.builder_remove_week')}</button>
+                      )}
+                    </div>
                   </div>
-                  <div className="wb-week-nav">
-                    <button className="wb-btn wb-btn-primary" onClick={() => setBuilderStep(1)}>{t('plans.builder_back')}</button>
-                    <button className="wb-btn wb-btn-primary" onClick={() => setBuilderCurrentWeek(Math.max(builderCurrentWeek - 1, 0))} disabled={builderCurrentWeek === 0}>{t('plans.builder_prev_week')}</button>
-                    <button className="wb-btn wb-btn-primary" onClick={() => setBuilderCurrentWeek(Math.min(builderCurrentWeek + 1, builderWeeks.length - 1))} disabled={builderCurrentWeek === builderWeeks.length - 1}>{t('plans.builder_next_week')}</button>
-                    <button className="wb-btn wb-btn-primary" onClick={() => setBuilderWeeks(prev => [...prev, createWeek(prev.length + 1)])}>{t('plans.builder_add_week')}</button>
-                    {builderWeeks.length > 1 && (
-                      <button className="wb-btn wb-btn-danger" onClick={() => {
-                        const newWeeks = renameWeeksAfterDeletion(
-                          builderWeeks.filter((_, i) => i !== builderCurrentWeek)
-                        );
-                        setBuilderWeeks(newWeeks);
-                        setBuilderCurrentWeek(Math.min(builderCurrentWeek, newWeeks.length - 1));
-                      }}>{t('plans.builder_remove_week')}</button>
-                    )}
+
+                  <div className="wb-save-row">
+                    <button className="wb-btn wb-btn-primary wb-btn-block" onClick={handleSaveBuilderPlan} disabled={builderLoading || !builderWeeks.some(week => week.days.some(day => day.videoIds.length > 0))}>{builderLoading ? t('plans.builder_saving') : t('plans.builder_save')}</button>
                   </div>
+                  {builderStatus && (
+                    <div className="wb-status">{builderStatus}</div>
+                  )}
+                  {currentDay && renderDayCard(currentDay, builderCurrentDay, true)}
                 </div>
 
-                <div className="wb-save-row">
-                  <button className="wb-btn wb-btn-primary wb-btn-block" onClick={handleSaveBuilderPlan} disabled={builderLoading || !builderWeeks.some(week => week.days.some(day => day.videoIds.length > 0))}>{builderLoading ? t('plans.builder_saving') : t('plans.builder_save')}</button>
-                </div>
-                {builderStatus && (
-                  <div className="wb-status">{builderStatus}</div>
+                {currentWeek.days.length > 1 && (
+                  <div className="wb-day-list">
+                    <p className="wb-day-list-label">{t('plans.builder_switch_day')}</p>
+                    {currentWeek.days.map((day, index) => (
+                      builderCurrentDay === index ? null : renderDayCard(day, index)
+                    ))}
+                  </div>
                 )}
 
-                <div className="wb-day-list">
-                  {currentWeek.days.map((day, index) => {
-                    const selected = builderCurrentDay === index;
-                    return (
-                      <div key={day.name} className={`wb-day-card${selected ? ' selected' : ''}`} onClick={() => setBuilderCurrentDay(index)}>
-                        <div className="wb-day-card-head">
-                          <span className="wb-day-name">{day.name}</span>
-                          {day.videoIds.length > 0 && (
-                            <span className="wb-day-count">{day.videoIds.length}</span>
-                          )}
-                        </div>
-                        {day.videoIds.length === 0 ? (
-                          <p className="wb-day-empty">{t('plans.builder_no_selected_videos')}</p>
-                        ) : (
-                          <div className="wb-day-videos">
-                            {day.videoIds.map(id => {
-                              const video = allVideos.find(v => v.id === id);
-                              return (
-                                <div key={id} className="wb-day-video">
-                                  <span className="wb-day-video-name">{video ? video.filename : id}</span>
-                                  <button type="button" className="wb-day-video-remove" onClick={(e) => { e.stopPropagation(); removeVideoFromDay(builderCurrentWeek, index, id); }}>×</button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
                 <div className="wb-lower">
-                  <div className="wb-selected">
-                    <p className="wb-selected-title">{t('plans.builder_selected_videos')}</p>
-                    {currentDay.videoIds.length === 0 ? (
-                      <p className="wb-selected-empty">{t('plans.builder_no_selected_videos')}</p>
-                    ) : (
-                      <ul className="wb-selected-list">
-                        {currentDay.videoIds.map(id => {
-                          const video = allVideos.find(v => v.id === id);
-                          return (
-                            <li key={id}>{video ? video.filename : id}</li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-
                   <div className="wb-search-block">
                   <div className="wb-search-row">
                     <label className="wb-label">{t('plans.builder_search')}</label>

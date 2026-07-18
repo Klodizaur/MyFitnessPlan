@@ -7,6 +7,7 @@
   --text-secondary: #94a3b8;
   --accent-color: #3b82f6; /* Electric Blue */
   --accent-hover: #60a5fa;
+  --accent-soft: rgba(59, 130, 246, 0.15); /* subtle accent tint for selected states */
   --rest-color: #ef4444; /* Red for Rest */
   --progress-bg: rgba(255, 255, 255, 0.1);
   
@@ -25,6 +26,7 @@
   --text-secondary: #475569;
   --accent-color: #2563eb;
   --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.12);
   --progress-bg: rgba(0, 0, 0, 0.05);
   --glass-bg: rgba(255, 255, 255, 0.8);
   --glass-border: rgba(0, 0, 0, 0.05);
@@ -39,6 +41,7 @@
   --text-secondary: #fca5a5;
   --accent-color: #f97316;
   --accent-hover: #fb923c;
+  --accent-soft: rgba(249, 115, 22, 0.20);
   --progress-bg: rgba(255, 255, 255, 0.1);
   --glass-bg: rgba(61, 43, 70, 0.7);
   --glass-border: rgba(249, 115, 22, 0.2);
@@ -53,6 +56,7 @@
   --text-secondary: #a7f3d0;
   --accent-color: #10b981;
   --accent-hover: #34d399;
+  --accent-soft: rgba(16, 185, 129, 0.20);
   --progress-bg: rgba(255, 255, 255, 0.1);
   --glass-bg: rgba(6, 95, 70, 0.7);
   --glass-border: rgba(16, 185, 129, 0.2);
@@ -67,6 +71,7 @@
   --text-secondary: #9a3412;
   --accent-color: #fdba74;
   --accent-hover: #fb923c;
+  --accent-soft: rgba(253, 186, 116, 0.38);
   --progress-bg: rgba(0, 0, 0, 0.05);
   --glass-bg: rgba(255, 255, 255, 0.9);
   --glass-border: rgba(253, 186, 116, 0.2);
@@ -81,6 +86,7 @@
   --text-secondary: #be185d;
   --accent-color: #f9a8d4;
   --accent-hover: #f472b6;
+  --accent-soft: rgba(249, 168, 212, 0.40);
   --progress-bg: rgba(0, 0, 0, 0.05);
   --glass-bg: rgba(255, 255, 255, 0.9);
   --glass-border: rgba(249, 168, 212, 0.2);
@@ -95,6 +101,7 @@
   --text-secondary: #075985;
   --accent-color: #7dd3fc;
   --accent-hover: #38bdf8;
+  --accent-soft: rgba(125, 211, 252, 0.40);
   --progress-bg: rgba(0, 0, 0, 0.05);
   --glass-bg: rgba(255, 255, 255, 0.9);
   --glass-border: rgba(125, 211, 252, 0.2);
@@ -397,12 +404,19 @@ p { color: var(--text-secondary); line-height: 1.6; }
 }
 
 nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   display: flex;
   align-items: center;
   gap: 2rem;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 1.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .logo {
@@ -417,7 +431,7 @@ nav {
 }
 
 .logo-img {
-  height: 36px;
+  height: 30px;
   width: auto;
   display: block;
   border-radius: 6px;
@@ -430,7 +444,7 @@ nav {
   text-transform: uppercase;
   color: var(--accent-color);
   text-decoration: none;
-  padding: 0.5rem 0;
+  padding: 0.25rem 0;
 }
 
 .nav-links {
@@ -445,7 +459,7 @@ nav a {
   text-decoration: none;
   font-weight: 600;
   transition: all 0.2s;
-  padding: 0.6rem 1.2rem;
+  padding: 0.45rem 1rem;
   border-radius: 10px;
 }
 
@@ -1063,7 +1077,11 @@ nav .nav-links a:hover, nav .nav-links a.active {
 }
 
 /* ---- Forms & inputs ---- */
-.wb-form { display: grid; gap: 18px; }
+/* Block layout (not grid) so `position: sticky` children like .wb-sticky-head
+   have a tall containing block to travel within. A grid item's containing
+   block is its own row track, which would pin nothing. */
+.wb-form { display: block; }
+.wb-form > * + * { margin-top: 18px; }
 .wb-field { display: grid; gap: 8px; }
 .wb-label {
   display: block;
@@ -1133,7 +1151,8 @@ nav .nav-links a:hover, nav .nav-links a.active {
   flex-wrap: wrap;
 }
 .wb-step-label { margin: 0; font-size: 0.9rem; color: var(--wb-text-dim); }
-.wb-step-title { margin: 8px 0 0; color: var(--wb-text); font-size: 1.15rem; font-weight: 700; }
+.wb-step-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.wb-step-title { margin: 0; color: var(--wb-text); font-size: 1.15rem; font-weight: 700; }
 .wb-week-nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .wb-save-row { display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
 .wb-status {
@@ -1143,6 +1162,20 @@ nav .nav-links a:hover, nav .nav-links a.active {
   border: 1px solid var(--wb-selected-border);
   border-radius: 10px;
   padding: 10px 12px;
+}
+
+/* Pin the day title + week/save actions to the top while the user scrolls
+   down through the video picker. Sticky engages only once the bar reaches
+   the top of the modal, so nothing above this section is affected. */
+.wb-sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: 12px;
+  padding: 12px 0 14px;
+  background: var(--wb-panel);
+  border-bottom: 1px solid var(--wb-border);
 }
 
 /* ---- Day list ---- */
@@ -1203,6 +1236,25 @@ nav .nav-links a:hover, nav .nav-links a.active {
   line-height: 1;
   padding: 0 4px;
 }
+.wb-day-list-label { margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--wb-text-dim); }
+/* "Currently selected" pill shown on the pinned day card in the sticky header */
+.wb-day-badge {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--wb-accent);
+  color: var(--wb-accent-text);
+  vertical-align: middle;
+}
+/* The pinned current-day card is not re-selectable, and its video list is
+   capped so a busy day can't push the video picker off screen. */
+.wb-day-card.pinned { cursor: default; }
+.wb-day-card.pinned .wb-day-videos { max-height: 150px; overflow-y: auto; padding-right: 4px; }
 
 /* ---- Selected videos summary ---- */
 .wb-lower { display: grid; gap: 12px; }
@@ -1316,3 +1368,186 @@ nav .nav-links a:hover, nav .nav-links a.active {
 .wb-video-path { font-size: 0.85rem; color: var(--wb-text-dim); overflow-wrap: anywhere; }
 .wb-video-check { opacity: 0.85; align-self: flex-end; font-weight: 600; }
 .wb-videos.list .wb-video-check { align-self: center; }
+
+/* ==================================================================
+   Responsive / adaptive layout
+   ------------------------------------------------------------------
+   Breakpoints:
+     - <= 900px : tablet / small laptop  -> collapse nav to a menu,
+                  tighten spacing, stack multi-column filter rows
+     - <= 600px : phones -> full-width controls, smaller type
+   ================================================================== */
+
+/* Hamburger toggle: hidden on desktop, shown once the nav collapses. */
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+.nav-toggle:hover { background: var(--surface-hover); }
+
+/* Three-column filter row shared by Library and Album pages. */
+.filter-columns {
+  display: grid;
+  grid-template-columns: 240px 1fr 180px;
+  gap: 12px;
+  align-items: start;
+}
+
+/* Album subfolder cards: fill available width instead of 3 fixed columns. */
+.subfolder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 28px;
+}
+
+/* Search box inside page toolbars: caps at 360px but shrinks when space is tight. */
+.toolbar-search {
+  display: flex;
+  align-items: center;
+  background: var(--surface-hover);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  flex: 1 1 240px;
+  max-width: 360px;
+  min-width: 0;
+}
+
+/* VideoDetailsModal two-column body. */
+.vdm-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .app-container { padding: 1.5rem; }
+
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.35rem; }
+
+  /* The rounded floating-bar styling lives in the base nav rule so it applies
+     at every screen size; here we just let the items wrap into a menu and
+     tighten the padding a touch for small screens. */
+  nav {
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+  .nav-toggle {
+    display: inline-flex;
+    order: 2;
+    margin-left: auto;
+  }
+  .nav-links {
+    order: 3;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    flex-basis: 100%;
+    gap: 0.25rem;
+  }
+  .nav-links.open { display: flex; }
+  nav .nav-links a {
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+  }
+  .language-switcher {
+    margin-left: 0;
+    align-self: flex-start;
+    margin-top: 0.25rem;
+  }
+
+  /* Stack the filter row. */
+  .filter-columns { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  /* Stack the video details modal (thumbnail above info). */
+  .vdm-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .app-container { padding: 1rem; }
+
+  h1 { font-size: 1.65rem; }
+  h2 { font-size: 1.2rem; }
+
+  .glass-card { border-radius: 12px; }
+
+  .subfolder-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  /* List-mode video cards stack their thumbnail above the text on phones. */
+  .video-card--list { flex-direction: column; align-items: stretch !important; }
+  .video-card--list > div:first-child {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+  }
+
+  /* Hide the decorative floating hero thumbnail; it overlaps text on phones. */
+  .dashboard-hero-thumb { display: none !important; }
+
+  /* Tighten the player theater chrome. */
+  .player-theater-header { padding: 1rem; }
+  .player-theater-nav { gap: 1.25rem; }
+}
+
+/* Page wrapper with generous desktop gutters that tighten on smaller screens. */
+.page-root { padding: 2.5rem; }
+@media (max-width: 900px) { .page-root { padding: 1.5rem; } }
+@media (max-width: 600px) { .page-root { padding: 0.5rem; } }
+
+/* Dashboard hero: scale padding and the oversized rest-day title down on phones. */
+.dashboard-hero-inner { padding: 3rem; }
+.dashboard-rest-title { font-size: 5rem; }
+@media (max-width: 600px) {
+  .dashboard-hero-inner { padding: 1.5rem; }
+  .dashboard-rest-title { font-size: 2.75rem; }
+}
+
+/* Log calendar quick-add (+) button. Hidden until its day cell is hovered; on
+   touch devices (no hover) it stays partly visible so it's still discoverable. */
+.log-day-add {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  background: var(--surface-hover);
+  color: var(--accent-color);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
+  z-index: 2;
+}
+.log-day:hover .log-day-add,
+.log-day-add:focus-visible { opacity: 1; }
+.log-day-add:hover { background: var(--accent-color); color: #fff; }
+/* Un-dim empty days on hover so the add affordance reads clearly. */
+.log-day:hover { opacity: 1 !important; }
+@media (hover: none) {
+  .log-day-add { opacity: 0.5; }
+}

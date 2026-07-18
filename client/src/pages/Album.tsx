@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import VideoCard from '../components/VideoCard';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
-import { matchesTags, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
+import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
 import { Video } from '../types/video';
 
@@ -68,7 +68,7 @@ export default function Album() {
 
   // Videos to display (apply all active filters)
   const filtered = mainVideos.filter(v => {
-    if (q.trim() && !v.filename.toLowerCase().includes(q.trim().toLowerCase())) return false;
+    if (!matchesQuery([v.filename, v.description], q)) return false;
     if (!matchesTags(v.equipment, selectedEquipment, matchMode)) return false;
     if (!matchesTags(v.training_type, selectedTrainingType, matchMode)) return false;
     if (selectedIntensity && v.intensity !== selectedIntensity) return false;
@@ -89,9 +89,9 @@ export default function Album() {
   };
 
   return (
-    <div style={{ padding: '2.5rem' }}>
+    <div className="page-root">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => navigate(-1)} aria-label="Back" title="Back" style={{ width: 40, height: 40, borderRadius: 10, border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -102,8 +102,8 @@ export default function Album() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '8px 12px', borderRadius: 10, border: '1px solid var(--glass-border)', width: 360 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="toolbar-search">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input placeholder="Search subfolders & videos..." value={q} onChange={(e) => setQ(e.target.value)} style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%' }} />
           </div>
@@ -126,11 +126,11 @@ export default function Album() {
 
       {/* Banner */}
       <div style={{ display: 'flex', marginBottom: '2rem', gap: 20, alignItems: 'center' }}>
-        <div onMouseEnter={() => setImgHover(true)} onMouseLeave={() => setImgHover(false)} style={{ position: 'relative', flex: '0 0 360px' }}>
+        <div onMouseEnter={() => setImgHover(true)} onMouseLeave={() => setImgHover(false)} style={{ position: 'relative', flex: '1 1 280px', maxWidth: 360 }}>
           {albumImage ? (
-            <img src={albumImage} style={{ width: 360, height: 200, objectFit: 'cover', borderRadius: 12 }} />
+            <img src={albumImage} style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 12 }} />
           ) : (
-            <div style={{ width: 360, height: 200, borderRadius: 12, background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>No image</div>
+            <div style={{ width: '100%', height: 200, borderRadius: 12, background: 'var(--surface-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>No image</div>
           )}
 
           <div style={{ position: 'absolute', right: 8, top: 8, display: 'flex', gap: 8, opacity: imgHover ? 1 : 0, transition: 'opacity 140ms' }}>
@@ -151,7 +151,7 @@ export default function Album() {
       {subfolders.length > 0 && (
         <div style={{ marginBottom: '2.5rem' }}>
           <h3 style={{ marginBottom: 22 }}>Subfolders</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 360px)', gap: 28, justifyContent: 'center' }}>
+          <div className="subfolder-grid">
             {subfolders.filter(s => !q.trim() || s.key.toLowerCase().includes(q.trim().toLowerCase())).map(s => (
               <div key={s.key} onClick={() => { const next = currentSub ? `${currentSub}/${s.key}` : s.key; navigate(`/library/${encodeURIComponent(albumKey)}?path=${encodeURIComponent(next)}`); }} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ width: '100%', aspectRatio: '16/9', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -178,14 +178,14 @@ export default function Album() {
         </div>
       </div>
 
-      <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '240px 1fr 180px', gap: 12, alignItems: 'center' }}>
+      <div className="filter-columns" style={{ marginBottom: '1.5rem' }}>
         <div>
           <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Training Type</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {TRAINING_TYPES.map(t => {
               const sel = selectedTrainingType.includes(t);
               return (
-                <button key={t} onClick={() => setSelectedTrainingType(sel ? selectedTrainingType.filter(x => x !== t) : [...selectedTrainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
+                <button key={t} onClick={() => setSelectedTrainingType(sel ? selectedTrainingType.filter(x => x !== t) : [...selectedTrainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
                   <TrainingTypeIcon type={t} />
                   <span style={{ fontSize: '0.9rem' }}>{labels.trainingType(t)}</span>
                 </button>
@@ -200,7 +200,7 @@ export default function Album() {
             {BODY_PARTS.map(bp => {
               const sel = selectedBodyParts.includes(bp);
               return (
-                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
+                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
                   <BodyPartIcon part={bp} />
                   <span style={{ fontSize: '0.9rem' }}>{labels.bodyPart(bp)}</span>
                 </button>
@@ -215,7 +215,7 @@ export default function Album() {
             {['low','medium','high'].map(level => {
               const sel = selectedIntensity === level;
               return (
-                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
+                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
                   <IntensityIcon level={level} />
                   <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{labels.intensity(level)}</span>
                 </button>

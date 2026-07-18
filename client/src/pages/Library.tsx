@@ -5,7 +5,7 @@ import AlbumGrid from '../components/AlbumGrid';
 import VideoCard from '../components/VideoCard';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
-import { matchesTags, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
+import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
 import { Video } from '../types/video';
 
@@ -78,7 +78,7 @@ export default function Library() {
     setAlbums(result);
   }, [videos, sort, selectedEquipment, t]);
 
-  const visibleAlbums = albums.filter(a => a.title.toLowerCase().includes(query.trim().toLowerCase()));
+  const visibleAlbums = albums.filter(a => matchesQuery([a.title], query));
 
   const openAlbum = (key: string) => {
     navigate(`/library/${encodeURIComponent(key)}`);
@@ -96,8 +96,8 @@ export default function Library() {
       <h1>{t('library.title')}</h1>
       <p style={{ color: 'var(--text-secondary)' }}>{t('library.subtitle')}</p>
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: '1rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-hover)', padding: '8px 12px', borderRadius: 10, border: '1px solid var(--glass-border)', width: 360 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: '1rem', marginBottom: '1rem' }}>
+        <div className="toolbar-search">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input placeholder={t('library.search_placeholder')} value={query} onChange={(e) => setQuery(e.target.value)} style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%' }} />
         </div>
@@ -133,14 +133,14 @@ export default function Library() {
         <EquipmentPicker selected={selectedEquipment} onChange={setSelectedEquipment} />
       </div>
 
-      <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '240px 1fr 180px', gap: 12, alignItems: 'center' }}>
+      <div className="filter-columns" style={{ marginTop: '1rem' }}>
         <div>
           <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>{t('library.training_type')}</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {TRAINING_TYPES.map(t => {
               const sel = selectedTrainingType.includes(t);
               return (
-                <button key={t} onClick={() => setSelectedTrainingType(sel ? selectedTrainingType.filter(x => x !== t) : [...selectedTrainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
+                <button key={t} onClick={() => setSelectedTrainingType(sel ? selectedTrainingType.filter(x => x !== t) : [...selectedTrainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
                   <TrainingTypeIcon type={t} />
                   <span style={{ fontSize: '0.9rem' }}>{labels.trainingType(t)}</span>
                 </button>
@@ -155,7 +155,7 @@ export default function Library() {
             {BODY_PARTS.map(bp => {
               const sel = selectedBodyParts.includes(bp);
               return (
-                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
+                <button key={bp} onClick={() => setSelectedBodyParts(sel ? selectedBodyParts.filter(b => b !== bp) : [...selectedBodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
                   <BodyPartIcon part={bp} />
                   <span style={{ fontSize: '0.9rem' }}>{labels.bodyPart(bp)}</span>
                 </button>
@@ -170,7 +170,7 @@ export default function Library() {
             {['low','medium','high'].map(level => {
               const sel = selectedIntensity === level;
               return (
-                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
+                <button key={level} onClick={() => setSelectedIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
                   <IntensityIcon level={level} />
                   <span style={{ fontSize: '0.9rem', textTransform: 'capitalize' }}>{labels.intensity(level)}</span>
                 </button>
@@ -180,7 +180,7 @@ export default function Library() {
         </div>
       </div>
 
-      {(selectedEquipment.length > 0 || selectedTrainingType.length > 0 || selectedBodyParts.length > 0 || selectedIntensity) && (
+      {(query.trim() || selectedEquipment.length > 0 || selectedTrainingType.length > 0 || selectedBodyParts.length > 0 || selectedIntensity) && (
         <div style={{ marginTop: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h3 style={{ margin: 0 }}>{t('library.matching_videos')}</h3>
@@ -192,6 +192,7 @@ export default function Library() {
 
           {(() => {
             const matching = videos.filter(v => {
+              if (!matchesQuery([v.filename, v.description], query)) return false;
               if (!matchesTags(v.equipment, selectedEquipment, matchMode)) return false;
               if (!matchesTags(v.training_type, selectedTrainingType, matchMode)) return false;
               if (selectedIntensity && v.intensity !== selectedIntensity) return false;
