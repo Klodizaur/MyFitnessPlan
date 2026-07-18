@@ -32,7 +32,7 @@ export default function VideoDetailsModal({ video, onClose, onSaved, onRequestEd
     >
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 920, maxHeight: '90vh', overflowY: 'auto', borderRadius: 14, background: 'var(--surface-color)', padding: 18, boxSizing: 'border-box', boxShadow: '0 12px 40px rgba(2,6,23,0.6)' }}>
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 18, alignItems: 'start' }}>
+          <div className="vdm-grid">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ width: '100%', aspectRatio: '16/9', background: '#0b0b0b', borderRadius: 10, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {video.thumbnail_path ? (
@@ -90,7 +90,7 @@ export default function VideoDetailsModal({ video, onClose, onSaved, onRequestEd
                   ))}
 
                   {video.intensity && (
-                    <div style={{ padding: '6px 10px', borderRadius: 999, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: '0.85rem', color: 'var(--accent-color)', fontWeight: 700 }}>{labels.intensity(video.intensity)}</div>
+                    <div style={{ padding: '6px 10px', borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-color)', fontSize: '0.85rem', color: 'var(--accent-color)', fontWeight: 700 }}>{labels.intensity(video.intensity)}</div>
                   )}
                 </div>
               )}

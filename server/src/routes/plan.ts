@@ -208,6 +208,11 @@ export default async function (fastify: FastifyInstance) {
       // Update plan name and start date
       db.prepare('UPDATE workout_plans SET name = ?, start_date = ? WHERE id = ?').run(planName, startDate, id);
       
+      // Delete history first (it references workouts via a foreign key).
+      // Without this, deleting workouts that have completion marks fails
+      // with "FOREIGN KEY constraint failed".
+      db.prepare('DELETE FROM history WHERE workout_id IN (SELECT id FROM workouts WHERE plan_id = ?)').run(id);
+
       // Delete existing workouts for this plan
       db.prepare('DELETE FROM workouts WHERE plan_id = ?').run(id);
       

@@ -122,10 +122,13 @@ export default async function (fastify: FastifyInstance) {
     }
     
     if (existing) {
+      // Un-mark: remove from both the (ephemeral) history and the durable log.
       if (videoId) {
         db.prepare('DELETE FROM history WHERE workout_id = ? AND video_id = ?').run(workoutId, videoId);
+        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id = ?').run(workoutId, videoId);
       } else {
         db.prepare('DELETE FROM history WHERE workout_id = ? AND video_id IS NULL').run(workoutId);
+        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id IS NULL').run(workoutId);
       }
       return reply.send({ success: true, completed: false });
     } else {
@@ -135,6 +138,40 @@ export default async function (fastify: FastifyInstance) {
       } else {
         db.prepare('INSERT INTO history (id, workout_id) VALUES (?, ?)').run(nanoid(), workoutId);
       }
+
+      // Also snapshot a durable workout_log entry. Names are copied in now so the
+      // record survives future plan edits/deletes (which wipe `history`).
+      const workout = db.prepare('SELECT name, plan_id FROM workouts WHERE id = ?').get(workoutId) as { name?: string, plan_id?: string } | undefined;
+      const planName = workout?.plan_id
+        ? ((db.prepare('SELECT name FROM workout_plans WHERE id = ?').get(workout.plan_id) as { name?: string } | undefined)?.name ?? null)
+        : null;
+      let videoFilename: string | null = null;
+      let thumbnailPath: string | null = null;
+      if (videoId) {
+        const v = db.prepare('SELECT filename, thumbnail_path FROM videos WHERE id = ?').get(videoId) as { filename?: string, thumbnail_path?: string } | undefined;
+        videoFilename = v?.filename ?? null;
+        thumbnailPath = v?.thumbnail_path ?? null;
+      }
+
+      // Local date the workout was marked done. This is a local desktop app, so the
+      // server clock is the user's clock.
+      const now = new Date();
+      const completedDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .split('T')[0];
+
+      // Keep at most one log row per (workout_id, video_id), mirroring history.
+      if (videoId) {
+        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id = ?').run(workoutId, videoId);
+      } else {
+        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id IS NULL').run(workoutId);
+      }
+      db.prepare(`
+        INSERT INTO workout_log
+          (id, workout_id, video_id, plan_name, workout_name, video_filename, thumbnail_path, completed_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(nanoid(), workoutId, videoId ?? null, planName, workout?.name ?? null, videoFilename, thumbnailPath, completedDate);
+
       return reply.send({ success: true, completed: true });
     }
   });

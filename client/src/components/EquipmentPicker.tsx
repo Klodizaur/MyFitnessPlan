@@ -36,7 +36,7 @@ export default function EquipmentPicker({ selected, onChange }: Props) {
               minWidth: 72,
               borderRadius: 10,
               border: isSelected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)',
-              background: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'var(--surface-hover)',
+              background: isSelected ? 'var(--accent-soft)' : 'var(--surface-hover)',
               color: isSelected ? 'var(--accent-color)' : 'var(--text-primary)',
               cursor: 'pointer',
               transition: 'border-color 140ms, background 140ms',

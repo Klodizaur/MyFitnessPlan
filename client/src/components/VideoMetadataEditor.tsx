@@ -193,6 +193,7 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
           padding: '1.75rem',
           maxHeight: '92vh',
           overflowY: 'auto',
+          background: 'var(--surface-color)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: '1.25rem' }}>
@@ -296,7 +297,7 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
                 {TRAINING_TYPES.map(t => {
                   const sel = trainingType.includes(t);
                   return (
-                    <button key={t} onClick={() => setTrainingType(sel ? trainingType.filter(x => x !== t) : [...trainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
+                    <button key={t} onClick={() => setTrainingType(sel ? trainingType.filter(x => x !== t) : [...trainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
                       <TrainingTypeIcon type={t} />
                       <span style={{ fontSize: '0.95rem' }}>{labels.trainingType(t)}</span>
                     </button>
@@ -311,7 +312,7 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
                 {['low','medium','high'].map(level => {
                   const sel = intensity === level;
                   return (
-                    <button key={level} onClick={() => setIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'rgba(59,130,246,0.08)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
+                    <button key={level} onClick={() => setIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
                       <IntensityIcon level={level} />
                       <span style={{ fontSize: '0.95rem', textTransform: 'capitalize' }}>{labels.intensity(level)}</span>
                     </button>
@@ -328,7 +329,7 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
             {BODY_PARTS.map(bp => {
               const selected = bodyParts.includes(bp);
               return (
-                <button key={bp} onClick={() => setBodyParts(selected ? bodyParts.filter(b => b !== bp) : [...bodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: selected ? 'rgba(59,130,246,0.12)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
+                <button key={bp} onClick={() => setBodyParts(selected ? bodyParts.filter(b => b !== bp) : [...bodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: selected ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
                   <BodyPartIcon part={bp} />
                   <span style={{ fontSize: '0.95rem' }}>{labels.bodyPart(bp)}</span>
                 </button>

@@ -1,18 +1,19 @@
 import { Routes, Route, NavLink } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Calendar from './pages/Calendar';
+import Profile from './pages/Profile';
 import Player from './pages/Player';
 import Plans from './pages/Plans';
-import About from './pages/About';
 import Library from './pages/Library';
 import Album from './pages/Album';
 import LanguageSwitcher from './components/LanguageSwitcher';
 
 function App() {
   const { t } = useTranslation();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     // Fetch settings to get the current theme
@@ -35,13 +36,26 @@ function App() {
             <span className="logo-text">MyFitnessPlan</span>
           </NavLink>
         </div>
-        <div className="nav-links">
+        <button
+          type="button"
+          className="nav-toggle"
+          aria-label="Toggle navigation menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(open => !open)}
+        >
+          {menuOpen ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          )}
+        </button>
+        <div className={`nav-links${menuOpen ? ' open' : ''}`} onClick={() => setMenuOpen(false)}>
           <NavLink to="/" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.dashboard')}</NavLink>
           <NavLink to="/plans" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.plans')}</NavLink>
           <NavLink to="/calendar" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.calendar')}</NavLink>
-          <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.settings')}</NavLink>
-          <NavLink to="/about" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.about')}</NavLink>
           <NavLink to="/library" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.library') || 'Library'}</NavLink>
+          <NavLink to="/profile" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.profile')}</NavLink>
+          <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>{t('nav.settings')}</NavLink>
           <LanguageSwitcher />
         </div>
       </nav>
@@ -51,8 +65,8 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/plans" element={<Plans />} />
           <Route path="/calendar" element={<Calendar />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/about" element={<About />} />
           <Route path="/library" element={<Library />} />
           <Route path="/library/:albumId" element={<Album />} />
           <Route path="/library/:albumId/:subId" element={<Album />} />

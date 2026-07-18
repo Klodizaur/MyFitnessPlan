@@ -297,7 +297,7 @@ export default function Player() {
                 <div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: 6 }}>{labels.sections.intensity}</div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: '0.9rem', color: 'var(--accent-color)', fontWeight: 700 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-color)', fontSize: '0.9rem', color: 'var(--accent-color)', fontWeight: 700 }}>
                       <IntensityIcon level={intensity} />
                       <span style={{ textTransform: 'capitalize' }}>{labels.intensity(intensity)}</span>
                     </div>

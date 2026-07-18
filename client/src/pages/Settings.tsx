@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import '../styles/About.css';
 
 const THEMES = [
   { id: 'midnight', primary: '#3b82f6', bg: '#0f172a' },
@@ -103,6 +104,7 @@ export default function Settings() {
   };
 
   return (
+    <>
     <div className="glass-card" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1>{t('nav.settings')}</h1>
       
@@ -321,5 +323,67 @@ export default function Settings() {
         </div>
       )}
     </div>
+
+    <div className="about-card" style={{ maxWidth: '800px', margin: '2rem auto' }}>
+      <h1>MyFitnessPlan</h1>
+
+      <div className="about-section">
+        <h2>{t('about.version')}</h2>
+        <p>1.1.3</p>
+      </div>
+
+      <div className="about-section">
+        <h2>{t('about.created_by')}</h2>
+        <p>
+          <strong>Klaudia</strong>
+          <br />
+          <a
+            href="https://www.linkedin.com/in/klaudiacreativestuff/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="about-link"
+          >
+            {t('about.linkedin')}
+          </a>
+          <br />
+          <a
+            href="https://github.com/Klodizaur"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="about-link"
+          >
+            {t('about.github')}
+          </a>
+          <br />
+          <em>{t('about.role')}</em>
+          <br />
+          <strong>Big Deck IT LTD</strong>
+        </p>
+      </div>
+
+      <div className="about-section">
+        <h2>{t('about.description')}</h2>
+        <p>
+          {t('about.description_text')}
+        </p>
+      </div>
+
+      <div className="about-section">
+        <h2>{t('about.license')}</h2>
+        <p>{t('about.license_text')}</p>
+        <p className="about-highlight">
+          {t('about.non_commercial')}
+          <a
+            href="https://github.com/Klodizaur/MyFitnessPlan"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="about-link"
+          >
+          {t('about.contribute')}
+          </a>
+        </p>
+      </div>
+    </div>
+    </>
   );
 }
