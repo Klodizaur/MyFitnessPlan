@@ -83,7 +83,7 @@ function CalendarCard({ day, calendarView, navigate }: { day: ScheduleDay, calen
         }}>
           {hasThumbnail ? (
             <img 
-              src={`http://localhost:3000/thumbnails/${currentVideo.thumbnail}`} 
+              src={`/thumbnails/${currentVideo.thumbnail}`} 
               alt={currentVideo.filename} 
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
@@ -309,13 +309,13 @@ export default function Calendar() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/settings')
+    fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
         if (data.calendar_view) setCalendarView(data.calendar_view);
       });
 
-    fetch('http://localhost:3000/api/schedule')
+    fetch('/api/schedule')
       .then(res => res.json())
       .then(data => {
         if (data.schedule) {

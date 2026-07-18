@@ -128,7 +128,7 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
             }}
           >
             {video.thumbnail_path ? (
-              <img src={`http://localhost:3000/thumbnails/${video.thumbnail_path}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={`/thumbnails/${video.thumbnail_path}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <div style={{ padding: 12 }}>{video.filename}</div>
             )}
@@ -205,7 +205,7 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
           }}
         >
           {video.thumbnail_path ? (
-            <img src={`http://localhost:3000/thumbnails/${video.thumbnail_path}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={`/thumbnails/${video.thumbnail_path}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
             <div style={{ padding: 20 }}>{video.filename}</div>
           )}

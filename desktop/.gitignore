@@ -1,0 +1,7 @@
+# Dependencies
+node_modules
+
+# Build staging and installer output - never commit these (large binaries;
+# installers belong on GitHub Releases, not in the repo).
+.build
+release

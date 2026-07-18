@@ -36,7 +36,7 @@ export default function VideoDetailsModal({ video, onClose, onSaved, onRequestEd
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ width: '100%', aspectRatio: '16/9', background: '#0b0b0b', borderRadius: 10, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {video.thumbnail_path ? (
-                  <img src={`http://localhost:3000/thumbnails/${video.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={`/thumbnails/${video.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <div style={{ padding: 14, color: 'var(--text-secondary)' }}>{video.filename}</div>
                 )}

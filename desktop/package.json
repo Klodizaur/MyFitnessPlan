@@ -1,0 +1,24 @@
+{
+  "name": "workout-planner-desktop",
+  "productName": "MyFitnessPlan",
+  "private": true,
+  "version": "1.2.0",
+  "description": "Desktop wrapper for MyFitnessPlan. Isolated from the app; runs the compiled server on Electron's Node and packages installers.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:app": "npm --prefix .. run build",
+    "stage": "node scripts/stage.mjs",
+    "prepare:dist": "npm run build:app && npm run stage",
+    "dist:dir": "npm run prepare:dist && electron-builder --dir",
+    "dist:mac": "npm run prepare:dist && electron-builder --mac",
+    "dist:win": "npm run prepare:dist && electron-builder --win",
+    "dist:linux": "npm run prepare:dist && electron-builder --linux"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "ffmpeg-static": "^5.2.0"
+  }
+}

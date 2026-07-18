@@ -28,7 +28,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/schedule')
+    fetch('/api/schedule')
       .then(res => res.json())
       .then(data => {
         if (data.schedule) {
@@ -50,7 +50,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/library/videos')
+    fetch('/api/library/videos')
       .then(r => r.json())
       .then((data: any[]) => {
         const map = new Map<string, any[]>();
@@ -62,7 +62,7 @@ export default function Dashboard() {
           arr.push(v);
           map.set(key, arr);
         }
-        const albums = Array.from(map.entries()).slice(0, 4).map(([key, vids]) => ({ key, title: key === '.' ? 'Root' : key, cover: vids[0]?.thumbnail_path ? `http://localhost:3000/thumbnails/${vids[0].thumbnail_path}` : null, count: vids.length }));
+        const albums = Array.from(map.entries()).slice(0, 4).map(([key, vids]) => ({ key, title: key === '.' ? 'Root' : key, cover: vids[0]?.thumbnail_path ? `/thumbnails/${vids[0].thumbnail_path}` : null, count: vids.length }));
         setLibraryPreview(albums);
       }).catch(() => {});
   }, []);
@@ -109,7 +109,7 @@ export default function Dashboard() {
               top: 0, left: 0, right: 0, bottom: 0, 
               zIndex: 0,
               background: todaySchedule.isWorkoutDay && firstPendingVideo?.thumbnail 
-                ? `url(http://localhost:3000/thumbnails/${firstPendingVideo.thumbnail})` 
+                ? `url(/thumbnails/${firstPendingVideo.thumbnail})` 
                 : 'var(--surface-color)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
@@ -199,7 +199,7 @@ export default function Dashboard() {
                <div className="dashboard-hero-thumb" style={{ 
                  position: 'absolute', right: '5%', top: '50%', transform: 'translateY(-50%)', width: '280px', aspectRatio: '16/9', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', zIndex: 2
                }}>
-                  <img src={`http://localhost:3000/thumbnails/${firstPendingVideo.thumbnail}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={`/thumbnails/${firstPendingVideo.thumbnail}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', fontSize: '0.65rem', color: 'white' }}>
                     {firstPendingVideo.filename}
                   </div>
@@ -262,7 +262,7 @@ export default function Dashboard() {
                      width: '60px', height: '60px', borderRadius: '12px', background: 'var(--surface-hover)', overflow: 'hidden', flexShrink: 0, border: '1px solid var(--glass-border)'
                    }}>
                       {day.workout?.videos[0]?.thumbnail ? (
-                        <img src={`http://localhost:3000/thumbnails/${day.workout.videos[0].thumbnail}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={`/thumbnails/${day.workout.videos[0].thumbnail}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>🔥</div>
                       )}
