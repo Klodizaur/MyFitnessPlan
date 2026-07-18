@@ -23,7 +23,7 @@ type LogEntry = {
   equipment: string[];
 };
 
-const API = 'http://localhost:3000';
+const API = '';
 
 // Distinct, theme-agnostic colors for the pie/donut segments.
 const PALETTE = [

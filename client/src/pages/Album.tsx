@@ -28,7 +28,7 @@ export default function Album() {
 
   useEffect(() => {
     setAlbumKey(albumId ? decodeURIComponent(albumId) : '');
-    fetch('http://localhost:3000/api/library/videos')
+    fetch('/api/library/videos')
       .then(r => r.json())
       .then((data: Video[]) => setVideos(data || []))
       .catch(err => console.error('Failed to load library videos:', err));
@@ -78,7 +78,7 @@ export default function Album() {
   const shown = filtered.slice();
   shown.sort((a, b) => (sortMode === 'alpha' ? naturalCompare(a.filename, b.filename) : naturalCompare(b.filename, a.filename)));
 
-  const albumImage = localStorage.getItem(`albumImage:${albumKey}`) || (mainVideos[0]?.thumbnail_path ? `http://localhost:3000/thumbnails/${mainVideos[0].thumbnail_path}` : null);
+  const albumImage = localStorage.getItem(`albumImage:${albumKey}`) || (mainVideos[0]?.thumbnail_path ? `/thumbnails/${mainVideos[0].thumbnail_path}` : null);
   const setImage = (d: string | null) => {
     if (d) localStorage.setItem(`albumImage:${albumKey}`, d);
     else localStorage.removeItem(`albumImage:${albumKey}`);
@@ -155,7 +155,7 @@ export default function Album() {
             {subfolders.filter(s => !q.trim() || s.key.toLowerCase().includes(q.trim().toLowerCase())).map(s => (
               <div key={s.key} onClick={() => { const next = currentSub ? `${currentSub}/${s.key}` : s.key; navigate(`/library/${encodeURIComponent(albumKey)}?path=${encodeURIComponent(next)}`); }} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ width: '100%', aspectRatio: '16/9', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {s.sample?.thumbnail_path ? <img src={`http://localhost:3000/thumbnails/${s.sample.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 20, color: 'var(--text-secondary)' }}>{s.count} items</div>}
+                  {s.sample?.thumbnail_path ? <img src={`/thumbnails/${s.sample.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 20, color: 'var(--text-secondary)' }}>{s.count} items</div>}
                 </div>
                 <div style={{ padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.key}</div>

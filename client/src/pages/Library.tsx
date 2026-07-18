@@ -38,7 +38,7 @@ export default function Library() {
   };
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/library/videos')
+    fetch('/api/library/videos')
       .then(r => r.json())
       .then((data: Video[]) => setVideos(data || []))
       .catch(err => console.error('Failed to load library:', err));
@@ -69,7 +69,7 @@ export default function Library() {
 
     const result = Array.from(map.entries()).map(([key, vids]) => {
       const stored = localStorage.getItem(`albumImage:${key}`);
-      const cover = stored || (vids[0]?.thumbnail_path ? `http://localhost:3000/thumbnails/${vids[0].thumbnail_path}` : null);
+      const cover = stored || (vids[0]?.thumbnail_path ? `/thumbnails/${vids[0].thumbnail_path}` : null);
       return { key, title: key === '.' ? t('library.root_folder') : key, cover, count: vids.length };
     });
     // apply natural sort for numbered folder titles

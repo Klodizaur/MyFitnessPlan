@@ -17,7 +17,7 @@ function App() {
 
   useEffect(() => {
     // Fetch settings to get the current theme
-    fetch('http://localhost:3000/api/settings')
+    fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
         if (data.theme) {

@@ -17,7 +17,7 @@ interface Plan {
   background_blur?: number;
 }
 
-const API_BASE = 'http://localhost:3000';
+const API_BASE = '';
 
 const resolveBackgroundUrl = (backgroundImage?: string | null) => {
   if (!backgroundImage) return null;
@@ -78,7 +78,7 @@ export default function Plans() {
   const [bgPickerLoading, setBgPickerLoading] = useState(false);
 
   const fetchPlans = async () => {
-    const res = await fetch('http://localhost:3000/api/plan');
+    const res = await fetch('/api/plan');
     const data = await res.json();
     setPlans(data);
   };
@@ -92,7 +92,7 @@ export default function Plans() {
     const formData = new FormData();
     formData.append('file', selectedFile);
 
-    const res = await fetch('http://localhost:3000/api/plan/upload', {
+    const res = await fetch('/api/plan/upload', {
       method: 'POST',
       body: formData
     });
@@ -107,7 +107,7 @@ export default function Plans() {
 
   const handleActivate = async (id: string) => {
     setStatus(t('plans.activating_status'));
-    const res = await fetch(`http://localhost:3000/api/plan/activate/${id}`, {
+    const res = await fetch(`/api/plan/activate/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ startDate: activationDate })
@@ -124,7 +124,7 @@ export default function Plans() {
   const handleDelete = async (id: string) => {
     if (!confirm(t('plans.delete_confirm'))) return;
     setStatus(t('plans.deleting_status'));
-    const res = await fetch(`http://localhost:3000/api/plan/${id}`, {
+    const res = await fetch(`/api/plan/${id}`, {
       method: 'DELETE'
     });
     const data = await res.json();
@@ -141,7 +141,7 @@ export default function Plans() {
     if (!plan) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/plan/${planId}`);
+      const res = await fetch(`/api/plan/${planId}`);
       const planData = await res.json();
 
       // Reconstruct weeks from workouts based on sequence_order
@@ -190,7 +190,7 @@ export default function Plans() {
 
   useEffect(() => {
     if (!isBuilderOpen || allVideos.length > 0) return;
-    fetch('http://localhost:3000/api/library/videos')
+    fetch('/api/library/videos')
       .then(r => r.json())
       .then((data: Video[]) => setAllVideos(data || []))
       .catch(() => setAllVideos([]));
@@ -263,8 +263,8 @@ export default function Plans() {
     setBuilderStatus(t('plans.builder_saving'));
 
     const endpoint = editingPlanId 
-      ? `http://localhost:3000/api/plan/${editingPlanId}`
-      : 'http://localhost:3000/api/plan/create';
+      ? `/api/plan/${editingPlanId}`
+      : '/api/plan/create';
 
     const res = await fetch(endpoint, {
       method: editingPlanId ? 'PUT' : 'POST',
@@ -391,7 +391,7 @@ export default function Plans() {
     setBgPickerLoading(true);
     setBgPickerVideos([]);
     try {
-      const res = await fetch(`http://localhost:3000/api/plan/${planId}`);
+      const res = await fetch(`/api/plan/${planId}`);
       const planData = await res.json();
 
       const idSet = new Set<string>();
@@ -404,7 +404,7 @@ export default function Plans() {
         }
       });
 
-      const vRes = await fetch('http://localhost:3000/api/library/videos');
+      const vRes = await fetch('/api/library/videos');
       const videoList: Video[] = await vRes.json();
 
       setBgPickerVideos((videoList || []).filter(v => idSet.has(v.id) && v.thumbnail_path));
@@ -421,7 +421,7 @@ export default function Plans() {
   };
 
   const handleSelectThumbnailBackground = async (planId: string, thumbnailPath: string) => {
-    const res = await fetch(`http://localhost:3000/api/plan/${planId}/background`, {
+    const res = await fetch(`/api/plan/${planId}/background`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ thumbnailPath })
@@ -437,7 +437,7 @@ export default function Plans() {
     setBgUploading(true);
     const formData = new FormData();
     formData.append('file', imageFile);
-    const res = await fetch(`http://localhost:3000/api/plan/${planId}/background`, {
+    const res = await fetch(`/api/plan/${planId}/background`, {
       method: 'POST',
       body: formData
     });
@@ -450,7 +450,7 @@ export default function Plans() {
   };
 
   const handleClearBackground = async (planId: string) => {
-    const res = await fetch(`http://localhost:3000/api/plan/${planId}/background`, {
+    const res = await fetch(`/api/plan/${planId}/background`, {
       method: 'DELETE'
     });
     const data = await res.json();
@@ -460,7 +460,7 @@ export default function Plans() {
   };
 
   const handleToggleBackgroundBlur = async (planId: string, blur: boolean) => {
-    const res = await fetch(`http://localhost:3000/api/plan/${planId}/background-blur`, {
+    const res = await fetch(`/api/plan/${planId}/background-blur`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ blur })
@@ -622,7 +622,7 @@ export default function Plans() {
                       title={video.filename}
                       onClick={() => bgPickerPlanId && handleSelectThumbnailBackground(bgPickerPlanId, video.thumbnail_path as string)}
                     >
-                      <img src={`http://localhost:3000/thumbnails/${video.thumbnail_path}`} alt={video.filename} />
+                      <img src={`/thumbnails/${video.thumbnail_path}`} alt={video.filename} />
                     </div>
                   ))}
                 </div>
@@ -829,7 +829,7 @@ export default function Plans() {
                           {videoViewMode === 'grid' ? (
                             <>
                               {video.thumbnail_path ? (
-                                <img className="wb-video-thumb" src={`http://localhost:3000/thumbnails/${video.thumbnail_path}`} alt={video.filename} />
+                                <img className="wb-video-thumb" src={`/thumbnails/${video.thumbnail_path}`} alt={video.filename} />
                               ) : (
                                 <div className="wb-video-thumb wb-video-thumb-empty">No thumbnail</div>
                               )}
