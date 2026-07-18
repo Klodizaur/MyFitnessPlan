@@ -26,7 +26,7 @@ export default function Player() {
   const labels = useMetaLabels();
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/library/videos')
+    fetch('/api/library/videos')
       .then(res => res.json())
       .then(data => {
         const vid = data.find((v: any) => v.id === videoId);
@@ -47,7 +47,7 @@ export default function Player() {
         setError('Failed to load video details');
       });
 
-    fetch('http://localhost:3000/api/schedule')
+    fetch('/api/schedule')
       .then(res => res.json())
       .then(data => {
         const schedule = data.schedule || [];
@@ -107,7 +107,7 @@ export default function Player() {
     if (!workoutId || !videoId || isMarking) return;
     setIsMarking(true);
     try {
-      const res = await fetch('http://localhost:3000/api/schedule/toggle-done', {
+      const res = await fetch('/api/schedule/toggle-done', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workoutId, videoId })
@@ -135,7 +135,7 @@ export default function Player() {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
-  const videoUrl = `http://localhost:3000/videos/${videoPath.split('/').map(encodeURIComponent).join('/')}`;
+  const videoUrl = `/videos/${videoPath.split('/').map(encodeURIComponent).join('/')}`;
   const hasMeta = Boolean(description.trim()) || equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity);
 
   return (

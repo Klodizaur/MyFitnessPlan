@@ -13,7 +13,7 @@ import {
 import { useMetaLabels } from '../lib/labels';
 import { Video } from '../types/video';
 
-const API = 'http://localhost:3000';
+const API = '';
 
 type Props = {
   /** Target day in YYYY-MM-DD (already guaranteed to be today or earlier). */
