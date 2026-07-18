@@ -152,7 +152,7 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:3000/api/library/videos/${video.id}`, {
+      const res = await fetch(`/api/library/videos/${video.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description, equipment, training_type: trainingType, body_parts: bodyParts, intensity }),

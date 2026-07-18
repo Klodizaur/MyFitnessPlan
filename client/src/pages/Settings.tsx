@@ -21,9 +21,10 @@ export default function Settings() {
   const [theme, setTheme] = useState('midnight');
   const [calendarView, setCalendarView] = useState('list');
   const [status, setStatus] = useState('');
+  const [appVersion, setAppVersion] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/settings')
+    fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
         if (data.video_directory) setDirectory(data.video_directory);
@@ -34,10 +35,17 @@ export default function Settings() {
       });
   }, []);
 
+  useEffect(() => {
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(data => { if (data.version) setAppVersion(data.version); })
+      .catch(() => {});
+  }, []);
+
   const handleSetDirectory = async () => {
     setStatus(t('settings.scanning_status'));
     try {
-      const res = await fetch('http://localhost:3000/api/library/set-directory', {
+      const res = await fetch('/api/library/set-directory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ directory })
@@ -52,7 +60,7 @@ export default function Settings() {
 
   const handleSaveSettings = async () => {
     try {
-      await fetch('http://localhost:3000/api/settings', {
+      await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -329,7 +337,7 @@ export default function Settings() {
 
       <div className="about-section">
         <h2>{t('about.version')}</h2>
-        <p>1.1.3</p>
+        <p>{appVersion || '\u2014'}</p>
       </div>
 
       <div className="about-section">

@@ -1,0 +1,57 @@
+name: Build desktop installers
+
+# Native modules (better-sqlite3) and ffmpeg can't be cross-compiled, so each
+# installer is built on its own OS runner. Trigger manually, or by pushing a v* tag.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build_script: dist:mac
+            artifact_name: myfitnessplan-macos-dmg
+            artifact_glob: desktop/release/*.dmg
+          - os: windows-latest
+            build_script: dist:win
+            artifact_name: myfitnessplan-windows-installer
+            artifact_glob: desktop/release/*.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Installs the client + server workspaces so `npm run build:app` works.
+      - name: Install app dependencies
+        run: npm install
+
+      - name: Install desktop dependencies
+        run: npm install
+        working-directory: desktop
+
+      # prepare:dist builds the app, stages resources, rebuilds better-sqlite3 for
+      # Electron's ABI, and bundles ffmpeg; then electron-builder produces the installer.
+      - name: Build installer
+        run: npm run ${{ matrix.build_script }}
+        working-directory: desktop
+        env:
+          # Unsigned build. Add signing/notarization secrets here later for public distribution.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error

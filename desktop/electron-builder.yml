@@ -1,0 +1,51 @@
+appId: com.bigdeckit.myfitnessplan
+productName: MyFitnessPlan
+copyright: Copyright Big Deck IT LTD
+
+directories:
+  output: release
+  buildResources: build
+
+# The wrapper itself is tiny; the app/server/ffmpeg ship as extraResources (below).
+files:
+  - main.js
+  - package.json
+  - assets/**/*
+
+asar: true
+
+# Everything the compiled app needs at runtime, kept OUTSIDE asar so the native
+# better-sqlite3 binary and the ffmpeg executable can be loaded/executed directly.
+extraResources:
+  - from: .build/client/dist
+    to: client/dist
+  - from: .build/server
+    to: server
+  - from: .build/ffmpeg
+    to: ffmpeg
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.healthcare-fitness
+  icon: build/icon.icns
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+win:
+  target:
+    - nsis
+  icon: build/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+linux:
+  target:
+    - AppImage
+  category: Utility
+  icon: build/icon.png
