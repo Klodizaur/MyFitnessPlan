@@ -69,15 +69,18 @@ fastify.get('/videos/*', async (request, reply) => {
     return reply.code(404).send({ error: 'Video directory not configured' });
   }
 
-  const relativePath = decodeURIComponent((request.params as any)['*']);
-  const fullPath = path.join(videoDir, relativePath);
+  // Accept either `/` or `\` in the URL; resolve with the OS path module.
+  const relativePath = decodeURIComponent((request.params as any)['*']).replace(/\\/g, '/');
+  const fullPath = path.join(videoDir, ...relativePath.split('/').filter(Boolean));
 
   if (!fs.existsSync(fullPath)) {
     fastify.log.error(`File not found: ${fullPath}`);
     return reply.code(404).send({ error: 'Video file not found' });
   }
 
-  return reply.sendFile(relativePath, videoDir);
+  // sendFile joins root + filename; pass OS-native relative path for Windows.
+  const sendRel = path.relative(videoDir, fullPath);
+  return reply.sendFile(sendRel, videoDir);
 });
 
 // Serve thumbnails

@@ -77,7 +77,13 @@ insertSetting.run('video_directory', '');
 insertSetting.run('exclude_paths', JSON.stringify([]));
 insertSetting.run('start_date', new Date().toISOString().split('T')[0]); // YYYY-MM-DD
 insertSetting.run('theme', 'midnight');
-insertSetting.run('calendar_view', 'list');// Migrations
+insertSetting.run('calendar_view', 'list');
+
+// Normalize relative_path separators to `/` so Windows scans match the UI
+// (which always splits on `/`). No-op when paths are already POSIX.
+db.prepare("UPDATE videos SET relative_path = REPLACE(relative_path, '\\', '/') WHERE relative_path LIKE '%\\%'").run();
+
+// Migrations
 const tableInfo = db.pragma("table_info('workout_plans')") as any[];
 const hasStartDate = tableInfo.some(col => col.name === 'start_date');
 if (!hasStartDate) {

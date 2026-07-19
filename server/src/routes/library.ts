@@ -84,7 +84,8 @@ function formatVideoRow(row: {
   return {
     id: row.id,
     filename: row.filename,
-    relative_path: row.relative_path,
+    // Always expose POSIX separators so Mac/Windows clients share one code path.
+    relative_path: (row.relative_path || '').replace(/\\/g, '/'),
     thumbnail_path: row.thumbnail_path,
     description: row.description || '',
     equipment: parseEquipment(row.equipment),
@@ -186,7 +187,8 @@ normalizedDir = path.resolve(normalizedDir);
 
     // Process one by one to handle async thumbnail generation
     for (const file of videoFiles) {
-      const relativePath = path.relative(normalizedDir, file);
+      // Store with `/` so library/dashboard/player grouping works on every OS.
+      const relativePath = path.relative(normalizedDir, file).split(path.sep).join('/');
       let id = existingMap.get(file);
       
       if (id) {

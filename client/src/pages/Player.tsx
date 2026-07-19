@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { EquipmentIcon } from '../lib/equipment';
 import { TrainingTypeIcon, BodyPartIcon, IntensityIcon } from '../lib/metadata';
 import { useMetaLabels } from '../lib/labels';
+import { videoStreamUrl } from '../lib/paths';
 
 export default function Player() {
   const { videoId, workoutId } = useParams();
@@ -135,7 +136,7 @@ export default function Player() {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
-  const videoUrl = `/videos/${videoPath.split('/').map(encodeURIComponent).join('/')}`;
+  const videoUrl = videoStreamUrl(videoPath);
   const hasMeta = Boolean(description.trim()) || equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity);
 
   return (
@@ -186,6 +187,7 @@ export default function Player() {
           controls
           autoPlay
           onEnded={() => nextVideoId && navigate(`/player/${nextVideoId}/${workoutId}`)}
+          onError={() => setError('Could not play this video. The file may be missing or use an unsupported format.')}
         />
 
         {/* Floating prev/next */}

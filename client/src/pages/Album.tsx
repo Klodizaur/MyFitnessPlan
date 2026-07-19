@@ -5,6 +5,7 @@ import EquipmentPicker from '../components/EquipmentPicker';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
 import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
+import { fromAlbumRouteParam, toAlbumRouteParam, toPosixPath } from '../lib/paths';
 import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -27,7 +28,7 @@ export default function Album() {
   const labels = useMetaLabels();
 
   useEffect(() => {
-    setAlbumKey(albumId ? decodeURIComponent(albumId) : '');
+    setAlbumKey(fromAlbumRouteParam(albumId));
     fetch('/api/library/videos')
       .then(r => r.json())
       .then((data: Video[]) => setVideos(data || []))
@@ -37,14 +38,15 @@ export default function Album() {
   // Read nested path from query (supports deep nesting): ?path=sub1%2Fsub2
   const searchParams = new URLSearchParams(location.search);
   const pathParam = searchParams.get('path');
-  const currentSub = pathParam ? decodeURIComponent(pathParam) : null;
+  const currentSub = pathParam ? toPosixPath(decodeURIComponent(pathParam)) : null;
 
   // Determine base prefix for this view (main album or a deeper nested folder)
   const basePrefix = currentSub ? (albumKey === '.' ? currentSub : `${albumKey}/${currentSub}`) : (albumKey === '.' ? '' : albumKey);
 
   const isUnderBase = (rel: string) => {
-    if (!basePrefix) return !rel.includes('/');
-    return rel.startsWith(basePrefix + '/');
+    const posix = toPosixPath(rel);
+    if (!basePrefix) return !posix.includes('/');
+    return posix.startsWith(basePrefix + '/');
   };
 
   // Build subfolder map and mainVideos under current base
@@ -52,7 +54,7 @@ export default function Album() {
   const mainVideos = videos.filter(v => isUnderBase(v.relative_path || ''));
   // apply filters to mainVideos later when showing
   for (const v of videos) {
-    const rel = v.relative_path || '';
+    const rel = toPosixPath(v.relative_path || '');
     const prefix = basePrefix ? basePrefix + '/' : '';
     if (!rel.startsWith(prefix)) continue;
     const remainder = rel.slice(prefix.length);
@@ -153,7 +155,7 @@ export default function Album() {
           <h3 style={{ marginBottom: 22 }}>Subfolders</h3>
           <div className="subfolder-grid">
             {subfolders.filter(s => !q.trim() || s.key.toLowerCase().includes(q.trim().toLowerCase())).map(s => (
-              <div key={s.key} onClick={() => { const next = currentSub ? `${currentSub}/${s.key}` : s.key; navigate(`/library/${encodeURIComponent(albumKey)}?path=${encodeURIComponent(next)}`); }} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
+              <div key={s.key} onClick={() => { const next = currentSub ? `${currentSub}/${s.key}` : s.key; navigate(`/library/${encodeURIComponent(toAlbumRouteParam(albumKey))}?path=${encodeURIComponent(next)}`); }} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--glass-border)', background: 'var(--surface-color)', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ width: '100%', aspectRatio: '16/9', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {s.sample?.thumbnail_path ? <img src={`/thumbnails/${s.sample.thumbnail_path}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 20, color: 'var(--text-secondary)' }}>{s.count} items</div>}
                 </div>

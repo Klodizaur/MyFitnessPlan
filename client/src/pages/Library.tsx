@@ -7,16 +7,10 @@ import EquipmentPicker from '../components/EquipmentPicker';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
 import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
+import { topLevelAlbumKey, toAlbumRouteParam } from '../lib/paths';
 import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-
-function albumKeyFromPath(rel: string) {
-  if (!rel) return '.';
-  const parts = rel.split('/');
-  if (parts.length <= 1) return '.';
-  return parts.slice(0, -1).join('/');
-}
 
 export default function Library() {
   const [videos, setVideos] = useState<Video[]>([]);
@@ -61,7 +55,7 @@ export default function Library() {
         if (!vparts.some(bp => selectedBodyParts.includes(bp))) continue;
       }
       const rel = v.relative_path || '';
-      const top = rel.includes('/') ? rel.split('/')[0] : '.';
+      const top = topLevelAlbumKey(rel);
       const arr = map.get(top) || [];
       arr.push(v);
       map.set(top, arr);
@@ -81,7 +75,7 @@ export default function Library() {
   const visibleAlbums = albums.filter(a => matchesQuery([a.title], query));
 
   const openAlbum = (key: string) => {
-    navigate(`/library/${encodeURIComponent(key)}`);
+    navigate(`/library/${encodeURIComponent(toAlbumRouteParam(key))}`);
   };
 
   const setAlbumImage = (key: string, dataUrl: string | null) => {

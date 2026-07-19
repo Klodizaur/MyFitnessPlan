@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { topLevelAlbumKey, toAlbumRouteParam } from '../lib/paths';
 
 interface ScheduleDay {
   date: string;
@@ -57,7 +58,7 @@ export default function Dashboard() {
         for (const v of data || []) {
           const rel = v.relative_path || '';
           // Group by top-level folder (first segment) or '.' for root
-          const key = rel.includes('/') ? rel.split('/')[0] : (rel ? rel : '.');
+          const key = topLevelAlbumKey(rel);
           const arr = map.get(key) || [];
           arr.push(v);
           map.set(key, arr);
@@ -293,7 +294,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
           {libraryPreview.length > 0 ? (
             libraryPreview.map(a => (
-              <div key={a.key} style={{ width: 180, cursor: 'pointer' }} onClick={() => navigate(`/library/${encodeURIComponent(a.key)}`)}>
+              <div key={a.key} style={{ width: 180, cursor: 'pointer' }} onClick={() => navigate(`/library/${encodeURIComponent(toAlbumRouteParam(a.key))}`)}>
                 <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
                   {a.cover ? <img src={a.cover} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ padding: 12 }}>{a.count} videos</div>}
                 </div>
