@@ -79,8 +79,39 @@ fastify.get('/videos/*', async (request, reply) => {
   }
 
   // sendFile joins root + filename; pass OS-native relative path for Windows.
-  const sendRel = path.relative(videoDir, fullPath);
-  return reply.sendFile(sendRel, videoDir);
+  // const sendRel = path.relative(videoDir, fullPath);
+  //return reply.sendFile(sendRel, videoDir);
+  const stat = fs.statSync(fullPath);
+  const fileSize = stat.size;
+  const range = request.headers.range;
+
+  if (!range) {
+    reply
+      .header('Content-Type', 'video/mp4')
+      .header('Content-Length', fileSize);
+
+    return reply.send(fs.createReadStream(fullPath));
+  }
+
+  const parts = range.replace(/bytes=/, '').split('-');
+
+  const start = parseInt(parts[0], 10);
+  const end = parts[1]
+    ? parseInt(parts[1], 10)
+    : fileSize - 1;
+
+  const chunkSize = end - start + 1;
+
+  reply
+    .code(206)
+    .header('Content-Range', `bytes ${start}-${end}/${fileSize}`)
+    .header('Accept-Ranges', 'bytes')
+    .header('Content-Length', chunkSize)
+    .header('Content-Type', 'video/mp4');
+
+  return reply.send(
+    fs.createReadStream(fullPath, { start, end })
+  );
 });
 
 // Serve thumbnails
