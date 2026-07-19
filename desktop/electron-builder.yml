@@ -9,6 +9,7 @@ directories:
 # The wrapper itself is tiny; the app/server/ffmpeg ship as extraResources (below).
 files:
   - main.js
+  - preload.js
   - package.json
   - assets/**/*
 

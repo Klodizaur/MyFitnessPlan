@@ -202,6 +202,7 @@
     "modern_slider": "Nowoczesny suwak",
     "video_library_path": "Ścieżka biblioteki wideo",
     "video_library_path_msg": "Bezwzględna ścieżka do lokalnego katalogu wideo.",
+    "browse": "Przeglądaj",
     "scan": "Skanuj",
     "scanning_status": "Skanowanie katalogu...",
     "found_videos": "Sukces! Znaleziono {{count}} filmów.",

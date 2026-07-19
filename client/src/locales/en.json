@@ -151,6 +151,7 @@
     "modern_slider": "Modern Slider",
     "video_library_path": "Video Library Path",
     "video_library_path_msg": "Absolute path to your local video directory.",
+    "browse": "Browse",
     "scan": "Scan",
     "scanning_status": "Scanning directory...",
     "found_videos": "Success! Found {{count}} videos.",

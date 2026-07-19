@@ -21,7 +21,7 @@
  */
 
 const {
-  app, BrowserWindow, Tray, Menu, nativeImage, dialog, shell, utilityProcess,
+  app, BrowserWindow, Tray, Menu, nativeImage, dialog, shell, utilityProcess, ipcMain,
 } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -500,6 +500,20 @@ function currentUrl() {
   return isPackaged ? `http://localhost:${currentPort}/` : CLIENT_DEV_URL;
 }
 
+/** Native folder picker for Settings (video library / exclude paths). */
+ipcMain.handle('pick-directory', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const opts = {
+    title: 'Select folder',
+    properties: ['openDirectory', 'createDirectory'],
+  };
+  const pick = win
+    ? await dialog.showOpenDialog(win, opts)
+    : await dialog.showOpenDialog(opts);
+  if (pick.canceled || !pick.filePaths || pick.filePaths.length === 0) return null;
+  return pick.filePaths[0];
+});
+
 function openApp() {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -514,7 +528,11 @@ function openApp() {
     show: false,
     backgroundColor: '#0f172a',
     title: 'MyFitnessPlan',
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
   });
   log('Loading window:', url);
   mainWindow.loadURL(url);

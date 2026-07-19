@@ -22,6 +22,7 @@ export default function Settings() {
   const [calendarView, setCalendarView] = useState('list');
   const [status, setStatus] = useState('');
   const [appVersion, setAppVersion] = useState('');
+  const canBrowseFolders = typeof window !== 'undefined' && !!window.myFitnessPlan?.pickDirectory;
 
   useEffect(() => {
     fetch('/api/settings')
@@ -41,6 +42,18 @@ export default function Settings() {
       .then(data => { if (data.version) setAppVersion(data.version); })
       .catch(() => {});
   }, []);
+
+  const handleBrowseDirectory = async () => {
+    const picked = await window.myFitnessPlan?.pickDirectory();
+    if (picked) setDirectory(picked);
+  };
+
+  const handleBrowseExclude = async () => {
+    const picked = await window.myFitnessPlan?.pickDirectory();
+    if (!picked) return;
+    setExcludePaths((prev) => (prev.includes(picked) ? prev : [...prev, picked]));
+    setNewExclude('');
+  };
 
   const handleSetDirectory = async () => {
     setStatus(t('settings.scanning_status'));
@@ -198,13 +211,18 @@ export default function Settings() {
       <div style={{ marginBottom: '2rem' }}>
         <h2>{t('settings.video_library_path')}</h2>
         <p style={{ marginBottom: '1rem' }}>{t('settings.video_library_path_msg')}</p>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <input 
             type="text" 
             value={directory} 
             onChange={e => setDirectory(e.target.value)}
-            style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
+            style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
           />
+          {canBrowseFolders && (
+            <button className="btn btn-secondary" type="button" onClick={handleBrowseDirectory}>
+              {t('settings.browse')}
+            </button>
+          )}
           <button className="btn" onClick={handleSetDirectory}>{t('settings.scan')}</button>
         </div>
       </div>
@@ -213,14 +231,19 @@ export default function Settings() {
         <h2>{t('settings.exclude_folders')}</h2>
         <p style={{ marginBottom: '1rem' }}>{t('settings.exclude_folders_msg')}</p>
         
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <input 
             type="text" 
             placeholder={t('settings.path_placeholder')}
             value={newExclude} 
             onChange={e => setNewExclude(e.target.value)}
-            style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
+            style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
           />
+          {canBrowseFolders && (
+            <button className="btn btn-secondary" type="button" onClick={handleBrowseExclude}>
+              {t('settings.browse')}
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={handleAddExclude}>{t('settings.add')}</button>
         </div>
 
