@@ -142,13 +142,21 @@ export default async function (fastify: FastifyInstance) {
   fastify.post('/set-directory', async (request, reply) => {
     const { directory } = request.body as { directory: string };
 
-    // Normalize: expand ~ and trim whitespace
-    let normalizedDir = directory.trim().replace(/^~/, process.env.HOME || '~');
-    
-    // Auto-prepend / if the user forgot it (e.g. "Users/klodux/..." instead of "/Users/klodux/...")
-    if (!normalizedDir.startsWith('/')) {
+    // Normalize: trim whitespace and expand ~ on Unix-like systems
+    let normalizedDir = directory.trim();
+
+    if (normalizedDir.startsWith('~')) {
+      const home = process.env.HOME || process.env.USERPROFILE || '~';
+      normalizedDir = normalizedDir.replace(/^~/, home);
+    }
+
+    // On Unix-like systems, allow "Users/..." or "home/..." by prepending /
+    if (process.platform !== 'win32' && !path.isAbsolute(normalizedDir)) {
       normalizedDir = '/' + normalizedDir;
     }
+
+// Normalize the path for the current operating system
+normalizedDir = path.resolve(normalizedDir);
 
     let isValidDir = false;
     try {
