@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import VideoCard from '../components/VideoCard';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
 import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
-import { fromAlbumRouteParam, toAlbumRouteParam, toPosixPath } from '../lib/paths';
+import { fromAlbumRouteParam, toAlbumRouteParam, toPosixPath, isExternalVideo, isExternalAlbumKey, playlistIdFromAlbumKey } from '../lib/paths';
 import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -14,6 +15,8 @@ export default function Album() {
   const { albumId } = useParams();
   const [videos, setVideos] = useState<Video[]>([]);
   const [albumKey, setAlbumKey] = useState<string>('');
+  // User-picked cover, or null to fall back to the first video's thumbnail.
+  const [customImage, setCustomImage] = useState<string | null>(null);
   const [imgHover, setImgHover] = useState(false);
   const [q, setQ] = useState('');
   const [sortMode, setSortMode] = useState<'alpha' | 'alpha_desc'>('alpha');
@@ -26,9 +29,12 @@ export default function Album() {
   const location = useLocation();
   const [matchMode, setMatchMode] = useFilterMatchMode();
   const labels = useMetaLabels();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setAlbumKey(fromAlbumRouteParam(albumId));
+    const key = fromAlbumRouteParam(albumId);
+    setAlbumKey(key);
+    setCustomImage(localStorage.getItem(`albumImage:${key}`));
     fetch('/api/library/videos')
       .then(r => r.json())
       .then((data: Video[]) => setVideos(data || []))
@@ -49,11 +55,23 @@ export default function Album() {
     return posix.startsWith(basePrefix + '/');
   };
 
+  // An imported playlist is a flat album keyed by its playlist ID, not a real
+  // folder: it has no path, no subfolders, and nothing to nest into.
+  const isExternalAlbum = isExternalAlbumKey(albumKey);
+  const playlistId = isExternalAlbum ? playlistIdFromAlbumKey(albumKey) : null;
+
+  // Videos with no file on disk have an empty relative_path, which would match
+  // the library-root prefix and show them alongside real files. Folder views
+  // consider local videos only.
+  const localVideos = videos.filter(v => !isExternalVideo(v));
+
   // Build subfolder map and mainVideos under current base
   const subMap = new Map<string, { key: string; count: number; sample?: Video }>();
-  const mainVideos = videos.filter(v => isUnderBase(v.relative_path || ''));
+  const mainVideos = isExternalAlbum
+    ? videos.filter(v => isExternalVideo(v) && (v.external_playlist_id || 'unknown') === playlistId)
+    : localVideos.filter(v => isUnderBase(v.relative_path || ''));
   // apply filters to mainVideos later when showing
-  for (const v of videos) {
+  for (const v of isExternalAlbum ? [] : localVideos) {
     const rel = toPosixPath(v.relative_path || '');
     const prefix = basePrefix ? basePrefix + '/' : '';
     if (!rel.startsWith(prefix)) continue;
@@ -80,14 +98,74 @@ export default function Album() {
   const shown = filtered.slice();
   shown.sort((a, b) => (sortMode === 'alpha' ? naturalCompare(a.filename, b.filename) : naturalCompare(b.filename, a.filename)));
 
-  const albumImage = localStorage.getItem(`albumImage:${albumKey}`) || (mainVideos[0]?.thumbnail_path ? `/thumbnails/${mainVideos[0].thumbnail_path}` : null);
+  // Held in state, not read from localStorage during render: writing to storage
+  // alone doesn't re-render, so a newly picked cover wouldn't appear until the
+  // page was navigated away from and back.
+  const albumImage = customImage ?? (mainVideos[0]?.thumbnail_path ? `/thumbnails/${mainVideos[0].thumbnail_path}` : null);
   const setImage = (d: string | null) => {
     if (d) localStorage.setItem(`albumImage:${albumKey}`, d);
     else localStorage.removeItem(`albumImage:${albumKey}`);
+    setCustomImage(d);
   };
 
   const updateVideo = (updated: Video) => {
     setVideos(prev => prev.map(v => (v.id === updated.id ? updated : v)));
+  };
+
+  // The playlist name is stored on every video in the album, so any of them
+  // can supply it.
+  const playlistTitle = mainVideos[0]?.external_playlist_title || t('library.untitled_playlist');
+
+  const handleRenamePlaylist = async () => {
+    if (!playlistId) return;
+    const next = window.prompt(t('library.rename_playlist'), playlistTitle);
+    const trimmed = next?.trim();
+    if (!trimmed || trimmed === playlistTitle) return;
+
+    try {
+      const res = await fetch(`/api/external/playlist/${encodeURIComponent(playlistId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: trimmed })
+      });
+      if (!res.ok) return;
+      // Grouping keys off the playlist ID, so only the display name changes.
+      setVideos(prev => prev.map(v =>
+        (v.external_playlist_id || 'unknown') === playlistId
+          ? { ...v, external_playlist_title: trimmed }
+          : v
+      ));
+    } catch (err) {
+      console.error('Failed to rename playlist:', err);
+    }
+  };
+
+  const handleDeletePlaylist = async () => {
+    if (!playlistId) return;
+
+    // Plans keep referencing deleted videos by ID; the schedule drops IDs it
+    // can't resolve, so those entries just disappear from the plan. Say so
+    // before deleting rather than letting a plan quietly shrink.
+    let warning = '';
+    try {
+      const res = await fetch(`/api/external/playlist/${encodeURIComponent(playlistId)}/usage`);
+      const usage = await res.json();
+      if (usage?.planCount > 0) {
+        warning = `\n\n${t('library.delete_playlist_in_use', { count: usage.planCount })}`;
+      }
+    } catch {
+      // Usage is advisory; a failed check shouldn't block the delete.
+    }
+
+    if (!window.confirm(`${t('library.delete_playlist_confirm', { name: playlistTitle })}${warning}`)) return;
+
+    try {
+      const res = await fetch(`/api/external/playlist/${encodeURIComponent(playlistId)}`, { method: 'DELETE' });
+      if (!res.ok) return;
+      navigate('/library');
+    } catch (err) {
+      console.error('Failed to delete playlist:', err);
+    }
   };
 
   return (
@@ -98,9 +176,36 @@ export default function Album() {
           <button onClick={() => navigate(-1)} aria-label="Back" title="Back" style={{ width: 40, height: 40, borderRadius: 10, border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <div>
-            <h1 style={{ display: 'inline-block', margin: 0 }}>{albumKey === '.' ? 'Root' : albumKey}</h1>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{mainVideos.length} videos in this collection</div>
+          <div className="album-heading">
+            {/* Playlist names run long, so the actions get their own row below
+                rather than trailing the title and being pushed off. */}
+            <h1 className="album-heading-title">
+              {isExternalAlbum ? playlistTitle : albumKey === '.' ? 'Root' : albumKey}
+            </h1>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+              {mainVideos.length} videos in this collection
+              {isExternalAlbum && ` — ${t('library.external_album_hint')}`}
+            </div>
+            {isExternalAlbum && (
+              <div className="album-actions">
+                <button
+                  type="button"
+                  className="album-action-btn"
+                  onClick={handleRenamePlaylist}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
+                  {t('library.rename_playlist')}
+                </button>
+                <button
+                  type="button"
+                  className="album-action-btn album-action-danger"
+                  onClick={handleDeletePlaylist}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" /></svg>
+                  {t('library.delete_playlist')}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -140,9 +245,6 @@ export default function Album() {
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => setImage(r.result as string); r.readAsDataURL(f); }} />
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><path d="M12 15V3"/></svg>
             </label>
-            <button title="Remove image" onClick={() => setImage(null)} style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(0,0,0,0.5)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>
-            </button>
           </div>
         </div>
 

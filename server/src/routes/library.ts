@@ -70,7 +70,11 @@ function parseTrainingTypes(raw: string | null | undefined): string[] {
   }
 }
 
-function formatVideoRow(row: {
+/** Columns every endpoint needs to build a client-shaped video object. */
+export const VIDEO_COLUMNS =
+  'id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds, source, external_id, external_url, external_playlist_id, external_playlist_title';
+
+export function formatVideoRow(row: {
   id: string;
   filename: string;
   relative_path: string;
@@ -81,6 +85,11 @@ function formatVideoRow(row: {
   body_parts?: string | null;
   intensity?: string | null;
   duration_seconds?: number | null;
+  source?: string | null;
+  external_id?: string | null;
+  external_url?: string | null;
+  external_playlist_id?: string | null;
+  external_playlist_title?: string | null;
 }) {
   return {
     id: row.id,
@@ -94,6 +103,12 @@ function formatVideoRow(row: {
     training_type: parseTrainingTypes(row.training_type),
     body_parts: parseBodyParts(row.body_parts),
     intensity: row.intensity || '',
+    // Older rows predate the column; they are all local files.
+    source: row.source || 'local',
+    external_id: row.external_id || null,
+    external_url: row.external_url || null,
+    external_playlist_id: row.external_playlist_id || null,
+    external_playlist_title: row.external_playlist_title || null,
   };
 }
 
@@ -225,8 +240,13 @@ normalizedDir = path.resolve(normalizedDir);
     // Save to settings
     db.prepare("UPDATE settings SET value = ? WHERE key = 'video_directory'").run(normalizedDir);
 
-    // Get existing videos for stable IDs
-    const existingVideos = db.prepare('SELECT id, filepath, duration_seconds FROM videos').all() as { id: string; filepath: string; duration_seconds: number | null }[];
+    // Get existing videos for stable IDs. Scoped to local videos: the scan
+    // reconciles against the filesystem and deletes anything it didn't find, so
+    // external (YouTube) rows — which have no file on disk — must never be in
+    // this set or every scan would wipe them out of the user's plans.
+    const existingVideos = db.prepare(
+      "SELECT id, filepath, duration_seconds FROM videos WHERE source = 'local'"
+    ).all() as { id: string; filepath: string; duration_seconds: number | null }[];
     const existingMap = new Map(existingVideos.map(v => [v.filepath, v.id]));
     const existingDurations = new Map(existingVideos.map(v => [v.filepath, v.duration_seconds]));
     
@@ -288,9 +308,7 @@ normalizedDir = path.resolve(normalizedDir);
   });
 
   fastify.get('/videos', async (request, reply) => {
-    const videos = db.prepare(
-      'SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds FROM videos'
-    ).all() as any[];
+    const videos = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM videos`).all() as any[];
     return reply.send(videos.map(formatVideoRow));
   });
 
@@ -323,9 +341,7 @@ normalizedDir = path.resolve(normalizedDir);
     db.prepare('UPDATE videos SET description = ?, equipment = ?, training_type = ?, body_parts = ?, intensity = ? WHERE id = ?')
       .run(description, JSON.stringify(equipment), JSON.stringify(training_type), JSON.stringify(body_parts), intensity, id);
 
-    const updated = db.prepare(
-      'SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds FROM videos WHERE id = ?'
-    ).get(id) as any;
+    const updated = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM videos WHERE id = ?`).get(id) as any;
 
     return reply.send(formatVideoRow(updated));
   });

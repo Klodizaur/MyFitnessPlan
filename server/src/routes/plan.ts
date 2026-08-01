@@ -253,7 +253,7 @@ export default async function (fastify: FastifyInstance) {
     // workout count and the union of equipment tags across its videos.
     const plans = db.prepare('SELECT * FROM workout_plans ORDER BY is_active DESC, uploaded_at DESC').all() as any[];
     const workouts = db.prepare('SELECT plan_id, video_ids FROM workouts').all() as { plan_id: string; video_ids: string | null }[];
-    const videos = db.prepare('SELECT id, equipment FROM videos').all() as { id: string; equipment: string | null }[];
+    const videos = db.prepare('SELECT id, equipment, source FROM videos').all() as { id: string; equipment: string | null; source: string | null }[];
 
     const equipmentByVideo = new Map<string, string[]>();
     for (const v of videos) {
@@ -265,9 +265,14 @@ export default async function (fastify: FastifyInstance) {
       }
     }
 
+    // Videos with no file on disk. A plan containing any of these can't be done
+    // offline, which the Plans page warns about on the card.
+    const externalVideoIds = new Set(videos.filter(v => (v.source || 'local') !== 'local').map(v => v.id));
+
     const enriched = plans.map(plan => {
       const planWorkouts = workouts.filter(w => w.plan_id === plan.id);
       const equipmentSet = new Set<string>();
+      let hasExternal = false;
       for (const w of planWorkouts) {
         let videoIds: string[] = [];
         try {
@@ -276,9 +281,15 @@ export default async function (fastify: FastifyInstance) {
         } catch {}
         for (const vid of videoIds) {
           for (const eq of equipmentByVideo.get(vid) || []) equipmentSet.add(eq);
+          if (externalVideoIds.has(vid)) hasExternal = true;
         }
       }
-      return { ...plan, workout_count: planWorkouts.length, equipment: Array.from(equipmentSet) };
+      return {
+        ...plan,
+        workout_count: planWorkouts.length,
+        equipment: Array.from(equipmentSet),
+        has_external: hasExternal,
+      };
     });
 
     return reply.send(enriched);

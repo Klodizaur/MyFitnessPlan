@@ -136,6 +136,54 @@ if (!hasDuration) {
   db.exec('ALTER TABLE videos ADD COLUMN duration_seconds INTEGER');
 }
 
+// Where a video comes from. 'local' is a file under the scanned library
+// directory; anything else (currently only 'youtube') is an external video that
+// has no file on disk and is played through the provider's own embed.
+//
+// Everything downstream of `workouts.video_ids` resolves IDs against this table,
+// so external videos are stored as ordinary rows here rather than living inside
+// a plan — the schedule, player, completion log and plan tags all keep working
+// unchanged. The two places that must care are the library scan (which deletes
+// rows with no file behind them) and the matcher (which rebinds by filename).
+const hasSource = videoInfo.some(col => col.name === 'source');
+if (!hasSource) {
+  db.exec("ALTER TABLE videos ADD COLUMN source TEXT NOT NULL DEFAULT 'local'");
+}
+
+// Provider-side identifier (e.g. a YouTube video ID) and the canonical watch
+// URL. Both NULL for local videos.
+const hasExternalId = videoInfo.some(col => col.name === 'external_id');
+if (!hasExternalId) {
+  db.exec('ALTER TABLE videos ADD COLUMN external_id TEXT');
+}
+
+const hasExternalUrl = videoInfo.some(col => col.name === 'external_url');
+if (!hasExternalUrl) {
+  db.exec('ALTER TABLE videos ADD COLUMN external_url TEXT');
+}
+
+// Each imported playlist becomes its own album in the Library. The provider's
+// playlist ID is the stable grouping key; the title is only for display and is
+// editable, so renaming an album never re-buckets its videos.
+//
+// A video belongs to one playlist: importing it again from a different playlist
+// moves it, which keeps the album list predictable.
+const hasPlaylistId = videoInfo.some(col => col.name === 'external_playlist_id');
+if (!hasPlaylistId) {
+  db.exec('ALTER TABLE videos ADD COLUMN external_playlist_id TEXT');
+}
+
+const hasPlaylistTitle = videoInfo.some(col => col.name === 'external_playlist_title');
+if (!hasPlaylistTitle) {
+  db.exec('ALTER TABLE videos ADD COLUMN external_playlist_title TEXT');
+}
+
+// One row per external video, so re-importing a playlist updates in place
+// instead of duplicating. Partial index: local videos have NULL external_id.
+db.exec(
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_videos_external ON videos(source, external_id) WHERE external_id IS NOT NULL'
+);
+
 const planInfo = db.pragma("table_info('workout_plans')") as any[];
 const hasBackgroundImage = planInfo.some(col => col.name === 'background_image');
 if (!hasBackgroundImage) {

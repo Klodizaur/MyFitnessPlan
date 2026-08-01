@@ -1,15 +1,18 @@
 import React, { useRef, useState } from 'react';
+import YouTubeBadge from './YouTubeBadge';
 
 interface Props {
   albumKey: string;
   title: string;
   cover?: string | null;
   count: number;
+  /** True for an imported playlist, which gets the same badge as its videos. */
+  isExternal?: boolean;
   onClick?: () => void;
   onImageChange?: (dataUrl: string | null) => void;
 }
 
-export default function AlbumCard({ albumKey, title, cover, count, onClick, onImageChange }: Props) {
+export default function AlbumCard({ albumKey, title, cover, count, isExternal, onClick, onImageChange }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [hover, setHover] = useState(false);
 
@@ -45,6 +48,8 @@ export default function AlbumCard({ albumKey, title, cover, count, onClick, onIm
           <div style={{ position: 'absolute', left: 8, top: 8, background: 'rgba(0,0,0,0.6)', color: 'white', padding: '4px 8px', borderRadius: 12, fontSize: '0.75rem', fontWeight: 700 }}>
             {count}
           </div>
+
+          {isExternal && <YouTubeBadge />}
 
           {/* hover edit icon */}
           <div style={{ position: 'absolute', right: 8, top: 8, opacity: hover ? 1 : 0, transition: 'opacity 120ms', pointerEvents: hover ? 'auto' : 'none' }}>

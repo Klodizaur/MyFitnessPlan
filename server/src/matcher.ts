@@ -62,13 +62,34 @@ export function matchVideo(name: string, videos: { id: string; filename: string 
 }
 
 export function rematchPlanWorkouts(planId: string) {
-  const workouts = db.prepare('SELECT id, name FROM workouts WHERE plan_id = ?').all(planId) as { id: string; name: string }[];
-  const videos = db.prepare('SELECT id, filename FROM videos').all() as { id: string; filename: string }[];
-  
+  const workouts = db.prepare('SELECT id, name, video_ids FROM workouts WHERE plan_id = ?').all(planId) as
+    { id: string; name: string; video_ids: string | null }[];
+
+  // Match against local videos only. External videos are bound by explicit ID at
+  // import time, never by filename, so letting them into the candidate pool
+  // would only create opportunities to mis-bind.
+  const videos = db.prepare("SELECT id, filename FROM videos WHERE source = 'local'").all() as { id: string; filename: string }[];
+
+  const externalIds = new Set(
+    (db.prepare("SELECT id FROM videos WHERE source <> 'local'").all() as { id: string }[]).map(v => v.id)
+  );
+
   const updateStmt = db.prepare('UPDATE workouts SET video_ids = ? WHERE id = ?');
-  
+
   db.transaction(() => {
     for (const w of workouts) {
+      let currentIds: string[] = [];
+      try {
+        const parsed = JSON.parse(w.video_ids || '[]');
+        if (Array.isArray(parsed)) currentIds = parsed;
+      } catch {}
+
+      // A workout holding external videos was built by hand in the plan builder,
+      // not matched from a spreadsheet. Rematching keys off the workout *name*
+      // (the joined video titles), which would rebind a YouTube title onto some
+      // similarly-named local file. Leave these exactly as the user set them.
+      if (currentIds.some(id => externalIds.has(id))) continue;
+
       const videoNames = w.name.split('\n');
       const videoIds: string[] = [];
       for (const vname of videoNames) {

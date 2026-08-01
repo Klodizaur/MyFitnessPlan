@@ -103,6 +103,70 @@ export function FilterMatchToggle({
   );
 }
 
+/** Which kind of video to show. '' means both. */
+export type SourceFilter = '' | 'local' | 'external';
+
+/** Whether a video passes the current source filter. */
+export function matchesSource(video: { source?: string }, filter: SourceFilter): boolean {
+  if (!filter) return true;
+  const isExternal = (video.source || 'local') !== 'local';
+  return filter === 'external' ? isExternal : !isExternal;
+}
+
+type SourceFilterToggleProps = {
+  value: SourceFilter;
+  onChange: (value: SourceFilter) => void;
+  allLabel: string;
+  localLabel: string;
+  externalLabel: string;
+};
+
+/**
+ * Segmented "All / My files / YouTube" control, shared by the Library, Album
+ * and plan-builder filter panels.
+ */
+export function SourceFilterToggle({
+  value,
+  onChange,
+  allLabel,
+  localLabel,
+  externalLabel,
+}: SourceFilterToggleProps) {
+  const options: { value: SourceFilter; text: string }[] = [
+    { value: '', text: allLabel },
+    { value: 'local', text: localLabel },
+    { value: 'external', text: externalLabel },
+  ];
+  return (
+    <div style={{ display: 'inline-flex', padding: 3, borderRadius: 999, background: 'var(--surface-hover)', border: '1px solid var(--glass-border)' }}>
+      {options.map(opt => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value || 'all'}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(opt.value)}
+            style={{
+              border: 'none',
+              cursor: 'pointer',
+              padding: '5px 14px',
+              borderRadius: 999,
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              background: active ? 'var(--accent-color)' : 'transparent',
+              color: active ? '#fff' : 'var(--text-primary)',
+              transition: 'background 0.15s ease',
+            }}
+          >
+            {opt.text}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * Fold text into a diacritic-insensitive, lowercase form for searching.
  * Uses Unicode NFD decomposition and strips combining marks so accents are

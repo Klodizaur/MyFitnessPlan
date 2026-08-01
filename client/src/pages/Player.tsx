@@ -1,24 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { EquipmentIcon } from '../lib/equipment';
 import { TrainingTypeIcon, BodyPartIcon, IntensityIcon } from '../lib/metadata';
 import { useMetaLabels } from '../lib/labels';
 import { videoStreamUrl } from '../lib/paths';
+import YouTubeEmbed from '../components/YouTubeEmbed';
 
 export default function Player() {
   const { videoId, workoutId } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Set once the YouTube player is ready; used to route keyboard shortcuts.
+  const ytPlayerRef = useRef<any>(null);
+  const { t } = useTranslation();
   const [filename, setFilename] = useState('');
   const [videoPath, setVideoPath] = useState('');
+  // 'local' plays from disk via <video>; anything else uses a provider embed.
+  const [source, setSource] = useState<string>('local');
+  const [externalId, setExternalId] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [equipment, setEquipment] = useState<string[]>([]);
   const [trainingType, setTrainingType] = useState<string[]>([]);
   const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [intensity, setIntensity] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  // External videos have no relative_path, so "has a path" can't double as
+  // "finished loading" any more.
+  const [isLoaded, setIsLoaded] = useState(false);
+  const theaterRef = useRef<HTMLDivElement>(null);
   const [isMarking, setIsMarking] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [showMarkDone, setShowMarkDone] = useState(false);
@@ -30,6 +42,9 @@ export default function Player() {
   const [prevVideoId, setPrevVideoId] = useState<string | null>(null);
   const labels = useMetaLabels();
 
+  // Declared before the effects below, which depend on it.
+  const isExternal = source !== 'local';
+
   useEffect(() => {
     fetch('/api/library/videos')
       .then(res => res.json())
@@ -38,11 +53,14 @@ export default function Player() {
         if (vid) {
           setFilename(vid.filename);
           setVideoPath(vid.relative_path);
+          setSource(vid.source || 'local');
+          setExternalId(vid.external_id || null);
           setDescription(vid.description || '');
           setEquipment(vid.equipment || []);
           setTrainingType(vid.training_type || []);
           setBodyParts(vid.body_parts || []);
           setIntensity(vid.intensity || '');
+          setIsLoaded(true);
         } else {
           setError('Video not found in library');
         }
@@ -102,27 +120,40 @@ export default function Player() {
   }, [videoId, workoutId]);
 
   const toggleFullscreen = () => {
-    if (videoRef.current) {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else {
-        videoRef.current.requestFullscreen();
-      }
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+      return;
     }
+    // A cross-origin iframe can't be fullscreened directly, so external videos
+    // fullscreen the theater wrapper instead.
+    const target = isExternal ? theaterRef.current : videoRef.current;
+    target?.requestFullscreen();
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!videoRef.current) return;
+      // Same shortcuts either way; the two players just expose different APIs.
+      const player = isExternal ? ytPlayerRef.current : videoRef.current;
+      if (!player) return;
 
       if (e.code === 'Space') {
         e.preventDefault();
-        if (videoRef.current.paused) videoRef.current.play();
-        else videoRef.current.pause();
-      } else if (e.code === 'ArrowRight') {
-        videoRef.current.currentTime += 10;
-      } else if (e.code === 'ArrowLeft') {
-        videoRef.current.currentTime -= 10;
+        if (isExternal) {
+          // 1 === YT.PlayerState.PLAYING; read numerically so this doesn't
+          // depend on the YT global being loaded.
+          if (player.getPlayerState?.() === 1) player.pauseVideo();
+          else player.playVideo();
+        } else {
+          if (player.paused) player.play();
+          else player.pause();
+        }
+      } else if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
+        const delta = e.code === 'ArrowRight' ? 10 : -10;
+        if (isExternal) {
+          player.seekTo?.(Math.max(0, (player.getCurrentTime?.() || 0) + delta), true);
+        } else {
+          player.currentTime += delta;
+        }
       } else if (e.code === 'KeyF') {
         toggleFullscreen();
       }
@@ -130,7 +161,7 @@ export default function Player() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isExternal]);
 
   const handleToggleDone = async () => {
     if (!videoId || isMarking) return;
@@ -184,16 +215,20 @@ export default function Player() {
     );
   }
 
-  if (!videoPath) {
+  if (!isLoaded) {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
-  const videoUrl = videoStreamUrl(videoPath);
+  const videoUrl = isExternal ? '' : videoStreamUrl(videoPath);
   const hasMeta = Boolean(description.trim()) || equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity);
+
+  const goToNext = () => {
+    if (nextVideoId) navigate(`/player/${nextVideoId}/${workoutId}`);
+  };
 
   return (
     <div className="player-wrap">
-      <div className="player-theater" onDoubleClick={toggleFullscreen}>
+      <div className="player-theater" ref={theaterRef} onDoubleClick={toggleFullscreen}>
         {/* Header overlay — title + actions only */}
         <div className="player-theater-header">
           <h2>{filename}</h2>
@@ -235,14 +270,27 @@ export default function Player() {
           </div>
         </div>
 
-        <video
-          ref={videoRef}
-          src={videoUrl}
-          controls
-          autoPlay
-          onEnded={() => nextVideoId && navigate(`/player/${nextVideoId}/${workoutId}`)}
-          onError={() => setError('Could not play this video. The file may be missing or use an unsupported format.')}
-        />
+        {isExternal ? (
+          externalId ? (
+            <YouTubeEmbed
+              externalId={externalId}
+              onEnded={goToNext}
+              onReady={player => { ytPlayerRef.current = player; }}
+              onError={reason => setError(t(`player.youtube_error_${reason}`))}
+            />
+          ) : (
+            <div className="player-youtube-error">{t('player.youtube_error_unavailable')}</div>
+          )
+        ) : (
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            controls
+            autoPlay
+            onEnded={goToNext}
+            onError={() => setError('Could not play this video. The file may be missing or use an unsupported format.')}
+          />
+        )}
 
         {/* Floating prev/next */}
         <div className="player-theater-nav">

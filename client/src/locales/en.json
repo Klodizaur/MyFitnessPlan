@@ -91,7 +91,7 @@
     "builder_prev_week": "Previous Week",
     "builder_next_week": "Next Week",
     "builder_no_videos": "No videos match this search.",
-    "builder_prev_day": "Previous Day",
+    "builder_prev_day": "Previous day",
     "builder_next_day": "Next Day",
     "builder_currently_selected": "Currently selected",
     "builder_switch_day": "Switch day",
@@ -128,7 +128,9 @@
     "choose_from_library": "Choose from library",
     "upload_image": "Upload image",
     "remove_background": "Remove background image",
-    "blur_background": "Blur background"
+    "blur_background": "Blur background",
+    "needs_internet": "Needs internet",
+    "needs_internet_hint": "This plan uses YouTube videos, so it can't be done offline."
   },
   "calendar": {
     "today": "Today",
@@ -165,7 +167,8 @@
       "forest": "Forest",
       "pastel-orange": "Pastel Orange",
       "pastel-pink": "Pastel Pink",
-      "sky-blue": "Sky Blue"
+      "sky-blue": "Sky Blue",
+      "watermelon": "Watermelon"
     },
     "calendar_layout": "Calendar Layout",
     "calendar_layout_msg": "How should workouts with multiple videos be displayed?",
@@ -237,7 +240,21 @@
     "grid_view": "Grid",
     "list_view": "List",
     "no_match": "No videos match the selected filters.",
-    "root_folder": "Root"
+    "root_folder": "Root",
+    "external_album_hint": "imported from YouTube, needs an internet connection",
+    "external_needs_internet": "Plays from YouTube",
+    "untitled_playlist": "Untitled playlist",
+    "rename_playlist": "Rename this playlist",
+    "empty_scan_title": "Scan your library",
+    "empty_scan_hint": "Point the app at the folder holding your workout videos",
+    "empty_youtube_hint": "Turn a YouTube playlist into an album",
+    "source_all": "All",
+    "source_local": "My files",
+    "source_external": "YouTube",
+    "delete_playlist": "Delete this playlist",
+    "delete_playlist_confirm": "Delete \"{{name}}\" and all its videos from your library?",
+    "delete_playlist_in_use_one": "1 plan uses videos from this playlist. Those entries will disappear from it.",
+    "delete_playlist_in_use_other": "{{count}} plans use videos from this playlist. Those entries will disappear from them."
   },
   "profile": {
     "title": "Log",
@@ -296,6 +313,32 @@
     "total": "Total",
     "chart_pie": "Pie",
     "chart_bar": "Bars"
+  },
+  "player": {
+    "youtube_error_embed_blocked": "The person who uploaded this video doesn't allow it to play outside YouTube.",
+    "youtube_error_unavailable": "This video is no longer available on YouTube.",
+    "youtube_error_offline": "Couldn't reach YouTube. Check your internet connection."
+  },
+  "import": {
+    "btn": "Add from YouTube",
+    "title": "Add videos from YouTube",
+    "intro": "Paste a link to a YouTube playlist. It becomes its own album in your library, and you can rename it afterwards.",
+    "note": "These play from YouTube with ads and need an internet connection. There is no file on your computer, but you can still tag them like your own videos.",
+    "confirm": "Import",
+    "loading": "Importing...",
+    "show_only_one": "Show only the 1 imported video",
+    "show_only_other": "Show only the {{count}} imported videos",
+    "done_one": "Imported 1 video from the playlist.",
+    "done_other": "Imported {{count}} videos from the playlist.",
+    "done_truncated": "Imported the first {{count}} videos — the playlist was longer than that.",
+    "error_unavailable": "YouTube import isn't available in this version of the app.",
+    "error_unsupported_url": "That doesn't look like a YouTube link.",
+    "error_not_found": "Couldn't open that playlist. Check it isn't private, and that the link is right.",
+    "error_empty": "That playlist has no playable videos in it.",
+    "error_failed": "Couldn't read that playlist. Check the link and your internet connection.",
+    "cancel": "Cancel",
+    "public_warning": "The playlist must be Public or Unlisted. YouTube blocks private playlists, so those can't be imported.",
+    "fetching_descriptions_one": "Fetching a description from YouTube…",
+    "fetching_descriptions_other": "Fetching {{count}} descriptions from YouTube…"
   }
 }
-

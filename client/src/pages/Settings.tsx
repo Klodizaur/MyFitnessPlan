@@ -9,6 +9,7 @@ const THEMES = [
   { id: 'pastel-orange', primary: '#fdba74', bg: '#fff7ed' },
   { id: 'pastel-pink', primary: '#f9a8d4', bg: '#fdf2f8' },
   { id: 'sky-blue', primary: '#7dd3fc', bg: '#f0f9ff' },
+  { id: 'watermelon', primary: '#d81b45', bg: '#e8f8ea' },
 ];
 
 type ScanProgress = {

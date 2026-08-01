@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import AlbumGrid from '../components/AlbumGrid';
+import AlbumPlaceholderCard from '../components/AlbumPlaceholderCard';
 import VideoCard from '../components/VideoCard';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
-import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
+import { matchesTags, matchesQuery, matchesSource, useFilterMatchMode, FilterMatchToggle, SourceFilter, SourceFilterToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
-import { topLevelAlbumKey, toAlbumRouteParam } from '../lib/paths';
+import { albumKeyForVideo, toAlbumRouteParam, isExternalAlbumKey } from '../lib/paths';
+import { ImportResult, useImportAvailable, useDescriptionProgress } from '../lib/externalImport';
+import YouTubeImportModal from '../components/YouTubeImportModal';
 import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -21,22 +24,36 @@ export default function Library() {
   const [selectedTrainingType, setSelectedTrainingType] = useState<string[]>([]);
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
   const [selectedIntensity, setSelectedIntensity] = useState<string>('');
+  const [selectedSource, setSelectedSource] = useState<SourceFilter>('');
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [matchMode, setMatchMode] = useFilterMatchMode();
   const labels = useMetaLabels();
   const { t } = useTranslation();
+  const importAvailable = useImportAvailable();
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  // Set once something has been imported this session, which starts the
+  // background-description watch.
+  const [justImported, setJustImported] = useState(false);
 
   const updateVideo = (updated: Video) => {
     setVideos(prev => prev.map(v => (v.id === updated.id ? updated : v)));
   };
 
-  useEffect(() => {
+  const loadVideos = useCallback(() => {
     fetch('/api/library/videos')
       .then(r => r.json())
       .then((data: Video[]) => setVideos(data || []))
       .catch(err => console.error('Failed to load library:', err));
   }, []);
+
+  useEffect(() => {
+    loadVideos();
+  }, [loadVideos]);
+
+  // Descriptions are fetched in the background after an import, so refresh
+  // while that runs rather than leaving the user to reload the page.
+  const pendingDescriptions = useDescriptionProgress(justImported, loadVideos);
 
   useEffect(() => {
     // Group by top-level folder (main folders)
@@ -54,25 +71,54 @@ export default function Library() {
         const vparts = v.body_parts || [];
         if (!vparts.some(bp => selectedBodyParts.includes(bp))) continue;
       }
-      const rel = v.relative_path || '';
-      const top = topLevelAlbumKey(rel);
+      if (!matchesSource(v, selectedSource)) continue;
+      const top = albumKeyForVideo(v);
       const arr = map.get(top) || [];
       arr.push(v);
       map.set(top, arr);
     }
 
+    // An imported album is named after its playlist, carried on every video in
+    // it; a folder album is named after the folder.
+    const albumTitle = (key: string, vids: Video[]) => {
+      if (isExternalAlbumKey(key)) {
+        return vids[0]?.external_playlist_title || t('library.untitled_playlist');
+      }
+      return key === '.' ? t('library.root_folder') : key;
+    };
+
     const result = Array.from(map.entries()).map(([key, vids]) => {
       const stored = localStorage.getItem(`albumImage:${key}`);
       const cover = stored || (vids[0]?.thumbnail_path ? `/thumbnails/${vids[0].thumbnail_path}` : null);
-      return { key, title: key === '.' ? t('library.root_folder') : key, cover, count: vids.length };
+      return {
+        key,
+        title: albumTitle(key, vids),
+        cover,
+        count: vids.length,
+        isExternal: isExternalAlbumKey(key),
+      };
     });
     // apply natural sort for numbered folder titles
     if (sort === 'alpha') result.sort((a, b) => naturalCompare(a.title, b.title));
     else result.sort((a, b) => naturalCompare(b.title, a.title));
+    // Imported playlists group together after the user's own folders.
+    result.sort((a, b) => Number(a.isExternal) - Number(b.isExternal));
     setAlbums(result);
-  }, [videos, sort, selectedEquipment, t]);
+  }, [videos, sort, selectedEquipment, selectedSource, t]);
 
   const visibleAlbums = albums.filter(a => matchesQuery([a.title], query));
+  const isLibraryEmpty = videos.length === 0;
+
+  const handleImported = (result: ImportResult) => {
+    // Merge rather than refetch so the new album appears immediately.
+    setVideos(prev => {
+      const byId = new Map(prev.map(v => [v.id, v]));
+      for (const v of result.videos || []) byId.set(v.id, v);
+      return Array.from(byId.values());
+    });
+    setIsImportOpen(false);
+    setJustImported(true);
+  };
 
   const openAlbum = (key: string) => {
     navigate(`/library/${encodeURIComponent(toAlbumRouteParam(key))}`);
@@ -89,6 +135,15 @@ export default function Library() {
     <div style={{ padding: '1.5rem' }}>
       <h1>{t('library.title')}</h1>
       <p style={{ color: 'var(--text-secondary)' }}>{t('library.subtitle')}</p>
+
+      {/* Descriptions arrive well after the videos do, so say so instead of
+          leaving them looking permanently blank. */}
+      {pendingDescriptions > 0 && (
+        <div className="library-descr-progress">
+          <span className="library-descr-spinner" />
+          {t('import.fetching_descriptions', { count: pendingDescriptions })}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: '1rem', marginBottom: '1rem' }}>
         <div className="toolbar-search">
@@ -108,21 +163,66 @@ export default function Library() {
       </div>
 
       <div style={{ marginTop: '1rem' }}>
-        <AlbumGrid albums={visibleAlbums} onOpen={openAlbum} onImageChange={setAlbumImage} />
+        <AlbumGrid albums={visibleAlbums} onOpen={openAlbum} onImageChange={setAlbumImage}>
+          {/* A library with nothing in it has no obvious next step, so the two
+              ways to fill it appear as album slots waiting to be used. The
+              YouTube slot stays afterwards — adding another playlist should
+              feel like adding another album. */}
+          {isLibraryEmpty && (
+            <AlbumPlaceholderCard
+              title={t('library.empty_scan_title')}
+              hint={t('library.empty_scan_hint')}
+              accent
+              onClick={() => navigate('/settings')}
+              icon={
+                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v1" /><path d="M3 7h18l-1.6 11.2A2 2 0 0 1 17.4 20H6.6a2 2 0 0 1-2-1.8L3 7z" /></svg>
+              }
+            />
+          )}
+          {importAvailable && (
+            <AlbumPlaceholderCard
+              title={t('import.btn')}
+              hint={t('library.empty_youtube_hint')}
+              onClick={() => setIsImportOpen(true)}
+              icon={
+                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M21.6 7.2a2.5 2.5 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4A2.5 2.5 0 0 0 2.4 7.2C2 8.8 2 12 2 12s0 3.2.4 4.8a2.5 2.5 0 0 0 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4a2.5 2.5 0 0 0 1.8-1.8C22 15.2 22 12 22 12s0-3.2-.4-4.8z" />
+                  <path d="M10 15.5v-7l6 3.5-6 3.5z" fill="var(--surface-color)" />
+                </svg>
+              }
+            />
+          )}
+        </AlbumGrid>
       </div>
+
+      {isImportOpen && (
+        <YouTubeImportModal
+          onClose={() => setIsImportOpen(false)}
+          onImported={handleImported}
+        />
+      )}
 
       <div style={{ marginTop: '1.5rem', padding: '12px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
           <h3 style={{ margin: 0 }}>{t('library.filter_by_equipment')}</h3>
-          <FilterMatchToggle
-            mode={matchMode}
-            onChange={setMatchMode}
-            label={t('library.match_label')}
-            anyLabel={t('library.match_any')}
-            allLabel={t('library.match_all')}
-            anyHint={t('library.match_any_hint')}
-            allHint={t('library.match_all_hint')}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <SourceFilterToggle
+              value={selectedSource}
+              onChange={setSelectedSource}
+              allLabel={t('library.source_all')}
+              localLabel={t('library.source_local')}
+              externalLabel={t('library.source_external')}
+            />
+            <FilterMatchToggle
+              mode={matchMode}
+              onChange={setMatchMode}
+              label={t('library.match_label')}
+              anyLabel={t('library.match_any')}
+              allLabel={t('library.match_all')}
+              anyHint={t('library.match_any_hint')}
+              allHint={t('library.match_all_hint')}
+            />
+          </div>
         </div>
         <EquipmentPicker selected={selectedEquipment} onChange={setSelectedEquipment} />
       </div>
@@ -174,7 +274,7 @@ export default function Library() {
         </div>
       </div>
 
-      {(query.trim() || selectedEquipment.length > 0 || selectedTrainingType.length > 0 || selectedBodyParts.length > 0 || selectedIntensity) && (
+      {(query.trim() || selectedEquipment.length > 0 || selectedTrainingType.length > 0 || selectedBodyParts.length > 0 || selectedIntensity || selectedSource) && (
         <div style={{ marginTop: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h3 style={{ margin: 0 }}>{t('library.matching_videos')}</h3>
@@ -191,6 +291,7 @@ export default function Library() {
               if (!matchesTags(v.training_type, selectedTrainingType, matchMode)) return false;
               if (selectedIntensity && v.intensity !== selectedIntensity) return false;
               if (!matchesTags(v.body_parts, selectedBodyParts, matchMode)) return false;
+              if (!matchesSource(v, selectedSource)) return false;
               return true;
             });
 

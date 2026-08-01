@@ -10,6 +10,7 @@ import libraryRoutes from './routes/library.js';
 import planRoutes from './routes/plan.js';
 import scheduleRoutes from './routes/schedule.js';
 import profileRoutes from './routes/profile.js';
+import externalRoutes from './routes/external.js';
 
 const fastify = Fastify({ logger: true });
 
@@ -221,6 +222,7 @@ fastify.register(libraryRoutes, { prefix: '/api/library' });
 fastify.register(planRoutes, { prefix: '/api/plan' });
 fastify.register(scheduleRoutes, { prefix: '/api/schedule' });
 fastify.register(profileRoutes, { prefix: '/api/profile' });
+fastify.register(externalRoutes, { prefix: '/api/external' });
 
 // App version. The packaged desktop app injects MYFITNESSPLAN_VERSION; otherwise
 // we fall back to this package's version. Exposed so the UI shows it automatically.

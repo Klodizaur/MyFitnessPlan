@@ -183,7 +183,9 @@
     "choose_from_library": "Wybierz z tego planu",
     "upload_image": "Wgraj obraz",
     "remove_background": "Usuń obraz tła",
-    "blur_background": "Rozmyj tło"
+    "blur_background": "Rozmyj tło",
+    "needs_internet": "Wymaga internetu",
+    "needs_internet_hint": "Ten plan korzysta z filmów z YouTube, więc nie zadziała bez internetu."
   },
   "calendar": {
     "today": "Dzisiaj",
@@ -220,7 +222,8 @@
       "forest": "Las",
       "pastel-orange": "Pastelowy pomarańcz",
       "pastel-pink": "Pastelowy róż",
-      "sky-blue": "Błękit nieba"
+      "sky-blue": "Błękit nieba",
+      "watermelon": "Arbuz"
     },
     "calendar_layout": "Układ kalendarza",
     "calendar_layout_msg": "Jak powinny być wyświetlane treningi z wieloma filmami?",
@@ -292,7 +295,23 @@
     "grid_view": "Siatka",
     "list_view": "Lista",
     "no_match": "Żadne filmy nie pasują do wybranych filtrów.",
-    "root_folder": "Katalog główny"
+    "root_folder": "Katalog główny",
+    "external_album_hint": "zaimportowane z YouTube, wymaga połączenia z internetem",
+    "external_needs_internet": "Odtwarzane z YouTube",
+    "untitled_playlist": "Playlista bez nazwy",
+    "rename_playlist": "Zmień nazwę playlisty",
+    "empty_scan_title": "Przeskanuj bibliotekę",
+    "empty_scan_hint": "Wskaż folder z Twoimi filmami treningowymi",
+    "empty_youtube_hint": "Zamień playlistę YouTube w album",
+    "source_all": "Wszystkie",
+    "source_local": "Moje pliki",
+    "source_external": "YouTube",
+    "delete_playlist": "Usuń tę playlistę",
+    "delete_playlist_confirm": "Usunąć „{{name}}” i wszystkie jej filmy z biblioteki?",
+    "delete_playlist_in_use_one": "1 plan korzysta z filmów z tej playlisty. Te pozycje z niego znikną.",
+    "delete_playlist_in_use_few": "{{count}} plany korzystają z filmów z tej playlisty. Te pozycje z nich znikną.",
+    "delete_playlist_in_use_many": "{{count}} planów korzysta z filmów z tej playlisty. Te pozycje z nich znikną.",
+    "delete_playlist_in_use_other": "{{count}} planu korzysta z filmów z tej playlisty. Te pozycje z nich znikną."
   },
   "profile": {
     "title": "Dziennik",
@@ -351,6 +370,38 @@
     "total": "Razem",
     "chart_pie": "Kołowy",
     "chart_bar": "Słupkowy"
+  },
+  "player": {
+    "youtube_error_embed_blocked": "Autor tego filmu nie zezwala na odtwarzanie go poza YouTube.",
+    "youtube_error_unavailable": "Ten film nie jest już dostępny na YouTube.",
+    "youtube_error_offline": "Brak połączenia z YouTube. Sprawdź internet."
+  },
+  "import": {
+    "btn": "Dodaj z YouTube",
+    "title": "Dodaj filmy z YouTube",
+    "intro": "Wklej link do playlisty YouTube. Stanie się osobnym albumem w bibliotece, a nazwę możesz później zmienić.",
+    "note": "Te filmy odtwarzają się z YouTube (z reklamami) i wymagają internetu. Nie ma ich na dysku, ale nadal możesz je oznaczać tak jak własne filmy.",
+    "confirm": "Importuj",
+    "loading": "Importowanie...",
+    "show_only_one": "Pokaż tylko 1 zaimportowany film",
+    "show_only_few": "Pokaż tylko {{count}} zaimportowane filmy",
+    "show_only_many": "Pokaż tylko {{count}} zaimportowanych filmów",
+    "show_only_other": "Pokaż tylko {{count}} zaimportowanego filmu",
+    "done_one": "Zaimportowano 1 film z playlisty.",
+    "done_few": "Zaimportowano {{count}} filmy z playlisty.",
+    "done_many": "Zaimportowano {{count}} filmów z playlisty.",
+    "done_other": "Zaimportowano {{count}} filmu z playlisty.",
+    "done_truncated": "Zaimportowano pierwsze {{count}} filmów — playlista była dłuższa.",
+    "error_unavailable": "Import z YouTube nie jest dostępny w tej wersji aplikacji.",
+    "error_unsupported_url": "To nie wygląda na link do YouTube.",
+    "error_not_found": "Nie udało się otworzyć tej playlisty. Sprawdź, czy nie jest prywatna i czy link jest poprawny.",
+    "error_empty": "Ta playlista nie zawiera filmów do odtworzenia.",
+    "error_failed": "Nie udało się odczytać playlisty. Sprawdź link i połączenie z internetem.",
+    "cancel": "Anuluj",
+    "public_warning": "Playlista musi być publiczna lub niepubliczna (unlisted). YouTube blokuje playlisty prywatne, więc ich nie można zaimportować.",
+    "fetching_descriptions_one": "Pobieranie opisu z YouTube…",
+    "fetching_descriptions_few": "Pobieranie {{count}} opisów z YouTube…",
+    "fetching_descriptions_many": "Pobieranie {{count}} opisów z YouTube…",
+    "fetching_descriptions_other": "Pobieranie {{count}} opisu z YouTube…"
   }
 }
-

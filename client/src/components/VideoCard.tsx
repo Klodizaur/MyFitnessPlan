@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { EquipmentIcon } from '../lib/equipment';
 import { useMetaLabels } from '../lib/labels';
+import { isExternalVideo } from '../lib/paths';
 import { Video } from '../types/video';
 import VideoMetadataEditor from './VideoMetadataEditor';
 import VideoDetailsModal from './VideoDetailsModal';
+import YouTubeBadge from './YouTubeBadge';
 
 type Props = {
   video: Video;
@@ -27,11 +30,17 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
   const [editing, setEditing] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const labels = useMetaLabels();
+  const { t } = useTranslation();
 
   const equipment = video.equipment || [];
   const hasMeta = Boolean(video.description?.trim()) || equipment.length > 0;
+  const isExternal = isExternalVideo(video);
 
   const openPlayer = () => navigate(`/player/${video.id}`);
+
+  // Marks a video that streams from YouTube rather than playing from disk, so
+  // it's obvious at a glance which parts of a plan need a connection.
+  const sourceBadge = isExternal ? <YouTubeBadge /> : null;
 
   // Runtime chip in the thumbnail's bottom-right corner. Hidden on hover so it
   // doesn't sit on top of the hover overlay.
@@ -150,12 +159,15 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
               <div style={{ padding: 12 }}>{video.filename}</div>
             )}
             {durationBadge}
+            {sourceBadge}
             {hoverOverlay}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: '1rem' }}>{video.filename}</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{video.relative_path}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+              {isExternal ? t('library.external_needs_internet') : video.relative_path}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
               {equipment.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, color: 'var(--text-primary)' }}>
@@ -229,6 +241,7 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
           )}
 
           {durationBadge}
+          {sourceBadge}
           {hoverOverlay}
 
           <div

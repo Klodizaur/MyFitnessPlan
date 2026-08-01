@@ -4,8 +4,10 @@ import { useTranslation } from 'react-i18next';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { EquipmentIcon } from '../lib/equipment';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, BODY_PARTS, INTENSITIES, TRAINING_TYPES } from '../lib/metadata';
-import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
+import { matchesTags, matchesQuery, matchesSource, useFilterMatchMode, FilterMatchToggle, SourceFilter, SourceFilterToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
+import { ImportResult, useImportAvailable } from '../lib/externalImport';
+import YouTubeImportModal from '../components/YouTubeImportModal';
 import { Video } from '../types/video';
 
 interface Plan {
@@ -19,6 +21,8 @@ interface Plan {
   workout_count?: number;
   equipment?: string[];
   category?: string | null;
+  /** True when the plan contains videos that stream instead of playing offline. */
+  has_external?: boolean;
 }
 
 const API_BASE = '';
@@ -82,11 +86,21 @@ export default function Plans() {
   const [selectedTrainingType, setSelectedTrainingType] = useState<string[]>([]);
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
   const [selectedIntensity, setSelectedIntensity] = useState<string>('');
+  const [selectedSource, setSelectedSource] = useState<SourceFilter>('');
   const [matchMode, setMatchMode] = useFilterMatchMode();
   const [showBuilderFilters, setShowBuilderFilters] = useState(false);
   const [videoViewMode, setVideoViewMode] = useState<'grid' | 'list'>('grid');
   const [builderStatus, setBuilderStatus] = useState('');
   const [builderLoading, setBuilderLoading] = useState(false);
+
+  // YouTube playlist import. Hidden entirely when the server reports no
+  // resolver (see server/src/external/index.ts), checked only once the builder
+  // is open so the Plans page costs nothing extra to load.
+  const importAvailable = useImportAvailable(isBuilderOpen);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  // IDs from the most recent import, so the builder can filter down to them.
+  const [importedIds, setImportedIds] = useState<string[]>([]);
+  const [showOnlyImported, setShowOnlyImported] = useState(false);
 
   // Background image picker state (scoped per-plan)
   const [bgPickerPlanId, setBgPickerPlanId] = useState<string | null>(null);
@@ -219,6 +233,25 @@ export default function Plans() {
       .catch(() => setAllVideos([]));
   }, [isBuilderOpen, allVideos.length]);
 
+  const handleImported = (result: ImportResult) => {
+    const imported = result.videos || [];
+    // Imported videos are ordinary library rows now, so merge them into the
+    // same list the builder already renders rather than tracking them apart.
+    setAllVideos(prev => {
+      const byId = new Map(prev.map(v => [v.id, v]));
+      for (const v of imported) byId.set(v.id, v);
+      return Array.from(byId.values());
+    });
+    setImportedIds(imported.map(v => v.id));
+    setShowOnlyImported(true);
+    setIsImportOpen(false);
+    setBuilderStatus(
+      result.truncated
+        ? t('import.done_truncated', { count: result.totalCount })
+        : t('import.done', { count: result.totalCount })
+    );
+  };
+
   const toggleVideoForDay = (videoId: string) => {
     setBuilderWeeks(prev => {
       return prev.map((week, wIndex) => {
@@ -346,6 +379,22 @@ export default function Plans() {
     setBuilderCurrentDay(0);
   };
 
+  // Mirror of goToNextDay. Rolls back into the previous week's last day, and
+  // stops at the very first day rather than wrapping around.
+  const goToPrevDay = () => {
+    if (builderCurrentDay > 0) {
+      setBuilderCurrentDay(builderCurrentDay - 1);
+      return;
+    }
+    if (builderCurrentWeek > 0) {
+      const prevWeek = builderWeeks[builderCurrentWeek - 1];
+      setBuilderCurrentWeek(builderCurrentWeek - 1);
+      setBuilderCurrentDay(Math.max((prevWeek?.days.length || 1) - 1, 0));
+    }
+  };
+
+  const isFirstDay = builderCurrentWeek === 0 && builderCurrentDay === 0;
+
   // Week/day headings are derived from the position, not from the stored
   // BuilderWeek/BuilderDay `name` (which is an internal English placeholder and
   // gets replaced by the video titles on save), so they follow the UI language.
@@ -401,17 +450,25 @@ export default function Plans() {
     setBuilderCurrentDay(0);
     setBuilderStatus('');
     setVideoSearch('');
+    setIsImportOpen(false);
+    setImportedIds([]);
+    setShowOnlyImported(false);
   };
 
   const builderVideos = allVideos.filter(video => {
+    // After an import, default to showing just what was brought in — a 40-video
+    // playlist is otherwise lost among the whole library.
+    if (showOnlyImported && !importedIds.includes(video.id)) return false;
+
     const matchesText = matchesQuery([video.filename, video.description], videoSearch);
 
     const matchesEquipment = matchesTags(video.equipment, selectedEquipment, matchMode);
     const matchesTrainingType = matchesTags(video.training_type, selectedTrainingType, matchMode);
     const matchesIntensity = !selectedIntensity || video.intensity === selectedIntensity;
     const matchesBodyParts = matchesTags(video.body_parts, selectedBodyParts, matchMode);
+    const matchesVideoSource = matchesSource(video, selectedSource);
 
-    return matchesText && matchesEquipment && matchesTrainingType && matchesIntensity && matchesBodyParts;
+    return matchesText && matchesEquipment && matchesTrainingType && matchesIntensity && matchesBodyParts && matchesVideoSource;
   });
 
   const currentWeek = builderWeeks[builderCurrentWeek];
@@ -585,6 +642,16 @@ export default function Plans() {
     </div>
   );
 
+  // Warns that a plan can't be done offline because some of its videos stream.
+  const renderOfflineWarning = (plan: Plan) => (
+    plan.has_external ? (
+      <span className="plan-offline-warning" title={t('plans.needs_internet_hint')}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+        {t('plans.needs_internet')}
+      </span>
+    ) : null
+  );
+
   // Workout count + equipment tags, shared by the featured card and the grid cards.
   const renderPlanInfo = (plan: Plan) => (
     <div className="plan-card-info">
@@ -592,6 +659,7 @@ export default function Plans() {
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M6.5 2v4.5M17.5 2v4.5M6.5 17.5V22M17.5 17.5V22M2 6.5h4.5M2 17.5h4.5M17.5 6.5H22M17.5 17.5H22"/></svg>
         {t('plans.workout_count', { count: plan.workout_count ?? 0 })}
       </span>
+      {renderOfflineWarning(plan)}
       {(plan.equipment || []).map(eq => (
         <span key={eq} className="plan-card-tag" title={labels.equipment(eq)}>
           <EquipmentIcon id={eq} size={13} />
@@ -672,6 +740,7 @@ export default function Plans() {
                 {activePlan.category && (
                   <span className="plan-featured-category">{categoryLabel(activePlan.category)}</span>
                 )}
+                {renderOfflineWarning(activePlan)}
               </div>
               <h2 className="plan-featured-title">{activePlan.name}</h2>
               <p className="plan-featured-date">
@@ -846,6 +915,10 @@ export default function Plans() {
         document.body
       )}
 
+      {isImportOpen && (
+        <YouTubeImportModal onClose={() => setIsImportOpen(false)} onImported={handleImported} />
+      )}
+
       {isBuilderOpen && createPortal(
         <div className="wb-overlay">
           <div className="wb-modal">
@@ -896,7 +969,6 @@ export default function Plans() {
                       <p className="wb-step-label">{t('plans.builder_step', { current: 2, total: 2 })}</p>
                       <div className="wb-step-title-row">
                         <h3 className="wb-step-title">{`${weekLabel(builderCurrentWeek)} - ${dayLabel(builderCurrentDay)}`}</h3>
-                        <button type="button" className="wb-btn wb-btn-primary wb-btn-sm wb-next-day" onClick={goToNextDay}>{t('plans.builder_next_day')} →</button>
                       </div>
                     </div>
                     <div className="wb-week-nav">
@@ -923,6 +995,23 @@ export default function Plans() {
                     <div className="wb-status">{builderStatus}</div>
                   )}
                   {currentDay && renderDayCard(currentDay, builderCurrentDay, true)}
+
+                  {/* Directly under the day being edited, where the eye already
+                      is after adding videos. Text-style so they don't compete
+                      with the solid buttons in the row above. */}
+                  <div className="wb-day-nav">
+                    <button
+                      type="button"
+                      className="wb-day-nav-btn"
+                      onClick={goToPrevDay}
+                      disabled={isFirstDay}
+                    >
+                      ← {t('plans.builder_prev_day')}
+                    </button>
+                    <button type="button" className="wb-day-nav-btn" onClick={goToNextDay}>
+                      {t('plans.builder_next_day')} →
+                    </button>
+                  </div>
                 </div>
 
                 {currentWeek.days.length > 1 && (
@@ -951,8 +1040,32 @@ export default function Plans() {
                       <input className="wb-input wb-search-input" value={videoSearch} onChange={e => setVideoSearch(e.target.value)} placeholder={t('plans.builder_search')} />
                       <button type="button" className="wb-btn wb-btn-primary wb-btn-min" onClick={() => setShowBuilderFilters(prev => !prev)}>{t('plans.builder_filters')}</button>
                       <button type="button" className="wb-btn wb-btn-primary wb-btn-min" onClick={() => setVideoViewMode(prev => prev === 'grid' ? 'list' : 'grid')}>{videoViewMode === 'grid' ? t('plans.builder_list_view') : t('plans.builder_grid_view')}</button>
+                      {importAvailable && (
+                        <button
+                          type="button"
+                          className="wb-btn wb-btn-primary wb-btn-min"
+                          onClick={() => setIsImportOpen(true)}
+                        >
+                          {t('import.btn')}
+                        </button>
+                      )}
                     </div>
                   </div>
+
+                  {/* Shown only after an import, so the list can be narrowed to
+                      the new videos or widened back to the whole library. */}
+                  {importedIds.length > 0 && (
+                    <div className="wb-import-scope">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={showOnlyImported}
+                          onChange={e => setShowOnlyImported(e.target.checked)}
+                        />
+                        {t('import.show_only', { count: importedIds.length })}
+                      </label>
+                    </div>
+                  )}
 
                   {showBuilderFilters && (
                     <div className="wb-filters">
@@ -960,6 +1073,13 @@ export default function Plans() {
                         <div className="wb-filter-head">
                           <p className="wb-filter-title">{t('plans.builder_filter_equipment')}</p>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                            <SourceFilterToggle
+                              value={selectedSource}
+                              onChange={setSelectedSource}
+                              allLabel={t('library.source_all')}
+                              localLabel={t('library.source_local')}
+                              externalLabel={t('library.source_external')}
+                            />
                             <FilterMatchToggle
                               mode={matchMode}
                               onChange={setMatchMode}
@@ -974,6 +1094,7 @@ export default function Plans() {
                               setSelectedTrainingType([]);
                               setSelectedIntensity('');
                               setSelectedBodyParts([]);
+                              setSelectedSource('');
                             }}>{t('plans.builder_clear_filters')}</button>
                           </div>
                         </div>

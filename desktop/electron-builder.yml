@@ -24,6 +24,9 @@ extraResources:
     to: server
   - from: .build/ffmpeg
     to: ffmpeg
+  # Remove this entry (and its stage.mjs block) to stop shipping yt-dlp.
+  - from: .build/yt-dlp
+    to: yt-dlp
 
 mac:
   target:

@@ -93,6 +93,42 @@
   --glass-shadow: 0 4px 20px rgba(12, 74, 110, 0.05);
 }
 
+/* Watermelon: actually built like a slice — green rind background, white pith
+   for the cards, flesh pink for everything that acts. The pink/green contrast
+   is the whole point, so it reads nothing like the pastel-pink theme.
+
+   Cards get a pink edge against the green field, hovers tint pink, and rest
+   days go deep rind green (the usual red would vanish into the pink accent). */
+[data-theme='watermelon'] {
+  --bg-color: #e8f8ea;
+  --surface-color: #ffffff;
+  --surface-hover: #ffe3ea;
+  --text-primary: #14432a;
+  --text-secondary: #166534;
+  /* Deep enough that white button text clears 4.5:1, and that the accent is
+     still readable as text on the green field. */
+  --accent-color: #d81b45;
+  --accent-hover: #be123c;
+  --accent-soft: rgba(216, 27, 69, 0.14);
+  --rest-color: #166534;
+  --progress-bg: rgba(20, 67, 42, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(216, 27, 69, 0.22);
+  --glass-shadow: 0 4px 20px rgba(20, 67, 42, 0.10);
+}
+
+/* Seeds. data-theme lives on <body>, so this styles the page field itself —
+   kept faint and widely spaced so it stays texture rather than noise, and the
+   cards sit on their own opaque surfaces above it regardless. */
+body[data-theme='watermelon'] {
+  background-image:
+    radial-gradient(ellipse 5px 8px at 30px 40px, rgba(20, 67, 42, 0.13) 60%, transparent 61%),
+    radial-gradient(ellipse 5px 8px at 110px 100px, rgba(20, 67, 42, 0.13) 60%, transparent 61%),
+    radial-gradient(ellipse 5px 8px at 70px 150px, rgba(216, 27, 69, 0.10) 60%, transparent 61%);
+  background-size: 160px 190px;
+  background-attachment: fixed;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -158,9 +194,20 @@ body {
   font-family: var(--font-family);
 }
 
+/* Themes whose accent is saturated enough to carry white button text. The
+   pastel light themes are excluded on purpose — white on their pale accents
+   is unreadable, so they keep the dark default. */
 [data-theme='midnight'] .btn,
 [data-theme='sunset'] .btn,
 [data-theme='forest'] .btn {
+  color: #fff;
+}
+
+/* Watermelon is the only light theme in that group, so it has to skip the
+   variants that aren't filled with the accent: .btn-secondary and the ghosts
+   are transparent, and white text on a white card is invisible. The dark
+   themes above get away without this because their surfaces are dark. */
+[data-theme='watermelon'] .btn:not(.btn-secondary):not(.btn-ghost):not(.btn-danger-ghost) {
   color: #fff;
 }
 
@@ -263,6 +310,30 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  background: #000;
+}
+
+/* YouTube's IFrame API replaces the inner div with an iframe, so both the
+   wrapper and the injected iframe have to fill the theater. */
+.player-youtube,
+.player-youtube > div,
+.player-youtube iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+.player-youtube-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  color: #fff;
   background: #000;
 }
 
@@ -977,6 +1048,281 @@ nav .nav-links a:hover, nav .nav-links a.active {
   transition: opacity 160ms ease;
 }
 
+/* Marks a video that streams from YouTube instead of playing from disk.
+   Sits opposite the runtime chip so the two never overlap. */
+.video-source-badge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+/* "Needs internet" marker on a plan card containing external videos. */
+.plan-offline-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #f59e0b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Shown while YouTube descriptions are still being fetched in the background. */
+.library-descr-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-color);
+  color: var(--accent-color);
+  font-size: 0.83rem;
+  font-weight: 600;
+}
+
+.library-descr-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: library-descr-spin 0.8s linear infinite;
+}
+
+@keyframes library-descr-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-descr-spinner { animation: none; }
+}
+
+/* Day stepper, sitting directly under the day being edited. Deliberately
+   text-style: the row above is already dense with solid buttons. */
+.wb-day-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.wb-day-nav-btn {
+  border: none;
+  background: none;
+  padding: 6px 2px;
+  font-family: var(--font-family);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  cursor: pointer;
+  transition: opacity 140ms ease;
+}
+
+.wb-day-nav-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.wb-day-nav-btn:disabled {
+  color: var(--wb-text-dim, var(--text-secondary));
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* An empty album slot that acts as a call to action. Matches AlbumCard's
+   footprint so it sits inline with real albums. */
+.album-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px dashed var(--glass-border);
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.album-placeholder:hover {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+  transform: translateY(-2px);
+}
+
+.album-placeholder.accent {
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+}
+
+.album-placeholder-icon {
+  display: flex;
+  color: var(--accent-color);
+}
+
+.album-placeholder-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.album-placeholder-hint {
+  font-size: 0.76rem;
+  line-height: 1.3;
+  color: var(--text-secondary);
+}
+
+/* Album page heading. A long playlist name wraps instead of forcing the
+   header wider, and never pushes the actions out of view. */
+.album-heading {
+  min-width: 0;
+}
+
+.album-heading-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Rename / delete for an imported playlist. Their own row under the title,
+   so the layout holds no matter how long the playlist name is. */
+.album-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.album-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.album-action-btn:hover {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.album-action-danger:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+/* Playlist import modal, layered above the plan builder. */
+.wb-overlay-top {
+  z-index: 1200;
+}
+
+.wb-import-modal {
+  width: min(560px, calc(100vw - 2rem));
+  padding: 1.75rem;
+  border-radius: 16px;
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.wb-import-title {
+  margin: 0 0 0.5rem;
+}
+
+.wb-import-intro,
+.wb-import-note {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  margin: 0 0 1rem;
+}
+
+.wb-import-note {
+  margin: 0.75rem 0 0;
+}
+
+/* The playlist-must-be-public notice. Prominent because pointing this at a
+   private playlist is the single most common way the import fails. */
+.wb-import-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.wb-import-warning svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.wb-import-error {
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  font-size: 0.85rem;
+}
+
+.wb-import-scope {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.wb-import-scope label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.wb-import-scope input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
 /* A user's free-text note on a logged workout. */
 .log-note {
   display: flex;
@@ -1344,6 +1690,26 @@ nav .nav-links a:hover, nav .nav-links a.active {
   --wb-danger-border: rgba(220, 38, 38, 0.35);
 }
 
+[data-theme='watermelon'] .wb-modal {
+  --wb-panel: #ffffff;
+  --wb-panel-border: rgba(216, 27, 69, 0.20);
+  --wb-text: #14432a;
+  --wb-text-dim: #166534;
+  --wb-surface: #f2fbf3;
+  --wb-input-bg: #e8f8ea;
+  --wb-border: rgba(20, 67, 42, 0.18);
+  --wb-selected: rgba(216, 27, 69, 0.16);
+  --wb-selected-border: #d81b45;
+  --wb-accent: #d81b45;
+  --wb-accent-hover: #be123c;
+  --wb-accent-text: #ffffff;
+  --wb-ghost-bg: rgba(21, 128, 61, 0.08);
+  --wb-ghost-hover: rgba(21, 128, 61, 0.16);
+  --wb-danger: #b91c1c;
+  --wb-danger-bg: rgba(185, 28, 28, 0.10);
+  --wb-danger-border: rgba(185, 28, 28, 0.35);
+}
+
 [data-theme='sky-blue'] .wb-modal {
   --wb-panel: #ffffff;
   --wb-panel-border: rgba(12, 74, 110, 0.12);
@@ -1673,38 +2039,39 @@ nav .nav-links a:hover, nav .nav-links a.active {
   gap: 6px;
 }
 .wb-empty { margin: 0; color: var(--wb-text-dim); }
+/* No card chrome. Boxing these up forced every title into the same height,
+   which is what was cutting long names — without a box the title is free to
+   take as many lines as it needs. Selection reads from the tinted title and
+   the check, so nothing is lost by dropping the border. */
 .wb-video-card {
   display: flex;
   text-align: left;
-  border: 1px solid var(--wb-border);
-  border-radius: 12px;
-  background: var(--wb-surface);
+  border: none;
+  border-radius: 10px;
+  background: transparent;
   color: var(--wb-text);
   cursor: pointer;
   font-family: var(--font-family);
-  overflow: hidden;
   padding: 0;
-  transition: box-shadow 0.15s ease, transform 0.15s ease, background 0.2s ease;
+  transition: background 0.15s ease;
 }
 .wb-video-card:hover {
-  transform: translateY(-2px);
-  box-shadow: inset 0 0 0 1px var(--wb-selected-border);
+  background: var(--wb-surface);
 }
-/* Ring instead of a thicker border, so selecting never shifts the layout. */
 .wb-video-card.selected {
   background: var(--wb-selected);
-  box-shadow: inset 0 0 0 2px var(--wb-selected-border);
 }
 .wb-videos.grid .wb-video-card {
   flex-direction: column;
   align-items: stretch;
+  padding: 6px;
 }
 .wb-videos.list .wb-video-card {
   flex-direction: row;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 .wb-video-thumb-wrap {
   position: relative;
@@ -1712,6 +2079,8 @@ nav .nav-links a:hover, nav .nav-links a.active {
   width: 100%;
   aspect-ratio: 16 / 9;
   background: var(--wb-input-bg);
+  border-radius: 8px;
+  overflow: hidden;
 }
 .wb-video-thumb {
   width: 100%;
@@ -1726,20 +2095,18 @@ nav .nav-links a:hover, nav .nav-links a.active {
   color: var(--wb-text-dim);
   font-size: 1.2rem;
 }
-/* Two lines max, so uneven title lengths don't make a ragged grid. */
+/* Never truncated. A workout's title is the only thing distinguishing it from
+   the next one — "SZYBKI TRENING NA..." repeated down the grid is useless, so
+   titles wrap to whatever height they need and rows stay ragged. */
 .wb-video-name {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
   font-size: 0.82rem;
   font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
-.wb-videos.grid .wb-video-name { padding: 9px 10px 10px; }
+.wb-videos.grid .wb-video-name { padding: 8px 2px 2px; }
 .wb-videos.list .wb-video-name {
-  -webkit-line-clamp: 1;
   font-size: 0.88rem;
   flex: 1;
   min-width: 0;

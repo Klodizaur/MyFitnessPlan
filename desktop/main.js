@@ -47,6 +47,7 @@ const CLIENT_DEV_PROBE = 'http://127.0.0.1:5173';
 function serverEntry() { return path.join(process.resourcesPath, 'server', 'dist', 'index.js'); }
 function clientDir() { return path.join(process.resourcesPath, 'client', 'dist'); }
 function ffmpegDir() { return path.join(process.resourcesPath, 'ffmpeg'); }
+function ytdlpDir() { return path.join(process.resourcesPath, 'yt-dlp'); }
 
 const TRAY_ICON = path.join(__dirname, 'assets', 'tray-icon.png');
 
@@ -90,12 +91,13 @@ function findFreePort() {
   });
 }
 
-/** Server environment: ensure the bundled ffmpeg is found first, plus extras. */
+/** Server environment: ensure the bundled ffmpeg and yt-dlp are found first, plus extras. */
 function serverEnv(extra) {
   const env = { ...process.env, ...(extra || {}) };
   env.MYFITNESSPLAN_VERSION = app.getVersion(); // shown in the app's Settings via /api/version
   const parts = [];
-  if (isPackaged) parts.push(ffmpegDir());
+  // ytdlpDir() is only here to be found on PATH; drop it to stop shipping yt-dlp.
+  if (isPackaged) parts.push(ffmpegDir(), ytdlpDir());
   else parts.push('/opt/homebrew/bin', '/usr/local/bin');
   env.PATH = [...parts, env.PATH || ''].filter(Boolean).join(path.delimiter);
   return env;
