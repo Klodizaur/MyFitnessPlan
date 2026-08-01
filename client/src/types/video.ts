@@ -8,4 +8,6 @@ export type Video = {
   training_type?: string[];
   body_parts?: string[];
   intensity?: string;
+  /** Runtime in seconds, filled in by the library scan. Null when not probed. */
+  duration_seconds?: number | null;
 };

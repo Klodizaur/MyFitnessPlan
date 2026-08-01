@@ -128,6 +128,14 @@ if (!hasIntensity) {
   db.exec("ALTER TABLE videos ADD COLUMN intensity TEXT");
 }
 
+// Runtime in whole seconds, read from the video file during a library scan.
+// NULL means "not probed yet" (or the probe failed) and is filled in on the
+// next scan, so existing libraries pick durations up without a full re-import.
+const hasDuration = videoInfo.some(col => col.name === 'duration_seconds');
+if (!hasDuration) {
+  db.exec('ALTER TABLE videos ADD COLUMN duration_seconds INTEGER');
+}
+
 const planInfo = db.pragma("table_info('workout_plans')") as any[];
 const hasBackgroundImage = planInfo.some(col => col.name === 'background_image');
 if (!hasBackgroundImage) {
@@ -137,6 +145,13 @@ if (!hasBackgroundImage) {
 const hasBackgroundBlur = planInfo.some(col => col.name === 'background_blur');
 if (!hasBackgroundBlur) {
   db.exec('ALTER TABLE workout_plans ADD COLUMN background_blur INTEGER DEFAULT 0');
+}
+
+// Optional grouping label for the Plans page. Holds either a known preset key
+// (e.g. 'strength') or a user-typed custom label, which the client renders as-is.
+const hasCategory = planInfo.some(col => col.name === 'category');
+if (!hasCategory) {
+  db.exec('ALTER TABLE workout_plans ADD COLUMN category TEXT');
 }
 
 // One-time backfill of the durable workout_log from the existing history table.
@@ -172,6 +187,16 @@ if (!workoutLogInfo.some((c: any) => c.name === 'is_manual')) {
   db.exec('ALTER TABLE workout_log ADD COLUMN is_manual INTEGER DEFAULT 0');
 }
 
+// Free-text note the user attaches to a logged workout. Stored on every row of
+// the workout so it survives if individual parts are re-marked.
+if (!workoutLogInfo.some((c: any) => c.name === 'notes')) {
+  db.exec('ALTER TABLE workout_log ADD COLUMN notes TEXT');
+}
+
 db.exec('CREATE INDEX IF NOT EXISTS idx_workout_log_date ON workout_log(completed_date)');
+
+// The 'snow' theme was removed. Anyone still on it would fall back to the bare
+// :root variables, so move them onto the default theme explicitly.
+db.prepare("UPDATE settings SET value = 'midnight' WHERE key = 'theme' AND value = 'snow'").run();
 
 export default db;

@@ -59,6 +59,39 @@ if (clientDist && fs.existsSync(clientDist)) {
   });
 }
 
+// How much of a video to send when the player asks for "the rest of the file".
+// Chromium streams happily in steps; sending hundreds of MB in one reply stalls
+// playback of large files until the entire body has been received.
+const MAX_STREAM_CHUNK = 4 * 1024 * 1024; // 4 MB
+
+// Content-Type from the extension. The route previously labelled everything
+// video/mp4, which misdescribes .webm/.mkv/.mov files to the player.
+const VIDEO_MIME: Record<string, string> = {
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.webm': 'video/webm',
+  '.ogv': 'video/ogg',
+  '.mov': 'video/quicktime',
+  '.mkv': 'video/x-matroska',
+  '.avi': 'video/x-msvideo',
+};
+
+function videoContentType(filePath: string): string {
+  return VIDEO_MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
+}
+
+// A read stream that gives up cleanly. Without this a mid-transfer read error
+// (a disconnected drive, a file replaced under us) leaves the request hanging
+// open, which the player shows as a video that never loads.
+function streamFile(filePath: string, options?: { start: number; end: number }) {
+  const stream = fs.createReadStream(filePath, options);
+  stream.on('error', err => {
+    fastify.log.error({ err, filePath }, 'video stream failed');
+    stream.destroy();
+  });
+  return stream;
+}
+
 // Dynamic video route
 fastify.get('/videos/*', async (request, reply) => {
   const stmt = db.prepare("SELECT value FROM settings WHERE key = 'video_directory'");
@@ -78,40 +111,81 @@ fastify.get('/videos/*', async (request, reply) => {
     return reply.code(404).send({ error: 'Video file not found' });
   }
 
-  // sendFile joins root + filename; pass OS-native relative path for Windows.
-  // const sendRel = path.relative(videoDir, fullPath);
-  //return reply.sendFile(sendRel, videoDir);
   const stat = fs.statSync(fullPath);
   const fileSize = stat.size;
   const range = request.headers.range;
+  const contentType = videoContentType(fullPath);
 
   if (!range) {
     reply
-      .header('Content-Type', 'video/mp4')
+      .header('Content-Type', contentType)
+      .header('Accept-Ranges', 'bytes')
       .header('Content-Length', fileSize);
 
-    return reply.send(fs.createReadStream(fullPath));
+    return reply.send(streamFile(fullPath));
   }
 
-  const parts = range.replace(/bytes=/, '').split('-');
+  // Only "bytes=" ranges are meaningful here; anything else falls back to the
+  // whole file rather than being mis-parsed into NaN offsets.
+  const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+  if (!match || (!match[1] && !match[2])) {
+    reply
+      .header('Content-Type', contentType)
+      .header('Accept-Ranges', 'bytes')
+      .header('Content-Length', fileSize);
+    return reply.send(streamFile(fullPath));
+  }
 
-  const start = parseInt(parts[0], 10);
-  const end = parts[1]
-    ? parseInt(parts[1], 10)
-    : fileSize - 1;
+  const [, rawStart, rawEnd] = match;
+
+  // A suffix range ("bytes=-500") asks for the final N bytes. Players use this to
+  // grab an MP4's trailing `moov` atom, so it has to work.
+  let start: number;
+  let end: number;
+  const clientGaveEnd = rawEnd !== '';
+  if (rawStart === '') {
+    const suffixLength = Math.min(parseInt(rawEnd, 10), fileSize);
+    start = fileSize - suffixLength;
+    end = fileSize - 1;
+  } else {
+    start = parseInt(rawStart, 10);
+    end = clientGaveEnd ? parseInt(rawEnd, 10) : fileSize - 1;
+  }
+
+  // Unsatisfiable range: answer 416 with the real size instead of a broken stream.
+  if (!Number.isFinite(start) || start < 0 || start >= fileSize) {
+    return reply
+      .code(416)
+      .header('Content-Range', `bytes */${fileSize}`)
+      .send();
+  }
+  end = Math.min(Number.isFinite(end) ? end : fileSize - 1, fileSize - 1);
+  if (end < start) end = fileSize - 1;
+
+  // The important part. An open-ended range ("bytes=X-") means "the rest of the
+  // file", and answering it literally produced ~795MB in a single reply. A player
+  // cannot start until enough of that body has arrived, so a large video stalls.
+  // Every reply is now capped: HTTP explicitly allows returning less than asked
+  // for, as long as Content-Range describes what was actually sent, and players
+  // simply request the next span. No single response can stall playback again.
+  end = Math.min(start + MAX_STREAM_CHUNK - 1, end);
 
   const chunkSize = end - start + 1;
+
+  // Logged so a failing machine produces evidence: compare what the player asked
+  // for against what was served. Visible in the desktop app's log.
+  fastify.log.info(
+    `video range ${path.basename(fullPath)} req="${range}" -> ${start}-${end}/${fileSize} (${chunkSize}B)`
+  );
 
   reply
     .code(206)
     .header('Content-Range', `bytes ${start}-${end}/${fileSize}`)
     .header('Accept-Ranges', 'bytes')
     .header('Content-Length', chunkSize)
-    .header('Content-Type', 'video/mp4');
+    .header('Content-Type', contentType);
 
-  return reply.send(
-    fs.createReadStream(fullPath, { start, end })
-  );
+  return reply.send(streamFile(fullPath, { start, end }));
 });
 
 // Serve thumbnails

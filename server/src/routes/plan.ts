@@ -42,6 +42,15 @@ function isDayHeaderRow(row: string[]): boolean {
 
 interface Session { name: string; videoNames: string[]; }
 
+// A plan's category is either a preset key the client translates, or a custom
+// label typed by the user. Empty/blank clears it. Capped so a stray paste can't
+// blow out the Plans page headings.
+function normalizeCategory(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  return trimmed ? trimmed.slice(0, 60) : null;
+}
+
 function detectFormat(records: string[][]): 'column' | 'row' {
   for (const row of records) {
     if (isWeekHeader(row) && isDayHeaderRow(row)) return 'column';
@@ -170,7 +179,7 @@ export default async function (fastify: FastifyInstance) {
   });
 
   fastify.post('/create', async (request, reply) => {
-    const body = request.body as { name?: string; startDate?: string; days?: Array<{ name: string; videoIds: string[] }> };
+    const body = request.body as { name?: string; startDate?: string; category?: string; days?: Array<{ name: string; videoIds: string[] }> };
     const days = Array.isArray(body.days) ? body.days.filter(day => Array.isArray(day.videoIds) && day.videoIds.length > 0) : [];
     if (!days.length) {
       return reply.code(400).send({ error: 'No workouts provided' });
@@ -179,9 +188,10 @@ export default async function (fastify: FastifyInstance) {
     const planId = nanoid();
     const planName = body.name?.trim() || `Custom Plan ${new Date().toISOString().split('T')[0]}`;
     const startDate = body.startDate || new Date().toISOString().split('T')[0];
+    const category = normalizeCategory(body.category);
 
     db.transaction(() => {
-      db.prepare('INSERT INTO workout_plans (id, name, is_active, start_date) VALUES (?, ?, 0, ?)').run(planId, planName, startDate);
+      db.prepare('INSERT INTO workout_plans (id, name, is_active, start_date, category) VALUES (?, ?, 0, ?, ?)').run(planId, planName, startDate, category);
       const insertStmt = db.prepare(
         'INSERT INTO workouts (id, plan_id, name, sequence_order, video_ids) VALUES (?, ?, ?, ?, ?)'
       );
@@ -195,7 +205,7 @@ export default async function (fastify: FastifyInstance) {
 
   fastify.put('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as { name?: string; startDate?: string; days?: Array<{ name: string; videoIds: string[] }> };
+    const body = request.body as { name?: string; startDate?: string; category?: string; days?: Array<{ name: string; videoIds: string[] }> };
     const days = Array.isArray(body.days) ? body.days.filter(day => Array.isArray(day.videoIds) && day.videoIds.length > 0) : [];
     if (!days.length) {
       return reply.code(400).send({ error: 'No workouts provided' });
@@ -203,10 +213,11 @@ export default async function (fastify: FastifyInstance) {
 
     const planName = body.name?.trim() || `Custom Plan ${new Date().toISOString().split('T')[0]}`;
     const startDate = body.startDate || new Date().toISOString().split('T')[0];
+    const category = normalizeCategory(body.category);
 
     db.transaction(() => {
-      // Update plan name and start date
-      db.prepare('UPDATE workout_plans SET name = ?, start_date = ? WHERE id = ?').run(planName, startDate, id);
+      // Update plan name, start date and category
+      db.prepare('UPDATE workout_plans SET name = ?, start_date = ?, category = ? WHERE id = ?').run(planName, startDate, category, id);
       
       // Delete history first (it references workouts via a foreign key).
       // Without this, deleting workouts that have completion marks fails
@@ -238,8 +249,39 @@ export default async function (fastify: FastifyInstance) {
   });
 
   fastify.get('/', async (request, reply) => {
-    const plans = db.prepare('SELECT * FROM workout_plans ORDER BY uploaded_at DESC').all();
-    return reply.send(plans);
+    // Active plan first, then newest uploads. Each plan is enriched with its
+    // workout count and the union of equipment tags across its videos.
+    const plans = db.prepare('SELECT * FROM workout_plans ORDER BY is_active DESC, uploaded_at DESC').all() as any[];
+    const workouts = db.prepare('SELECT plan_id, video_ids FROM workouts').all() as { plan_id: string; video_ids: string | null }[];
+    const videos = db.prepare('SELECT id, equipment FROM videos').all() as { id: string; equipment: string | null }[];
+
+    const equipmentByVideo = new Map<string, string[]>();
+    for (const v of videos) {
+      try {
+        const parsed = JSON.parse(v.equipment || '[]');
+        equipmentByVideo.set(v.id, Array.isArray(parsed) ? parsed : []);
+      } catch {
+        equipmentByVideo.set(v.id, []);
+      }
+    }
+
+    const enriched = plans.map(plan => {
+      const planWorkouts = workouts.filter(w => w.plan_id === plan.id);
+      const equipmentSet = new Set<string>();
+      for (const w of planWorkouts) {
+        let videoIds: string[] = [];
+        try {
+          const parsed = JSON.parse(w.video_ids || '[]');
+          if (Array.isArray(parsed)) videoIds = parsed;
+        } catch {}
+        for (const vid of videoIds) {
+          for (const eq of equipmentByVideo.get(vid) || []) equipmentSet.add(eq);
+        }
+      }
+      return { ...plan, workout_count: planWorkouts.length, equipment: Array.from(equipmentSet) };
+    });
+
+    return reply.send(enriched);
   });
 
   fastify.get('/:id', async (request, reply) => {

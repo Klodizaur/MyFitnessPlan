@@ -22,6 +22,10 @@ export default function Player() {
   const [isMarking, setIsMarking] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [showMarkDone, setShowMarkDone] = useState(false);
+  // Standalone mode: the video is played outside any plan workout (e.g. straight
+  // from the Library). Marking done then logs a manual workout_log entry.
+  const [standalone, setStandalone] = useState(false);
+  const [standaloneWorkoutId, setStandaloneWorkoutId] = useState<string | null>(null);
   const [nextVideoId, setNextVideoId] = useState<string | null>(null);
   const [prevVideoId, setPrevVideoId] = useState<string | null>(null);
   const labels = useMetaLabels();
@@ -48,29 +52,53 @@ export default function Player() {
         setError('Failed to load video details');
       });
 
+    // When the video is not part of a plan workout, offer a standalone "mark as
+    // done" that writes a manual entry to the workout log. Check today's log to
+    // restore the toggle state (and remember the entry id for un-marking).
+    const loadStandaloneState = () => {
+      setStandalone(true);
+      fetch('/api/profile/history')
+        .then(res => res.json())
+        .then(data => {
+          const now = new Date();
+          const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+          const entry = (data.entries || []).find(
+            (e: any) => e.isManual && e.videoId === videoId && e.completedDate === today
+          );
+          setStandaloneWorkoutId(entry?.workoutId || null);
+          setIsDone(!!entry);
+          setShowMarkDone(true);
+        })
+        .catch(() => setShowMarkDone(false));
+    };
+
+    if (!workoutId) {
+      loadStandaloneState();
+      return;
+    }
+
     fetch('/api/schedule')
       .then(res => res.json())
       .then(data => {
         const schedule = data.schedule || [];
         const day = schedule.find((d: any) => d.workout?.id === workoutId);
-        if (day?.workout) {
-          const videos = day.workout.videos || [];
-          const currentVideo = videos.find((v: any) => v.id === videoId);
-          if (currentVideo) {
-            setIsDone(currentVideo.isCompleted);
-            setShowMarkDone(true);
-          } else {
-            setIsDone(false);
-            setShowMarkDone(false);
-          }
-
-          const currentIndex = videos.findIndex((v: any) => v.id === videoId);
-          if (currentIndex !== -1) {
-            setNextVideoId(currentIndex < videos.length - 1 ? videos[currentIndex + 1].id : null);
-            setPrevVideoId(currentIndex > 0 ? videos[currentIndex - 1].id : null);
-          }
+        const videos = day?.workout?.videos || [];
+        const currentVideo = videos.find((v: any) => v.id === videoId);
+        if (currentVideo) {
+          setStandalone(false);
+          setIsDone(currentVideo.isCompleted);
+          setShowMarkDone(true);
+        } else {
+          loadStandaloneState();
         }
-      });
+
+        const currentIndex = videos.findIndex((v: any) => v.id === videoId);
+        if (currentIndex !== -1) {
+          setNextVideoId(currentIndex < videos.length - 1 ? videos[currentIndex + 1].id : null);
+          setPrevVideoId(currentIndex > 0 ? videos[currentIndex - 1].id : null);
+        }
+      })
+      .catch(() => loadStandaloneState());
   }, [videoId, workoutId]);
 
   const toggleFullscreen = () => {
@@ -105,16 +133,40 @@ export default function Player() {
   }, []);
 
   const handleToggleDone = async () => {
-    if (!workoutId || !videoId || isMarking) return;
+    if (!videoId || isMarking) return;
     setIsMarking(true);
     try {
-      const res = await fetch('/api/schedule/toggle-done', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workoutId, videoId })
-      });
-      const data = await res.json();
-      if (res.ok) setIsDone(data.completed);
+      if (!standalone && workoutId) {
+        // Part of the active plan: toggle plan completion (also updates the log).
+        const res = await fetch('/api/schedule/toggle-done', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workoutId, videoId })
+        });
+        const data = await res.json();
+        if (res.ok) setIsDone(data.completed);
+      } else if (isDone && standaloneWorkoutId) {
+        // Standalone un-mark: remove the manual log entry created earlier.
+        const res = await fetch(`/api/profile/history/${encodeURIComponent(standaloneWorkoutId)}`, { method: 'DELETE' });
+        if (res.ok) {
+          setIsDone(false);
+          setStandaloneWorkoutId(null);
+        }
+      } else {
+        // Standalone mark: log this video to the workout log for today.
+        const now = new Date();
+        const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        const res = await fetch('/api/profile/history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ completedDate: today, videoIds: [videoId] })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setIsDone(true);
+          setStandaloneWorkoutId(data.workoutIds?.[0] || null);
+        }
+      }
     } catch (err) {
       console.error('Failed to toggle status:', err);
     } finally {
@@ -161,7 +213,9 @@ export default function Player() {
                   fontWeight: 600,
                 }}
               >
-                {isDone ? '✓ This Part Done' : 'Mark Part Done'}
+                {standalone
+                  ? (isDone ? '✓ Logged as Done' : 'Mark as Done')
+                  : (isDone ? '✓ This Part Done' : 'Mark Part Done')}
               </button>
             )}
             <button

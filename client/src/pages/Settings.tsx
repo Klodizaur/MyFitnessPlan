@@ -4,13 +4,20 @@ import '../styles/About.css';
 
 const THEMES = [
   { id: 'midnight', primary: '#3b82f6', bg: '#0f172a' },
-  { id: 'snow', primary: '#2563eb', bg: '#f8fafc' },
   { id: 'sunset', primary: '#f97316', bg: '#2d1b36' },
   { id: 'forest', primary: '#10b981', bg: '#064e3b' },
   { id: 'pastel-orange', primary: '#fdba74', bg: '#fff7ed' },
   { id: 'pastel-pink', primary: '#f9a8d4', bg: '#fdf2f8' },
   { id: 'sky-blue', primary: '#7dd3fc', bg: '#f0f9ff' },
 ];
+
+type ScanProgress = {
+  active: boolean;
+  phase: 'idle' | 'discovering' | 'processing' | 'done';
+  processed: number;
+  total: number;
+  currentFile: string;
+};
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
@@ -21,6 +28,8 @@ export default function Settings() {
   const [theme, setTheme] = useState('midnight');
   const [calendarView, setCalendarView] = useState('list');
   const [status, setStatus] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [appVersion, setAppVersion] = useState('');
   const canBrowseFolders = typeof window !== 'undefined' && !!window.myFitnessPlan?.pickDirectory;
 
@@ -57,6 +66,18 @@ export default function Settings() {
 
   const handleSetDirectory = async () => {
     setStatus(t('settings.scanning_status'));
+    setScanning(true);
+    setScanProgress(null);
+
+    // The scan request stays open for the whole run (one ffmpeg pass per video),
+    // so progress is polled from a separate endpoint while it is in flight.
+    const poll = window.setInterval(() => {
+      fetch('/api/library/scan-progress')
+        .then(res => res.json())
+        .then((data: ScanProgress) => { if (data.active) setScanProgress(data); })
+        .catch(() => {});
+    }, 400);
+
     try {
       const res = await fetch('/api/library/set-directory', {
         method: 'POST',
@@ -68,6 +89,10 @@ export default function Settings() {
       else setStatus(t('settings.found_videos', { count: data.count }));
     } catch (err) {
       setStatus(t('settings.failed_connect'));
+    } finally {
+      window.clearInterval(poll);
+      setScanning(false);
+      setScanProgress(null);
     }
   };
 
@@ -223,8 +248,38 @@ export default function Settings() {
               {t('settings.browse')}
             </button>
           )}
-          <button className="btn" onClick={handleSetDirectory}>{t('settings.scan')}</button>
+          <button className="btn" onClick={handleSetDirectory} disabled={scanning}>
+            {scanning ? t('settings.scanning') : t('settings.scan')}
+          </button>
         </div>
+
+        {scanning && (
+          <div className="scan-progress">
+            <div className="scan-progress-head">
+              <span>
+                {scanProgress && scanProgress.phase === 'processing' && scanProgress.total > 0
+                  ? t('settings.scan_progress', { processed: scanProgress.processed, total: scanProgress.total })
+                  : t('settings.scan_discovering')}
+              </span>
+              {scanProgress && scanProgress.total > 0 && (
+                <strong>{Math.round((scanProgress.processed / scanProgress.total) * 100)}%</strong>
+              )}
+            </div>
+            <div className="scan-progress-track">
+              {/* Before the file list is known there is no percentage to show, so
+                  the bar runs as an indeterminate sweep instead. */}
+              <div
+                className={`scan-progress-fill${scanProgress && scanProgress.total > 0 ? '' : ' indeterminate'}`}
+                style={scanProgress && scanProgress.total > 0
+                  ? { width: `${(scanProgress.processed / scanProgress.total) * 100}%` }
+                  : undefined}
+              />
+            </div>
+            {scanProgress?.currentFile && (
+              <div className="scan-progress-file" title={scanProgress.currentFile}>{scanProgress.currentFile}</div>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom: '2rem' }}>
@@ -364,9 +419,23 @@ export default function Settings() {
       </div>
 
       <div className="about-section">
+        <h2>{t('about.website')}</h2>
+        <p>
+          <a
+            href="https://myfitnessplan.bigdeckit.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="about-link"
+          >
+            myfitnessplan.bigdeckit.com
+          </a>
+        </p>
+      </div>
+
+      <div className="about-section">
         <h2>{t('about.created_by')}</h2>
         <p>
-          <strong>Klaudia</strong>
+          <strong>Klaudia Krzos</strong>
           <br />
           <a
             href="https://www.linkedin.com/in/klaudiacreativestuff/"
@@ -387,8 +456,6 @@ export default function Settings() {
           </a>
           <br />
           <em>{t('about.role')}</em>
-          <br />
-          <strong>Big Deck IT LTD</strong>
         </p>
       </div>
 

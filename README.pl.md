@@ -248,8 +248,7 @@ Projekt jest objęty licencją **Non-Commercial Use License**.
 
 Więcej informacji znajduje się w pliku [LICENSE](LICENSE).
 
-**Autor:** [Klaudia Krzos](https://www.linkedin.com/in/klaudiacreativestuff/)  
-**Firma:** Big Deck IT LTD
+**Autor:** Klaudia Krzos — [LinkedIn](https://www.linkedin.com/in/klaudiacreativestuff/) · [GitHub](https://github.com/Klodizaur)
 
 ## Support
 

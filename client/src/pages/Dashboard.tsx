@@ -21,10 +21,19 @@ interface ScheduleDay {
   } | null;
 }
 
+interface PlanInfo {
+  name: string;
+  totalWorkouts: number;
+  completedWorkouts: number;
+  firstDate: string;
+  lastDate: string;
+}
+
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const [todaySchedule, setTodaySchedule] = useState<ScheduleDay | null>(null);
   const [upcomingWorkouts, setUpcomingWorkouts] = useState<ScheduleDay[]>([]);
+  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
   const [libraryPreview, setLibraryPreview] = useState<{ key: string; title: string; cover?: string | null; count: number }[]>([]);
   const navigate = useNavigate();
 
@@ -32,13 +41,23 @@ export default function Dashboard() {
     fetch('/api/schedule')
       .then(res => res.json())
       .then(data => {
-        if (data.schedule) {
+        if (data.schedule && data.schedule.length > 0) {
           const today = new Date().toISOString().split('T')[0];
+
+          const workoutDays = data.schedule.filter((d: any) => d.isWorkoutDay);
+          setPlanInfo({
+            name: data.planName || '',
+            totalWorkouts: workoutDays.length,
+            completedWorkouts: workoutDays.filter((d: any) => d.workout?.isCompleted).length,
+            firstDate: data.schedule[0].date,
+            lastDate: data.schedule[data.schedule.length - 1].date,
+          });
+
           const todayIndex = data.schedule.findIndex((d: any) => d.date === today);
-          
+
           if (todayIndex !== -1) {
             setTodaySchedule(data.schedule[todayIndex]);
-            
+
             // Find next 2 workouts (skip rest days)
             const nextWorkouts = data.schedule
               .slice(todayIndex + 1)
@@ -70,6 +89,21 @@ export default function Dashboard() {
 
   const firstPendingVideo = todaySchedule?.workout?.videos.find(v => !v.isCompleted) || todaySchedule?.workout?.videos[0];
 
+  // Where "today" falls relative to the active plan's schedule window.
+  const todayStr = new Date().toISOString().split('T')[0];
+  const planStatus: 'none' | 'upcoming' | 'active' | 'ended' = !planInfo
+    ? 'none'
+    : todayStr < planInfo.firstDate
+    ? 'upcoming'
+    : todayStr > planInfo.lastDate
+    ? 'ended'
+    : 'active';
+  const planDaysLeft = planInfo
+    ? Math.max(0, Math.round((new Date(planInfo.lastDate).getTime() - new Date(todayStr).getTime()) / 86400000))
+    : 0;
+
+  const stripExt = (name: string) => name.replace(/\.[^/.]+$/, '');
+
   const workoutNameParts = (todaySchedule?.workout?.name || '')
     .split(/\n+/) // preserve separate lines from uploaded TSVs
     .flatMap(part => part.split(/(\s+\(\d+\s+min\)\s*)/))
@@ -89,8 +123,24 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Library preview (moved to bottom) */}
-      
+      {/* Active plan status banner */}
+      {planInfo && planStatus === 'active' && (
+        <div className="glass-card" style={{ padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '-1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', minWidth: 0 }}>
+            <span style={{ background: 'var(--accent-color)', color: 'white', padding: '3px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', flexShrink: 0 }}>
+              {t('dashboard.active_plan')}
+            </span>
+            <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{planInfo.name}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            <span>{t('dashboard.plan_progress', { completed: planInfo.completedWorkouts, total: planInfo.totalWorkouts })}</span>
+            <span style={{ fontWeight: 700, color: planDaysLeft <= 3 ? 'var(--accent-color)' : 'var(--text-primary)' }}>
+              {planDaysLeft === 0 ? t('dashboard.plan_last_day') : t('dashboard.plan_days_left', { count: planDaysLeft })}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div 
         className="glass-card" 
@@ -207,6 +257,24 @@ export default function Dashboard() {
                </div>
             )}
           </>
+        ) : planInfo && planStatus === 'ended' ? (
+          <div style={{ padding: '3rem', textAlign: 'center', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+            <div style={{ fontSize: '3.5rem' }}>🎉</div>
+            <h2 style={{ margin: 0 }}>{t('dashboard.plan_finished_title', { plan: planInfo.name })}</h2>
+            <p style={{ margin: 0, maxWidth: 520 }}>
+              {t('dashboard.plan_finished_msg', { completed: planInfo.completedWorkouts, total: planInfo.totalWorkouts })}
+            </p>
+            <button className="btn" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/plans')}>{t('dashboard.plan_finished_cta')}</button>
+          </div>
+        ) : planInfo && planStatus === 'upcoming' ? (
+          <div style={{ padding: '3rem', textAlign: 'center', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+            <div style={{ fontSize: '3.5rem' }}>🗓️</div>
+            <h2 style={{ margin: 0 }}>{planInfo.name}</h2>
+            <p style={{ margin: 0 }}>
+              {t('dashboard.plan_starts_on', { date: new Date(planInfo.firstDate + 'T00:00:00').toLocaleDateString(i18n.language, { weekday: 'long', month: 'long', day: 'numeric' }) })}
+            </p>
+            <button className="btn" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/calendar')}>{t('dashboard.full_plan')}</button>
+          </div>
         ) : (
           <div style={{ padding: '3rem', textAlign: 'center', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <h2>{t('dashboard.no_active_plan')}</h2>
@@ -272,9 +340,15 @@ export default function Dashboard() {
                       <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-color)', textTransform: 'uppercase' }}>
                         {new Date(day.date).toLocaleDateString(i18n.language, { weekday: 'short', month: 'short', day: 'numeric' })}
                       </div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {day.workout?.name}
-                      </div>
+                      {/* One line per video, never a merged blob of titles */}
+                      {(day.workout?.videos?.length
+                        ? day.workout.videos.map(v => stripExt(v.filename))
+                        : (day.workout?.name || '').split(/\n+/).filter(Boolean)
+                      ).map((title, j) => (
+                        <div key={j} style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {title}
+                        </div>
+                      ))}
                    </div>
                 </div>
               ))

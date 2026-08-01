@@ -18,21 +18,6 @@
   --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
 }
 
-[data-theme='snow'] {
-  --bg-color: #f8fafc;
-  --surface-color: #ffffff;
-  --surface-hover: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --accent-color: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-soft: rgba(37, 99, 235, 0.12);
-  --progress-bg: rgba(0, 0, 0, 0.05);
-  --glass-bg: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(0, 0, 0, 0.05);
-  --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
-}
-
 [data-theme='sunset'] {
   --bg-color: #2d1b36;
   --surface-color: #3d2b46;
@@ -589,6 +574,213 @@ nav .nav-links a:hover, nav .nav-links a.active {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
+/* Featured card for the active plan: a full-bleed hero above the plan grid.
+   Everything sits on a dark scrim, so all text is white and stays readable in
+   every theme (the pastel themes have very light accent colors). */
+.plan-featured {
+  position: relative;
+  border-radius: 22px;
+  overflow: hidden;
+  margin-bottom: 2.5rem;
+  min-height: 300px;
+  display: flex;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+}
+
+.plan-featured-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(100deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.72) 42%, rgba(0,0,0,0.35) 100%),
+    linear-gradient(0deg, rgba(0,0,0,0.45) 0%, transparent 55%);
+}
+
+.plan-featured-content {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 2.25rem;
+  color: #fff;
+}
+
+.plan-featured-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.plan-featured-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-featured-active {
+  background: var(--accent-color);
+  color: #fff;
+  padding: 4px 13px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.plan-featured-category {
+  padding: 4px 13px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(6px);
+}
+
+.plan-featured-title {
+  font-size: 2.3rem;
+  line-height: 1.1;
+  font-weight: 800;
+  margin: 0;
+  color: #fff;
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.55);
+}
+
+.plan-featured-date {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.plan-featured-date strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Details panel: workout count, equipment, actions. */
+.plan-featured-panel {
+  flex: 0 0 300px;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.plan-featured-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.plan-featured-count svg {
+  flex-shrink: 0;
+  color: var(--accent-color);
+}
+
+.plan-featured-panel-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 8px;
+}
+
+.plan-featured-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plan-featured-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+}
+
+.plan-featured-panel .plan-card-actions {
+  margin-top: 0.25rem;
+}
+
+/* Category sections listing the non-active plans */
+.plans-category + .plans-category {
+  margin-top: 2.25rem;
+}
+
+.plans-category-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0 0 1rem;
+}
+
+.plans-category-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  background: var(--surface-hover);
+  border: 1px solid var(--glass-border);
+}
+
+@media (max-width: 860px) {
+  .plan-featured-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+  .plan-featured-title {
+    font-size: 1.7rem;
+  }
+  .plan-featured-panel {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+}
+
 .plan-card {
   position: relative;
   border-radius: 20px;
@@ -705,6 +897,162 @@ nav .nav-links a:hover, nav .nav-links a.active {
   font-size: 0.8rem;
   color: rgba(255,255,255,0.75);
   margin-bottom: 1rem;
+}
+
+/* Library scan progress, shown under the directory row while a scan runs. */
+.scan-progress {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+}
+
+.scan-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.6rem;
+}
+
+.scan-progress-head strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.scan-progress-track {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--progress-bg);
+  overflow: hidden;
+}
+
+.scan-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent-color);
+  transition: width 0.3s ease;
+}
+
+/* No total yet (still walking the directory tree) — sweep instead of fill. */
+.scan-progress-fill.indeterminate {
+  width: 35%;
+  animation: scan-sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes scan-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+.scan-progress-file {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Runtime chip in the corner of a video thumbnail. Always white on black, since
+   it sits on the thumbnail image rather than on a themed surface. */
+.video-duration-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+/* A user's free-text note on a logged workout. */
+.log-note {
+  display: flex;
+  gap: 8px;
+  margin-top: 0.85rem;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--accent-color);
+}
+
+.log-note svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--text-secondary);
+}
+
+.log-note p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* "Plan: X" marker on workout log entries. Text stays at --text-primary in every
+   theme — the pastel themes use a light accent that is unreadable as a text color,
+   so the accent only tints the background and the icon sits on the border. */
+.log-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  border: 1px solid var(--glass-border);
+}
+
+.log-plan-badge svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+/* Workout count + equipment tag chips shown on every plan card */
+.plan-card-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.plan-card-workouts,
+.plan-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.22);
+  backdrop-filter: blur(6px);
+  white-space: nowrap;
+}
+
+.plan-card-workouts {
+  background: var(--accent-color);
+  border-color: transparent;
 }
 
 .plan-card-datefield {
@@ -914,26 +1262,6 @@ nav .nav-links a:hover, nav .nav-links a.active {
   --wb-danger: #f87171;
   --wb-danger-bg: rgba(248, 113, 113, 0.16);
   --wb-danger-border: rgba(248, 113, 113, 0.4);
-}
-
-[data-theme='snow'] .wb-modal {
-  --wb-panel: #ffffff;
-  --wb-panel-border: rgba(15, 23, 42, 0.10);
-  --wb-text: #0f172a;
-  --wb-text-dim: #475569;
-  --wb-surface: #f1f5f9;
-  --wb-input-bg: #f8fafc;
-  --wb-border: rgba(15, 23, 42, 0.14);
-  --wb-selected: rgba(37, 99, 235, 0.14);
-  --wb-selected-border: #2563eb;
-  --wb-accent: #2563eb;
-  --wb-accent-hover: #1d4ed8;
-  --wb-accent-text: #ffffff;
-  --wb-ghost-bg: rgba(15, 23, 42, 0.05);
-  --wb-ghost-hover: rgba(15, 23, 42, 0.10);
-  --wb-danger: #dc2626;
-  --wb-danger-bg: rgba(220, 38, 38, 0.10);
-  --wb-danger-border: rgba(220, 38, 38, 0.35);
 }
 
 [data-theme='sunset'] .wb-modal {
@@ -1237,6 +1565,31 @@ nav .nav-links a:hover, nav .nav-links a.active {
   padding: 0 4px;
 }
 .wb-day-list-label { margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--wb-text-dim); }
+/* Marks where the currently-edited day sits in the day list, separating the days
+   before it from the ones after it. Occupies that day's slot in the sequence. */
+.wb-day-marker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+}
+.wb-day-marker-line {
+  flex: 1;
+  height: 0;
+  border-top: 1px dashed var(--wb-selected-border);
+  opacity: 0.7;
+}
+.wb-day-marker-label {
+  flex-shrink: 0;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--wb-text);
+  background: var(--wb-selected);
+  border: 1px solid var(--wb-selected-border);
+}
 /* "Currently selected" pill shown on the pinned day card in the sticky header */
 .wb-day-badge {
   display: inline-block;
@@ -1307,67 +1660,124 @@ nav .nav-links a:hover, nav .nav-links a.active {
 }
 
 /* ---- Video results ---- */
+/* Compact browse grid: a large thumbnail, the title, and a corner add/remove
+   badge — nothing else, so scanning a big library stays calm. */
 .wb-videos.grid {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
 .wb-videos.list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 .wb-empty { margin: 0; color: var(--wb-text-dim); }
 .wb-video-card {
   display: flex;
-  gap: 10px;
   text-align: left;
-  padding: 14px;
   border: 1px solid var(--wb-border);
   border-radius: 12px;
   background: var(--wb-surface);
   color: var(--wb-text);
   cursor: pointer;
   font-family: var(--font-family);
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+  overflow: hidden;
+  padding: 0;
+  transition: box-shadow 0.15s ease, transform 0.15s ease, background 0.2s ease;
 }
-.wb-video-card:hover { transform: translateY(-2px); border-color: var(--wb-selected-border); }
+.wb-video-card:hover {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px var(--wb-selected-border);
+}
+/* Ring instead of a thicker border, so selecting never shifts the layout. */
 .wb-video-card.selected {
-  border: 2px solid var(--wb-selected-border);
   background: var(--wb-selected);
-  padding: 13px;
+  box-shadow: inset 0 0 0 2px var(--wb-selected-border);
 }
 .wb-videos.grid .wb-video-card {
   flex-direction: column;
-  justify-content: space-between;
   align-items: stretch;
-  min-height: 160px;
 }
 .wb-videos.list .wb-video-card {
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.wb-video-thumb-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--wb-input-bg);
 }
 .wb-video-thumb {
   width: 100%;
-  height: 120px;
+  height: 100%;
   object-fit: cover;
-  border-radius: 14px;
   display: block;
 }
 .wb-video-thumb-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--wb-input-bg);
   color: var(--wb-text-dim);
-  font-size: 0.85rem;
+  font-size: 1.2rem;
 }
-.wb-video-meta { display: grid; gap: 6px; }
-.wb-video-name { font-weight: 700; overflow-wrap: anywhere; }
-.wb-video-path { font-size: 0.85rem; color: var(--wb-text-dim); overflow-wrap: anywhere; }
-.wb-video-check { opacity: 0.85; align-self: flex-end; font-weight: 600; }
-.wb-videos.list .wb-video-check { align-self: center; }
+/* Two lines max, so uneven title lengths don't make a ragged grid. */
+.wb-video-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.wb-videos.grid .wb-video-name { padding: 9px 10px 10px; }
+.wb-videos.list .wb-video-name {
+  -webkit-line-clamp: 1;
+  font-size: 0.88rem;
+  flex: 1;
+  min-width: 0;
+}
+.wb-video-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.wb-videos.grid .wb-video-check {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  transition: background 0.15s ease;
+}
+.wb-videos.grid .wb-video-card:hover .wb-video-check { background: rgba(0, 0, 0, 0.75); }
+.wb-videos.grid .wb-video-card.selected .wb-video-check {
+  background: var(--wb-accent);
+  color: var(--wb-accent-text);
+}
+.wb-videos.list .wb-video-check {
+  color: var(--wb-text-dim);
+  background: var(--wb-input-bg);
+}
+.wb-videos.list .wb-video-card.selected .wb-video-check {
+  background: var(--wb-accent);
+  color: var(--wb-accent-text);
+}
 
 /* ==================================================================
    Responsive / adaptive layout

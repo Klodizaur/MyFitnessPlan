@@ -227,8 +227,7 @@ For more details, see the [LICENSE](LICENSE) file.
 
 ---
 
-**Created by:** [Klaudia Krzos](https://www.linkedin.com/in/klaudiacreativestuff/)  
-**Company:** Big Deck IT LTD
+**Created by:** Klaudia Krzos — [LinkedIn](https://www.linkedin.com/in/klaudiacreativestuff/) · [GitHub](https://github.com/Klodizaur)
 
 ## Support
 

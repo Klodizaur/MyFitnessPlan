@@ -29,6 +29,8 @@ export default async function (fastify: FastifyInstance) {
         l.completed_date,
         l.completed_at,
         l.is_manual,
+        l.notes,
+        v.duration_seconds,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.training_type ELSE v.training_type END AS training_type,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.body_parts    ELSE v.body_parts    END AS body_parts,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.intensity     ELSE v.intensity     END AS intensity,
@@ -49,6 +51,10 @@ export default async function (fastify: FastifyInstance) {
       completedDate: r.completed_date,
       completedAt: r.completed_at,
       isManual: !!r.is_manual,
+      notes: r.notes || '',
+      // Runtime of the linked video, when the library has probed it. Manually
+      // logged entries have no video and therefore no duration.
+      durationSeconds: typeof r.duration_seconds === 'number' ? r.duration_seconds : null,
       trainingType: parseJsonArray(r.training_type),
       bodyParts: parseJsonArray(r.body_parts),
       intensity: r.intensity || null,
@@ -85,6 +91,33 @@ export default async function (fastify: FastifyInstance) {
       let updated = 0;
       for (const id of entryIds) {
         updated += update.run(completedDate, id).changes;
+      }
+      return updated;
+    });
+    const updated = applyUpdates(ids);
+
+    return reply.send({ success: true, updated });
+  });
+
+  // Attach (or clear) a free-text note on a logged workout. The note is written to
+  // every row of that workout so it is present no matter which part is read back;
+  // an empty string clears it.
+  fastify.put('/history/notes', async (request, reply) => {
+    const { ids, notes } = request.body as { ids?: string[]; notes?: string };
+
+    if (!Array.isArray(ids) || ids.length === 0 || !ids.every(id => typeof id === 'string')) {
+      return reply.code(400).send({ error: 'ids must be a non-empty array of strings' });
+    }
+    if (typeof notes !== 'string') {
+      return reply.code(400).send({ error: 'notes must be a string' });
+    }
+    const value = notes.trim().slice(0, 2000) || null;
+
+    const update = db.prepare('UPDATE workout_log SET notes = ? WHERE id = ?');
+    const applyUpdates = db.transaction((entryIds: string[]) => {
+      let updated = 0;
+      for (const id of entryIds) {
+        updated += update.run(value, id).changes;
       }
       return updated;
     });

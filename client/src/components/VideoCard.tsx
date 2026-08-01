@@ -12,6 +12,15 @@ type Props = {
   onUpdate: (video: Video) => void;
 };
 
+// "1:04:20" for long videos, "32:15" otherwise — the usual player convention.
+function formatRuntime(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
 export default function VideoCard({ video, viewMode, onUpdate }: Props) {
   const navigate = useNavigate();
   const [hovered, setHovered] = useState(false);
@@ -23,6 +32,14 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
   const hasMeta = Boolean(video.description?.trim()) || equipment.length > 0;
 
   const openPlayer = () => navigate(`/player/${video.id}`);
+
+  // Runtime chip in the thumbnail's bottom-right corner. Hidden on hover so it
+  // doesn't sit on top of the hover overlay.
+  const durationBadge = video.duration_seconds ? (
+    <span className="video-duration-badge" style={{ opacity: hovered ? 0 : 1 }}>
+      {formatRuntime(video.duration_seconds)}
+    </span>
+  ) : null;
 
   const hoverOverlay = (
     <div
@@ -132,6 +149,7 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
             ) : (
               <div style={{ padding: 12 }}>{video.filename}</div>
             )}
+            {durationBadge}
             {hoverOverlay}
           </div>
 
@@ -210,6 +228,7 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
             <div style={{ padding: 20 }}>{video.filename}</div>
           )}
 
+          {durationBadge}
           {hoverOverlay}
 
           <div
@@ -231,6 +250,8 @@ export default function VideoCard({ video, viewMode, onUpdate }: Props) {
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
+              // Keep the title clear of the runtime chip in the corner.
+              paddingRight: video.duration_seconds ? 48 : 0,
               fontFamily: 'var(--font-family)',
               letterSpacing: '-0.01em',
               textShadow: '0 1px 2px rgba(0,0,0,0.6)',

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import EquipmentPicker from '../components/EquipmentPicker';
+import { EquipmentIcon } from '../lib/equipment';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, BODY_PARTS, INTENSITIES, TRAINING_TYPES } from '../lib/metadata';
 import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
@@ -15,6 +16,9 @@ interface Plan {
   start_date: string;
   background_image?: string | null;
   background_blur?: number;
+  workout_count?: number;
+  equipment?: string[];
+  category?: string | null;
 }
 
 const API_BASE = '';
@@ -44,6 +48,17 @@ const createWeek = (weekNumber: number): BuilderWeek => ({
 
 const createInitialBuilderWeeks = () => [createWeek(1)];
 
+// Preset plan categories. Stored as these keys so the label follows the UI
+// language; anything else in `category` is a custom label shown verbatim.
+const PLAN_CATEGORIES = ['reduction', 'strength', 'cardio', 'mobility', 'endurance', 'flexibility'] as const;
+type PlanCategory = typeof PLAN_CATEGORIES[number];
+
+const isPresetCategory = (value: string): boolean =>
+  (PLAN_CATEGORIES as readonly string[]).includes(value);
+
+// Display-only: the extension is noise when browsing for videos to add.
+const stripVideoExt = (filename: string) => filename.replace(/\.[^/.]+$/, '');
+
 export default function Plans() {
   const { t } = useTranslation();
   const labels = useMetaLabels();
@@ -55,6 +70,9 @@ export default function Plans() {
   const [builderStep, setBuilderStep] = useState(1);
   const [planName, setPlanName] = useState('My Custom Plan');
   const [builderStartDate, setBuilderStartDate] = useState(new Date().toISOString().split('T')[0]);
+  // Either a preset key, '' for none, or 'custom' while the free-text field is open.
+  const [builderCategory, setBuilderCategory] = useState('');
+  const [builderCustomCategory, setBuilderCustomCategory] = useState('');
   const [builderWeeks, setBuilderWeeks] = useState<BuilderWeek[]>(createInitialBuilderWeeks());
   const [builderCurrentWeek, setBuilderCurrentWeek] = useState(0);
   const [builderCurrentDay, setBuilderCurrentDay] = useState(0);
@@ -176,6 +194,11 @@ export default function Plans() {
       // Populate builder state
       setPlanName(plan.name);
       setBuilderStartDate(plan.start_date);
+      const existingCategory = plan.category?.trim() || '';
+      setBuilderCategory(
+        existingCategory === '' ? '' : isPresetCategory(existingCategory) ? existingCategory : 'custom'
+      );
+      setBuilderCustomCategory(isPresetCategory(existingCategory) ? '' : existingCategory);
       setBuilderWeeks(finalWeeks);
       setBuilderCurrentWeek(0);
       setBuilderCurrentDay(0);
@@ -272,6 +295,7 @@ export default function Plans() {
       body: JSON.stringify({
         name: planName,
         startDate: builderStartDate,
+        category: resolvedBuilderCategory(),
         days: selectedDays
       })
     });
@@ -285,6 +309,8 @@ export default function Plans() {
       setIsBuilderOpen(false);
       setEditingPlanId(null);
       setBuilderStep(1);
+      setBuilderCategory('');
+      setBuilderCustomCategory('');
       setBuilderWeeks(createInitialBuilderWeeks());
       setBuilderCurrentWeek(0);
       setBuilderCurrentDay(0);
@@ -320,20 +346,26 @@ export default function Plans() {
     setBuilderCurrentDay(0);
   };
 
+  // Week/day headings are derived from the position, not from the stored
+  // BuilderWeek/BuilderDay `name` (which is an internal English placeholder and
+  // gets replaced by the video titles on save), so they follow the UI language.
+  const weekLabel = (index: number) => t('plans.builder_week_n', { n: index + 1 });
+  const dayLabel = (index: number) => t('plans.builder_day_n', { n: index + 1 });
+
   // Renders a single day card. `pinned` cards live inside the sticky header
   // (the day currently being edited) and are not clickable to re-select.
   const renderDayCard = (day: BuilderDay, index: number, pinned = false) => {
     const isSelected = builderCurrentDay === index;
     return (
       <div
-        key={day.name}
+        key={index}
         className={`wb-day-card${isSelected ? ' selected' : ''}${pinned ? ' pinned' : ''}`}
         onClick={pinned ? undefined : () => setBuilderCurrentDay(index)}
       >
         <div className="wb-day-card-head">
           <span className="wb-day-name">
             {pinned && <span className="wb-day-badge">{t('plans.builder_currently_selected')}</span>}
-            {day.name}
+            {dayLabel(index)}
           </span>
           {day.videoIds.length > 0 && (
             <span className="wb-day-count">{day.videoIds.length}</span>
@@ -362,6 +394,8 @@ export default function Plans() {
     setIsBuilderOpen(false);
     setEditingPlanId(null);
     setBuilderStep(1);
+    setBuilderCategory('');
+    setBuilderCustomCategory('');
     setBuilderWeeks(createInitialBuilderWeeks());
     setBuilderCurrentWeek(0);
     setBuilderCurrentDay(0);
@@ -474,6 +508,99 @@ export default function Plans() {
   const bgPickerPlan = plans.find(p => p.id === bgPickerPlanId);
   const bgPickerCurrentUrl = resolveBackgroundUrl(bgPickerPlan?.background_image);
 
+  // The active plan gets its own featured card above the grid of the remaining plans.
+  const activePlan = plans.find(p => p.is_active === 1) || null;
+  const otherPlans = plans.filter(p => p.is_active !== 1);
+
+  // Remaining plans are grouped under category headings: known presets first (in
+  // their canonical order), then custom labels A→Z, then uncategorized plans last.
+  const planGroups = (() => {
+    const byCategory = new Map<string, Plan[]>();
+    for (const plan of otherPlans) {
+      const key = plan.category?.trim() || '';
+      const arr = byCategory.get(key) || [];
+      arr.push(plan);
+      byCategory.set(key, arr);
+    }
+    const keys = Array.from(byCategory.keys());
+    const presets = keys.filter(k => isPresetCategory(k)).sort(
+      (a, b) => PLAN_CATEGORIES.indexOf(a as PlanCategory) - PLAN_CATEGORIES.indexOf(b as PlanCategory)
+    );
+    const custom = keys.filter(k => k && !isPresetCategory(k)).sort((a, b) => a.localeCompare(b));
+    const ordered = [...presets, ...custom, ...(byCategory.has('') ? [''] : [])];
+    return ordered.map(key => ({ key, plans: byCategory.get(key) || [] }));
+  })();
+
+  // Only show headings once there is something to distinguish.
+  const showCategoryHeadings = planGroups.some(g => g.key !== '');
+
+  // Preset categories are translated; custom labels are shown exactly as typed.
+  const categoryLabel = (key: string) =>
+    isPresetCategory(key) ? t(`plans.category_${key}`) : key;
+
+  // The value actually saved: a preset key, the typed custom label, or '' for none.
+  const resolvedBuilderCategory = () =>
+    builderCategory === 'custom' ? builderCustomCategory.trim() : builderCategory;
+
+  // Category chooser used in both the create flow (step 1) and the edit form.
+  const renderCategoryField = () => (
+    <div className="wb-field">
+      <label className="wb-label">{t('plans.builder_category')}</label>
+      <div className="wb-chip-row">
+        <button
+          type="button"
+          className={`wb-chip${builderCategory === '' ? ' selected' : ''}`}
+          onClick={() => setBuilderCategory('')}
+        >
+          {t('plans.category_none')}
+        </button>
+        {PLAN_CATEGORIES.map(cat => (
+          <button
+            type="button"
+            key={cat}
+            className={`wb-chip${builderCategory === cat ? ' selected' : ''}`}
+            onClick={() => setBuilderCategory(cat)}
+          >
+            {t(`plans.category_${cat}`)}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={`wb-chip${builderCategory === 'custom' ? ' selected' : ''}`}
+          onClick={() => setBuilderCategory('custom')}
+        >
+          + {t('plans.category_custom')}
+        </button>
+      </div>
+      {builderCategory === 'custom' && (
+        <input
+          className="wb-input"
+          style={{ marginTop: 10 }}
+          value={builderCustomCategory}
+          onChange={e => setBuilderCustomCategory(e.target.value)}
+          placeholder={t('plans.category_custom_placeholder')}
+          maxLength={60}
+        />
+      )}
+    </div>
+  );
+
+  // Workout count + equipment tags, shared by the featured card and the grid cards.
+  const renderPlanInfo = (plan: Plan) => (
+    <div className="plan-card-info">
+      <span className="plan-card-workouts">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M6.5 2v4.5M17.5 2v4.5M6.5 17.5V22M17.5 17.5V22M2 6.5h4.5M2 17.5h4.5M17.5 6.5H22M17.5 17.5H22"/></svg>
+        {t('plans.workout_count', { count: plan.workout_count ?? 0 })}
+      </span>
+      {(plan.equipment || []).map(eq => (
+        <span key={eq} className="plan-card-tag" title={labels.equipment(eq)}>
+          <EquipmentIcon id={eq} size={13} />
+          {labels.equipment(eq)}
+        </span>
+      ))}
+    </div>
+  );
+
   return (
     <div className="plans-container">
       <div className="glass-card plans-hero" style={{ marginBottom: '2rem' }}>
@@ -512,11 +639,89 @@ export default function Plans() {
         </div>
       )}
 
-      <div className="plans-grid">
-        {plans.map(plan => {
+      {activePlan && (
+        <div className="plan-featured">
+          {/* Full-bleed image with a dark scrim, so every label on top is white —
+              readable in all themes regardless of the theme's accent lightness. */}
+          {(() => {
+            const bgUrl = resolveBackgroundUrl(activePlan.background_image);
+            return bgUrl ? (
+              <div className={`plan-card-bg${activePlan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
+            ) : (
+              <>
+                <div className="plan-card-bg no-image" />
+                <div className="plan-card-logo" />
+              </>
+            );
+          })()}
+          <div className="plan-featured-scrim" />
+
+          <button
+            type="button"
+            className="plan-card-bg-btn"
+            title={t('plans.set_background') || 'Set background image'}
+            onClick={() => openBackgroundPicker(activePlan.id)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </button>
+
+          <div className="plan-featured-content">
+            <div className="plan-featured-main">
+              <div className="plan-featured-eyebrow">
+                <span className="plan-featured-active">{t('plans.active')}</span>
+                {activePlan.category && (
+                  <span className="plan-featured-category">{categoryLabel(activePlan.category)}</span>
+                )}
+              </div>
+              <h2 className="plan-featured-title">{activePlan.name}</h2>
+              <p className="plan-featured-date">
+                <span>{t('plans.start_date')}</span>
+                <strong>{activePlan.start_date}</strong>
+              </p>
+            </div>
+
+            <div className="plan-featured-panel">
+              <span className="plan-featured-count">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M6.5 2v4.5M17.5 2v4.5M6.5 17.5V22M17.5 17.5V22M2 6.5h4.5M2 17.5h4.5M17.5 6.5H22M17.5 17.5H22"/></svg>
+                {t('plans.workout_count', { count: activePlan.workout_count ?? 0 })}
+              </span>
+
+              {(activePlan.equipment || []).length > 0 && (
+                <div className="plan-featured-equipment">
+                  <span className="plan-featured-panel-label">{t('plans.builder_filter_equipment')}</span>
+                  <div className="plan-featured-tags">
+                    {(activePlan.equipment || []).map(eq => (
+                      <span key={eq} className="plan-featured-tag" title={labels.equipment(eq)}>
+                        <EquipmentIcon id={eq} size={13} />
+                        {labels.equipment(eq)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="plan-card-actions">
+                <button className="btn btn-ghost" onClick={() => handleEditPlan(activePlan.id)}>{t('plans.edit')}</button>
+                <button className="btn btn-danger-ghost" onClick={() => handleDelete(activePlan.id)}>{t('plans.delete')}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {planGroups.map(group => (
+        <section key={group.key || '__uncategorized'} className="plans-category">
+          {showCategoryHeadings && (
+            <h2 className="plans-category-heading">
+              {group.key ? categoryLabel(group.key) : t('plans.category_none')}
+              <span className="plans-category-count">{group.plans.length}</span>
+            </h2>
+          )}
+          <div className="plans-grid">
+            {group.plans.map(plan => {
           const bgUrl = resolveBackgroundUrl(plan.background_image);
           return (
-            <div key={plan.id} className={`glass-card plan-card ${plan.is_active ? 'active' : ''}`}>
+            <div key={plan.id} className="glass-card plan-card">
               {bgUrl ? (
                 <div className={`plan-card-bg${plan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
               ) : (
@@ -526,10 +731,6 @@ export default function Plans() {
                 </>
               )}
               <div className="plan-card-overlay" />
-
-              {plan.is_active === 1 && (
-                <span className="plan-card-badge">{t('plans.active')}</span>
-              )}
 
               <button
                 type="button"
@@ -543,34 +744,29 @@ export default function Plans() {
               <div className="plan-card-body">
                 <h3 className="plan-card-title">{plan.name}</h3>
 
-                {plan.is_active === 1 ? (
-                  <div className="plan-card-datefield">
-                    <label>{t('plans.start_date')}</label>
-                    <span className="plan-card-static-date">{plan.start_date}</span>
-                  </div>
-                ) : (
-                  <div className="plan-card-datefield">
-                    <label>{t('plans.set_start_date')}</label>
-                    <input
-                      type="date"
-                      value={activationDate}
-                      onChange={e => setActivationDate(e.target.value)}
-                    />
-                  </div>
-                )}
+                {renderPlanInfo(plan)}
+
+                <div className="plan-card-datefield">
+                  <label>{t('plans.set_start_date')}</label>
+                  <input
+                    type="date"
+                    value={activationDate}
+                    onChange={e => setActivationDate(e.target.value)}
+                  />
+                </div>
 
                 <div className="plan-card-actions">
                   <button className="btn btn-ghost" onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
-                  {!plan.is_active && (
-                    <button className="btn btn-ghost" onClick={() => handleActivate(plan.id)}>{t('plans.activate')}</button>
-                  )}
+                  <button className="btn btn-ghost" onClick={() => handleActivate(plan.id)}>{t('plans.activate')}</button>
                   <button className="btn btn-danger-ghost" onClick={() => handleDelete(plan.id)}>{t('plans.delete')}</button>
                 </div>
               </div>
             </div>
           );
-        })}
-      </div>
+            })}
+          </div>
+        </section>
+      ))}
 
       {plans.length === 0 && (
         <div style={{ textAlign: 'center', padding: '4rem', color: '#888' }}>
@@ -672,6 +868,7 @@ export default function Plans() {
                   <label className="wb-label">{t('plans.builder_start_date')}</label>
                   <input className="wb-input" type="date" value={builderStartDate} onChange={e => setBuilderStartDate(e.target.value)} />
                 </div>
+                {renderCategoryField()}
                 <div className="wb-actions">
                   <button className="wb-btn wb-btn-ghost" onClick={closeBuilder}>{t('plans.builder_cancel')}</button>
                   <button className="wb-btn wb-btn-primary" onClick={() => setBuilderStep(2)}>{t('plans.builder_next')}</button>
@@ -680,22 +877,25 @@ export default function Plans() {
             ) : (
               <div className="wb-form">
                 {editingPlanId && (
-                  <div className="wb-field">
-                    <label className="wb-label">{t('plans.builder_plan_name')}</label>
-                    <input
-                      className="wb-input"
-                      value={planName}
-                      onChange={e => setPlanName(e.target.value)}
-                      placeholder={t('plans.builder_plan_name')}
-                    />
-                  </div>
+                  <>
+                    <div className="wb-field">
+                      <label className="wb-label">{t('plans.builder_plan_name')}</label>
+                      <input
+                        className="wb-input"
+                        value={planName}
+                        onChange={e => setPlanName(e.target.value)}
+                        placeholder={t('plans.builder_plan_name')}
+                      />
+                    </div>
+                    {renderCategoryField()}
+                  </>
                 )}
                 <div className="wb-sticky-head">
                   <div className="wb-step-header">
                     <div>
                       <p className="wb-step-label">{t('plans.builder_step', { current: 2, total: 2 })}</p>
                       <div className="wb-step-title-row">
-                        <h3 className="wb-step-title">{`${currentWeek.name} - ${currentDay.name}`}</h3>
+                        <h3 className="wb-step-title">{`${weekLabel(builderCurrentWeek)} - ${dayLabel(builderCurrentDay)}`}</h3>
                         <button type="button" className="wb-btn wb-btn-primary wb-btn-sm wb-next-day" onClick={goToNextDay}>{t('plans.builder_next_day')} →</button>
                       </div>
                     </div>
@@ -728,8 +928,17 @@ export default function Plans() {
                 {currentWeek.days.length > 1 && (
                   <div className="wb-day-list">
                     <p className="wb-day-list-label">{t('plans.builder_switch_day')}</p>
+                    {/* The selected day is pinned in the sticky header, so in this
+                        list its slot becomes a marker — it keeps the days before and
+                        after visually separated and moves as the selection changes. */}
                     {currentWeek.days.map((day, index) => (
-                      builderCurrentDay === index ? null : renderDayCard(day, index)
+                      builderCurrentDay === index ? (
+                        <div key={`current-${index}`} className="wb-day-marker">
+                          <span className="wb-day-marker-line" />
+                          <span className="wb-day-marker-label">{dayLabel(index)} — {t('plans.builder_currently_selected')}</span>
+                          <span className="wb-day-marker-line" />
+                        </div>
+                      ) : renderDayCard(day, index)
                     ))}
                   </div>
                 )}
@@ -825,23 +1034,22 @@ export default function Plans() {
                     builderVideos.map(video => {
                       const selected = currentDay.videoIds.includes(video.id);
                       return (
-                        <button key={video.id} type="button" className={`wb-video-card${selected ? ' selected' : ''}`} onClick={() => toggleVideoForDay(video.id)}>
+                        <button key={video.id} type="button" className={`wb-video-card${selected ? ' selected' : ''}`} title={video.filename} onClick={() => toggleVideoForDay(video.id)}>
                           {videoViewMode === 'grid' ? (
                             <>
-                              {video.thumbnail_path ? (
-                                <img className="wb-video-thumb" src={`/thumbnails/${video.thumbnail_path}`} alt={video.filename} />
-                              ) : (
-                                <div className="wb-video-thumb wb-video-thumb-empty">No thumbnail</div>
-                              )}
-                              <div className="wb-video-meta">
-                                <span className="wb-video-name">{video.filename}</span>
-                                <span className="wb-video-path">{video.relative_path}</span>
-                              </div>
-                              <span className="wb-video-check">{selected ? '✓ Selected' : '+'}</span>
+                              <span className="wb-video-thumb-wrap">
+                                {video.thumbnail_path ? (
+                                  <img className="wb-video-thumb" src={`/thumbnails/${video.thumbnail_path}`} alt="" loading="lazy" />
+                                ) : (
+                                  <span className="wb-video-thumb wb-video-thumb-empty">—</span>
+                                )}
+                                <span className="wb-video-check">{selected ? '✓' : '+'}</span>
+                              </span>
+                              <span className="wb-video-name">{stripVideoExt(video.filename)}</span>
                             </>
                           ) : (
                             <>
-                              <span className="wb-video-name">{video.filename}</span>
+                              <span className="wb-video-name">{stripVideoExt(video.filename)}</span>
                               <span className="wb-video-check">{selected ? '✓' : '+'}</span>
                             </>
                           )}

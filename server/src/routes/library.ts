@@ -80,10 +80,12 @@ function formatVideoRow(row: {
   training_type?: string | null;
   body_parts?: string | null;
   intensity?: string | null;
+  duration_seconds?: number | null;
 }) {
   return {
     id: row.id,
     filename: row.filename,
+    duration_seconds: row.duration_seconds ?? null,
     // Always expose POSIX separators so Mac/Windows clients share one code path.
     relative_path: (row.relative_path || '').replace(/\\/g, '/'),
     thumbnail_path: row.thumbnail_path,
@@ -125,6 +127,27 @@ function scanDirectory(dir: string, excludePaths: string[], fileList: string[] =
   return fileList;
 }
 
+// Reads a video's runtime in seconds. Uses `ffmpeg -i` rather than ffprobe
+// because only ffmpeg is bundled with the packaged desktop app. ffmpeg exits
+// non-zero when given no output file, but still prints "Duration: HH:MM:SS.ss"
+// to stderr, which is what we parse. Returns null when it can't be determined.
+async function probeDuration(videoPath: string): Promise<number | null> {
+  let output = '';
+  try {
+    const { stderr } = await execPromise(`ffmpeg -i "${videoPath}"`);
+    output = stderr;
+  } catch (err: any) {
+    output = err?.stderr || '';
+  }
+
+  const match = output.match(/Duration:\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/);
+  if (!match) return null;
+
+  const [, hours, minutes, seconds] = match;
+  const total = Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+  return Number.isFinite(total) && total > 0 ? Math.round(total) : null;
+}
+
 async function generateThumbnail(videoPath: string, thumbId: string) {
   const thumbPath = path.join(THUMB_DIR, `${thumbId}.jpg`);
   if (fs.existsSync(thumbPath)) return `${thumbId}.jpg`;
@@ -139,7 +162,30 @@ async function generateThumbnail(videoPath: string, thumbId: string) {
   }
 }
 
+// Progress of the in-flight library scan, polled by the Settings page while the
+// (potentially long) /set-directory request is still running. Single-user local
+// app, so one module-level slot is enough.
+const scanProgress = {
+  active: false,
+  phase: 'idle' as 'idle' | 'discovering' | 'processing' | 'done',
+  processed: 0,
+  total: 0,
+  currentFile: '' as string,
+};
+
+function resetScanProgress() {
+  scanProgress.active = false;
+  scanProgress.phase = 'idle';
+  scanProgress.processed = 0;
+  scanProgress.total = 0;
+  scanProgress.currentFile = '';
+}
+
 export default async function (fastify: FastifyInstance) {
+  fastify.get('/scan-progress', async (_request, reply) => {
+    return reply.send(scanProgress);
+  });
+
   fastify.post('/set-directory', async (request, reply) => {
     const { directory } = request.body as { directory: string };
 
@@ -170,12 +216,19 @@ normalizedDir = path.resolve(normalizedDir);
       return reply.code(400).send({ error: `Invalid directory path: "${normalizedDir}" - Please check it exists and is accessible.` });
     }
 
+    // Report progress from here on; the client polls /scan-progress meanwhile.
+    resetScanProgress();
+    scanProgress.active = true;
+    scanProgress.phase = 'discovering';
+
+    try {
     // Save to settings
     db.prepare("UPDATE settings SET value = ? WHERE key = 'video_directory'").run(normalizedDir);
 
     // Get existing videos for stable IDs
-    const existingVideos = db.prepare('SELECT id, filepath FROM videos').all() as { id: string; filepath: string }[];
+    const existingVideos = db.prepare('SELECT id, filepath, duration_seconds FROM videos').all() as { id: string; filepath: string; duration_seconds: number | null }[];
     const existingMap = new Map(existingVideos.map(v => [v.filepath, v.id]));
+    const existingDurations = new Map(existingVideos.map(v => [v.filepath, v.duration_seconds]));
     
     // Get exclude paths
     const excludeRow = db.prepare("SELECT value FROM settings WHERE key = 'exclude_paths'").get() as { value: string } | undefined;
@@ -185,25 +238,34 @@ normalizedDir = path.resolve(normalizedDir);
     const videoFiles = scanDirectory(normalizedDir, excludePaths);
     const scannedIds = new Set<string>();
 
+    scanProgress.phase = 'processing';
+    scanProgress.total = videoFiles.length;
+
     // Process one by one to handle async thumbnail generation
     for (const file of videoFiles) {
+      scanProgress.currentFile = path.basename(file);
       // Store with `/` so library/dashboard/player grouping works on every OS.
       const relativePath = path.relative(normalizedDir, file).split(path.sep).join('/');
       let id = existingMap.get(file);
       
       if (id) {
-        // Update existing (maybe thumbnail is missing)
+        // Update existing (maybe thumbnail is missing). Only probe the duration
+        // when it isn't known yet, so repeat scans stay fast.
         const thumbnailPath = await generateThumbnail(file, id);
-        db.prepare('UPDATE videos SET filename = ?, relative_path = ?, thumbnail_path = ? WHERE id = ?')
-          .run(path.basename(file), relativePath, thumbnailPath, id);
+        const knownDuration = existingDurations.get(file) ?? null;
+        const duration = knownDuration ?? await probeDuration(file);
+        db.prepare('UPDATE videos SET filename = ?, relative_path = ?, thumbnail_path = ?, duration_seconds = ? WHERE id = ?')
+          .run(path.basename(file), relativePath, thumbnailPath, duration, id);
       } else {
         // Insert new video
         id = nanoid();
         const thumbnailPath = await generateThumbnail(file, id);
-        db.prepare('INSERT INTO videos (id, filename, filepath, relative_path, thumbnail_path) VALUES (?, ?, ?, ?, ?)')
-          .run(id, path.basename(file), file, relativePath, thumbnailPath);
+        const duration = await probeDuration(file);
+        db.prepare('INSERT INTO videos (id, filename, filepath, relative_path, thumbnail_path, duration_seconds) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(id, path.basename(file), file, relativePath, thumbnailPath, duration);
       }
       scannedIds.add(id);
+      scanProgress.processed++;
     }
 
     // Delete videos that no longer exist in filesystem
@@ -215,12 +277,19 @@ normalizedDir = path.resolve(normalizedDir);
     // Rematch all plans to fix any stale video IDs or paths
     rematchAllPlans();
 
+    scanProgress.phase = 'done';
     return reply.send({ success: true, count: videoFiles.length });
+    } finally {
+      // The client reads the final counts from the response, so the shared slot
+      // is released either way — including when the scan throws partway through.
+      scanProgress.active = false;
+      scanProgress.currentFile = '';
+    }
   });
 
   fastify.get('/videos', async (request, reply) => {
     const videos = db.prepare(
-      'SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity FROM videos'
+      'SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds FROM videos'
     ).all() as any[];
     return reply.send(videos.map(formatVideoRow));
   });
@@ -255,7 +324,7 @@ normalizedDir = path.resolve(normalizedDir);
       .run(description, JSON.stringify(equipment), JSON.stringify(training_type), JSON.stringify(body_parts), intensity, id);
 
     const updated = db.prepare(
-      'SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity FROM videos WHERE id = ?'
+      'SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds FROM videos WHERE id = ?'
     ).get(id) as any;
 
     return reply.send(formatVideoRow(updated));

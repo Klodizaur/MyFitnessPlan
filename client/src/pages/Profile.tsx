@@ -17,6 +17,8 @@ type LogEntry = {
   completedDate: string;
   completedAt: string;
   isManual: boolean;
+  notes: string;
+  durationSeconds: number | null;
   trainingType: string[];
   bodyParts: string[];
   intensity: string | null;
@@ -42,22 +44,46 @@ function toDateStr(d: Date) {
 }
 
 // Workout names can be multi-line TSV blobs like "Week 1 - Day 1\nFull Body (30 min)".
-// Trim the "Week X - Day Y" prefix and "(NN min)" suffixes for a clean label.
-function cleanWorkoutName(name: string | null): string {
-  if (!name) return '';
-  const lines = name
+// Trim the "Week X - Day Y" prefix and "(NN min)" suffixes and return each video
+// title as its own line, so multi-video days are never rendered as one merged clump.
+function workoutNameLines(name: string | null): string[] {
+  if (!name) return [];
+  return name
     .split(/\n+/)
     .map(s => s.trim())
     .filter(Boolean)
-    .filter((line, i) => !(i === 0 && /^week\s*\d+\s*-\s*day\s*\d+/i.test(line)));
-  const joined = (lines.length ? lines.join(' - ') : name)
-    .replace(/\s*\(\d+\s*min\)\s*/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return joined || name;
+    .filter((line, i) => !(i === 0 && /^week\s*\d+\s*-\s*day\s*\d+/i.test(line)))
+    .map(line => line.replace(/\s*\(\d+\s*min\)\s*/gi, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
 }
 
-function StatCard({ value, label, icon }: { value: number; label: string; icon: string }) {
+function cleanWorkoutName(name: string | null): string {
+  if (!name) return '';
+  const lines = workoutNameLines(name);
+  return lines.length ? lines.join(' - ') : name;
+}
+
+// Drop the file extension so "Full Body HIIT.mp4" displays as "Full Body HIIT".
+function stripExt(filename: string): string {
+  return filename.replace(/\.[^/.]+$/, '');
+}
+
+// One display title per completed video (falling back to the workout name lines),
+// so a day with several videos lists each one separately.
+function entryTitles(e: LogEntry): string[] {
+  if (e.videoFilename) return [stripExt(e.videoFilename)];
+  const lines = workoutNameLines(e.workoutName);
+  return lines.length ? lines : [];
+}
+
+// "18h 45m", or "45m" under an hour. Rounded down to whole minutes.
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(minutes / 60);
+  return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+}
+
+function StatCard({ value, label, icon }: { value: number | string; label: string; icon: string }) {
   return (
     <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span style={{ fontSize: '1.4rem' }}>{icon}</span>
@@ -143,6 +169,9 @@ export default function Profile() {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editDateValue, setEditDateValue] = useState('');
   const [savingDate, setSavingDate] = useState(false);
+  const [notesKey, setNotesKey] = useState<string | null>(null);
+  const [notesValue, setNotesValue] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
   const [addDate, setAddDate] = useState<string | null>(null);
   const [videosById, setVideosById] = useState<Map<string, Video>>(new Map());
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
@@ -198,6 +227,10 @@ export default function Profile() {
   }, [entries]);
 
   const stats = useMemo(() => {
+    const totalSeconds = entries.reduce((sum, e) => sum + (e.durationSeconds || 0), 0);
+    // How many entries could contribute a runtime at all, so the UI can say when
+    // the total is partial (manual entries and un-probed videos have none).
+    const timedEntries = entries.filter(e => e.durationSeconds).length;
     const activeDays = new Set(entries.map(e => e.completedDate));
     const workoutSet = new Set(entries.map(e => `${e.completedDate}|${e.workoutId || e.workoutName || e.id}`));
     const now = new Date();
@@ -207,7 +240,14 @@ export default function Profile() {
         .filter(e => e.completedDate.startsWith(monthPrefix))
         .map(e => `${e.completedDate}|${e.workoutId || e.workoutName || e.id}`)
     );
-    return { workouts: workoutSet.size, activeDays: activeDays.size, thisMonth: thisMonthSet.size };
+    return {
+      workouts: workoutSet.size,
+      activeDays: activeDays.size,
+      thisMonth: thisMonthSet.size,
+      totalSeconds,
+      timedEntries,
+      untimedEntries: entries.length - timedEntries,
+    };
   }, [entries]);
 
   const rangeEntries = useMemo(() => {
@@ -266,15 +306,21 @@ export default function Profile() {
     setViewMonth(d.getMonth());
   };
 
+  // One name per completed video, so multi-video days list each video separately
+  // in the calendar cell instead of a single merged clump of titles.
   const workoutNamesForDay = (dateStr: string): string[] => {
     const dayEntries = entriesByDate.get(dateStr) || [];
     const seen = new Set<string>();
     const names: string[] = [];
     for (const e of dayEntries) {
-      const key = e.workoutId || e.workoutName || e.id;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      names.push(cleanWorkoutName(e.workoutName) || e.videoFilename || t('profile.untitled_workout'));
+      const titles = entryTitles(e);
+      if (titles.length === 0) titles.push(t('profile.untitled_workout'));
+      for (const title of titles) {
+        const key = `${e.workoutId || e.id}:${title}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        names.push(title);
+      }
     }
     return names;
   };
@@ -282,15 +328,24 @@ export default function Profile() {
   const selectedGroups = useMemo(() => {
     if (!selectedDate) return [];
     const dayEntries = entriesByDate.get(selectedDate) || [];
-    const groups = new Map<string, { key: string; name: string; planName: string | null; isManual: boolean; entries: LogEntry[] }>();
+    const groups = new Map<string, { key: string; name: string; nameLines: string[]; planName: string | null; isManual: boolean; entries: LogEntry[] }>();
     for (const e of dayEntries) {
       const key = e.workoutId || e.workoutName || e.id;
-      const g = groups.get(key) || { key, name: cleanWorkoutName(e.workoutName), planName: e.planName, isManual: false, entries: [] };
+      const g = groups.get(key) || { key, name: cleanWorkoutName(e.workoutName), nameLines: [], planName: e.planName, isManual: false, entries: [] };
       g.isManual = g.isManual || e.isManual;
       g.entries.push(e);
       groups.set(key, g);
     }
-    return Array.from(groups.values());
+    // `workout_name` on a plan day is a blob listing EVERY video scheduled that day,
+    // so it must never be used as a title when the entries carry their own videos —
+    // only the videos actually marked done are shown, one row each. Name lines are
+    // kept solely for entries with no linked video (manually logged workouts).
+    return Array.from(groups.values()).map(g => ({
+      ...g,
+      nameLines: g.entries.every(e => e.videoFilename) ? [] : workoutNameLines(g.entries[0].workoutName),
+      // The note is mirrored across the workout's rows; take the first one set.
+      notes: g.entries.find(e => e.notes)?.notes || '',
+    }));
   }, [selectedDate, entriesByDate]);
 
   const saveEditDate = async (ids: string[]) => {
@@ -317,6 +372,25 @@ export default function Profile() {
       setSavingDate(false);
       setEditingKey(null);
       setEditDateValue('');
+    }
+  };
+
+  const saveNotes = async (ids: string[]) => {
+    if (savingNotes) return;
+    setSavingNotes(true);
+    try {
+      const res = await fetch(`${API}/api/profile/history/notes`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, notes: notesValue }),
+      });
+      if (res.ok) await loadHistory();
+    } catch (err) {
+      console.error('Failed to save notes', err);
+    } finally {
+      setSavingNotes(false);
+      setNotesKey(null);
+      setNotesValue('');
     }
   };
 
@@ -386,6 +460,15 @@ export default function Profile() {
         <StatCard value={stats.workouts} label={t('profile.stats_workouts')} icon="🏋️" />
         <StatCard value={stats.activeDays} label={t('profile.stats_active_days')} icon="📅" />
         <StatCard value={stats.thisMonth} label={t('profile.stats_this_month')} icon="🗓️" />
+        <StatCard
+          value={stats.timedEntries > 0 ? formatDuration(stats.totalSeconds) : '—'}
+          label={stats.timedEntries === 0
+            ? t('profile.stats_total_time_none')
+            : stats.untimedEntries > 0
+            ? t('profile.stats_total_time_partial')
+            : t('profile.stats_total_time')}
+          icon="⏱️"
+        />
       </div>
 
       {/* Activity calendar */}
@@ -487,12 +570,27 @@ export default function Profile() {
                   (e.bodyParts || []).forEach(x => bset.add(x));
                   if (e.intensity) intensity = e.intensity;
                 }
+                // When the group's entries are actual videos, the chips below already
+                // name each completed video — repeating the plan day's full title
+                // blob (every video of that day) as a header would be wrong.
+                const hasVideoEntries = group.entries.some(e => e.videoFilename);
                 return (
                   <div key={group.key} style={{ border: '1px solid var(--glass-border)', borderRadius: 12, padding: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 700 }}>{group.name || t('profile.untitled_workout')}</div>
-                        {group.planName && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{group.planName}</div>}
+                        {!hasVideoEntries && (
+                          <div style={{ fontWeight: 700, marginBottom: group.planName ? 6 : 0 }}>
+                            {group.nameLines.length > 1
+                              ? group.nameLines.map((line, i) => <div key={i}>{line}</div>)
+                              : (group.name || t('profile.untitled_workout'))}
+                          </div>
+                        )}
+                        {group.planName && (
+                          <span className="log-plan-badge">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+                            {t('profile.from_plan', { plan: group.planName })}
+                          </span>
+                        )}
                       </div>
                       {!isEditing ? (
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -505,6 +603,16 @@ export default function Profile() {
                             }}
                           >
                             {t('profile.edit_date')}
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                            onClick={() => {
+                              setNotesKey(group.key);
+                              setNotesValue(group.notes);
+                            }}
+                          >
+                            {group.notes ? t('profile.notes_edit') : t('profile.notes_add')}
                           </button>
                           {group.isManual && (
                             <button
@@ -542,16 +650,16 @@ export default function Profile() {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.75rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
                       {group.entries.map(e => {
                         const editableVideo = e.videoId ? videosById.get(e.videoId) : undefined;
                         return (
-                        <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--surface-color)', borderRadius: 8, padding: '4px 10px 4px 4px' }}>
-                          <div style={{ width: 44, height: 30, borderRadius: 5, overflow: 'hidden', background: 'var(--surface-hover)', flexShrink: 0 }}>
+                        <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--surface-color)', borderRadius: 8, padding: '4px 10px 4px 4px' }}>
+                          <div style={{ width: 52, height: 34, borderRadius: 5, overflow: 'hidden', background: 'var(--surface-hover)', flexShrink: 0 }}>
                             {e.thumbnail && <img src={`${API}/thumbnails/${e.thumbnail}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                           </div>
-                          <span style={{ fontSize: '0.75rem', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {e.videoFilename || t('profile.untitled_workout')}
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {e.videoFilename ? stripExt(e.videoFilename) : t('profile.untitled_workout')}
                           </span>
                           {editableVideo && (
                             <button
@@ -568,6 +676,42 @@ export default function Profile() {
                         );
                       })}
                     </div>
+
+                    {notesKey === group.key ? (
+                      <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <textarea
+                          value={notesValue}
+                          onChange={e => setNotesValue(e.target.value)}
+                          placeholder={t('profile.notes_placeholder')}
+                          maxLength={2000}
+                          rows={3}
+                          autoFocus
+                          style={{
+                            width: '100%', resize: 'vertical', padding: '10px 12px', borderRadius: 10,
+                            border: '1px solid var(--glass-border)', background: 'var(--surface-color)',
+                            color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: '0.85rem', lineHeight: 1.5,
+                          }}
+                        />
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button className="btn" style={{ fontSize: '0.78rem', padding: '6px 12px' }} disabled={savingNotes} onClick={() => saveNotes(ids)}>
+                            {t('profile.save')}
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                            disabled={savingNotes}
+                            onClick={() => { setNotesKey(null); setNotesValue(''); }}
+                          >
+                            {t('profile.cancel')}
+                          </button>
+                        </div>
+                      </div>
+                    ) : group.notes ? (
+                      <div className="log-note">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>
+                        <p>{group.notes}</p>
+                      </div>
+                    ) : null}
 
                     {(tset.size > 0 || bset.size > 0 || intensity) && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.75rem' }}>
