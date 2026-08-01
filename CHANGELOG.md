@@ -164,6 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Credits now read **Klaudia Krzos** throughout, including the desktop build's
   copyright notice and installer metadata, with LinkedIn and GitHub links.
 - Selecting a video in the builder no longer nudges the grid by a pixel.
+- README screenshots were refreshed to match the current UI.
 
 ### Fixed
 
@@ -182,6 +183,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The plan builder showed "Week 1 - Day 1" in English regardless of language.**
   Week and day headings were baked in when a plan was created; they are now derived
   at display time and follow the interface language.
+- **Windows video playback and folder paths.** Serving local videos no longer
+  breaks on Windows path separators; directory selection and related path handling
+  were hardened for the desktop build.
 
 ### Removed
 
@@ -197,5 +201,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Video durations are read via `ffmpeg -i` rather than `ffprobe`, because only
   `ffmpeg` ships with the packaged desktop app.
 
+## [1.2.0] - 2026-07-18
+
+### Added
+
+**Desktop**
+
+- A packaged **Electron** app for macOS and Windows, with its own staging pipeline
+  and GitHub Actions desktop build. The web/self-hosted flow still works the same.
+
+**Workout log**
+
+- A **Log** page for workout history: activity calendar, range summaries, and
+  breakdowns by training type, body part, equipment and intensity.
+- **Log a past workout** by hand — name it, optionally attach library videos, and
+  save it alongside plan completions. Manual entries can be removed later.
+
+**Plans**
+
+- Plans can take a **background image**, with an optional **blur** toggle so the
+  artwork stays behind the content without fighting the text.
+
+**Library**
+
+- Friendlier search and filtering across the library and plan builder (tokenised
+  matching over titles and metadata).
+
+### Changed
+
+- UI and Polish/English locale polish across Plans, Player, Album and the metadata
+  editor.
+- About content was trimmed as Profile/Log took over history and insights.
+
+## [1.1.3] - 2026-07-06
+
+### Added
+
+**Plans**
+
+- **Build your own plan** in the app: pick videos day by day, set a name and start
+  date, walk a workout/rest pattern, and save — no spreadsheet required. Existing
+  plans can still be imported from CSV/TSV, and built plans can be edited later.
+- The builder supports search plus filters for equipment, training type, intensity
+  and body parts, in grid or list view.
+
+**Library**
+
+- Richer video metadata: **training type**, **body parts** and **intensity**, next
+  to equipment and description.
+- A **video details** modal for reading and editing that metadata from the library
+  and player flows.
+
+### Internal
+
+- `videos` gains `training_type`, `body_parts` and `intensity` via startup
+  migrations.
+- Plan create/edit APIs grow to support the in-app builder.
+
+## [1.1.2] - 2026-06-14
+
+### Added
+
+**Library**
+
+- Browse your video collection **inside the app** as albums (folders), open an
+  album page, and play from there — not only via the scheduled player.
+- **Video cards** with thumbnails, plus an editor for description and **equipment**
+  tags (with a dedicated equipment picker).
+
+**Docs**
+
+- A full **Polish README** (`README.pl.md`) and a language link from the English
+  README.
+
+### Fixed
+
+- Album and library sorting quirks when browsing larger collections.
+
+### Internal
+
+- `videos` gains `description` and `equipment` via startup migrations.
+- Early Electron asset scaffolding appeared here; the shipping desktop wrapper
+  landed properly in 1.2.0.
+
+## [1.0.0] - 2026-05-08
+
+### Added
+
+Initial public release of **MyFitnessPlan** — a local, self-hosted workout planner
+built around your own video files.
+
+- Import workout plans from **CSV/TSV** spreadsheets (including multiple videos per
+  day).
+- Point Settings at a **local video directory**, scan it, and exclude folders you
+  do not want.
+- Define a flexible **workout/rest pattern** (not locked to Mon–Sun weeks).
+- **Dashboard**, **calendar**, built-in **player**, and mark-as-done progress
+  tracking with smart matching from spreadsheet names to files on disk.
+- Multiple plans you can switch between; activate one at a time.
+- Themes (Midnight, Snow, Sunset, Forest, Pastel Orange, Pastel Pink, Sky Blue)
+  and **English / Polish** UI.
+- Runs entirely on your machine — no cloud account and no subscription.
+
 [1.4.0]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v1.3.0
+[1.2.0]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v1.2.0
+[1.1.3]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v.1.1.3
+[1.1.2]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v.1.1.2
+[1.0.0]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v1.0.0

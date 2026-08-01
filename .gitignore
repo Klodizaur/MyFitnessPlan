@@ -3,6 +3,8 @@ dist
 server/dist
 server/data
 *.db
+*.db-shm
+*.db-wal
 .DS_Store
 .env
 .env.*
