@@ -6,7 +6,7 @@
  * OpenAI-compatible service, or a local Ollama/LM Studio install. A single
  * fetch keeps all of those on one code path and adds no dependencies.
  */
-import { AiSettings, getAiSettings, isAiConfigured } from './settings.js';
+import { AiSettings, getAiSettings, isAiConfigured, isLocalBaseUrl } from './settings.js';
 
 /** An error with a message that is safe and useful to show the user. */
 export class AiError extends Error {
@@ -23,6 +23,77 @@ const MAX_TOKENS = 16000;
 
 /** Long enough for a slow local model, short enough to fail rather than hang. */
 const TIMEOUT_MS = 180_000;
+
+/** Listing models is a cheap call; don't make the settings screen wait on it. */
+const LIST_TIMEOUT_MS = 15_000;
+
+export interface ModelChoice {
+  id: string;
+  label: string;
+}
+
+/**
+ * Ask the configured endpoint which models it serves.
+ *
+ * Model ids are exact and case-sensitive, so letting the user type one is a
+ * typo trap — and a hardcoded list would be wrong the week after the next
+ * release. Anthropic, OpenAI, OpenRouter and Ollama all answer `GET /v1/models`
+ * in near enough the same shape, so the list comes from whatever the user
+ * actually pointed at.
+ *
+ * Returns an empty list rather than throwing when the endpoint doesn't offer
+ * one: some gateways don't implement it, and that should degrade to typing the
+ * name by hand rather than blocking the feature.
+ */
+export async function listModels(): Promise<ModelChoice[]> {
+  const settings = getAiSettings();
+  if (!settings.apiKey && !isLocalBaseUrl(settings.baseUrl)) {
+    throw new AiError('Add an API key first.', 'not_configured');
+  }
+
+  const headers: Record<string, string> = {};
+  if (settings.provider === 'anthropic') {
+    headers['x-api-key'] = settings.apiKey;
+    headers['anthropic-version'] = '2023-06-01';
+  } else if (settings.apiKey) {
+    headers.authorization = `Bearer ${settings.apiKey}`;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${settings.baseUrl}/v1/models`, {
+      headers,
+      signal: AbortSignal.timeout(LIST_TIMEOUT_MS),
+    });
+  } catch {
+    throw new AiError(`Could not reach ${settings.baseUrl}.`, 'unreachable');
+  }
+
+  // 401/403 is worth reporting — the key is wrong, and the user needs to know
+  // that now rather than at generate time. Anything else just means this
+  // endpoint has no model list, which is not an error worth surfacing.
+  if (res.status === 401 || res.status === 403) {
+    throw new AiError(await describeHttpError(res), 'auth');
+  }
+  if (!res.ok) return [];
+
+  let payload: any;
+  try {
+    payload = await res.json();
+  } catch {
+    return [];
+  }
+
+  const entries = Array.isArray(payload?.data) ? payload.data : [];
+  return entries
+    .map((entry: any) => ({
+      id: typeof entry?.id === 'string' ? entry.id : '',
+      // Anthropic returns a human-readable name; elsewhere the id is the name.
+      label: typeof entry?.display_name === 'string' ? entry.display_name : '',
+    }))
+    .filter((choice: ModelChoice) => choice.id.length > 0)
+    .map((choice: ModelChoice) => ({ id: choice.id, label: choice.label || choice.id }));
+}
 
 export interface ModelRequest {
   system: string;

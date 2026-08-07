@@ -8,7 +8,7 @@
  * schema.
  */
 import { FastifyInstance } from 'fastify';
-import { AiError, callModel } from '../ai/provider.js';
+import { AiError, callModel, listModels } from '../ai/provider.js';
 import { generatePlan } from '../ai/planBuilder.js';
 import {
   AiProvider,
@@ -89,6 +89,20 @@ export default async function (fastify: FastifyInstance) {
       hasKey: Boolean(settings.apiKey),
       available: isAiConfigured(settings),
     });
+  });
+
+  /**
+   * Models the configured endpoint serves, so the user picks one instead of
+   * typing an exact, case-sensitive id from memory. An empty list is a valid
+   * answer — it means this endpoint has no model listing, and the settings
+   * screen falls back to a text field.
+   */
+  fastify.get('/models', async (_request, reply) => {
+    try {
+      return reply.send({ models: await listModels() });
+    } catch (err) {
+      return sendAiError(reply, err);
+    }
   });
 
   /** One cheap round trip, so a bad key or model surfaces here and not mid-plan. */

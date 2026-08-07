@@ -23,6 +23,14 @@ interface AiConfig {
   available: boolean;
 }
 
+interface ModelChoice {
+  id: string;
+  label: string;
+}
+
+/** Sentinel option that reveals the free-text field. */
+const CUSTOM_MODEL = '__custom__';
+
 export default function AiSettingsSection() {
   const { t } = useTranslation();
   const [config, setConfig] = useState<AiConfig | null>(null);
@@ -34,6 +42,12 @@ export default function AiSettingsSection() {
   const [statusOk, setStatusOk] = useState(true);
   const [testing, setTesting] = useState(false);
 
+  // Models the configured endpoint reports. Empty means either no key yet or an
+  // endpoint that doesn't list them, and the model becomes a text field.
+  const [models, setModels] = useState<ModelChoice[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [typingModel, setTypingModel] = useState(false);
+
   const load = () => {
     fetch('/api/ai/settings')
       .then(r => r.json())
@@ -42,11 +56,36 @@ export default function AiSettingsSection() {
         setProvider(data.provider);
         setBaseUrl(data.baseUrl);
         setModel(data.model);
+        if (data.hasKey || data.isLocal) loadModels();
       })
       .catch(() => setConfig(null));
   };
 
   useEffect(load, []);
+
+  /**
+   * Ask the endpoint what it serves. Failures are silent — an endpoint with no
+   * model listing is normal, and the text field covers it.
+   */
+  const loadModels = () => {
+    setLoadingModels(true);
+    fetch('/api/ai/models')
+      .then(r => (r.ok ? r.json() : { models: [] }))
+      .then(data => setModels(Array.isArray(data?.models) ? data.models : []))
+      .catch(() => setModels([]))
+      .finally(() => setLoadingModels(false));
+  };
+
+  /**
+   * Options to show in the picker.
+   *
+   * A model the user already saved is kept even when the endpoint doesn't list
+   * it — switching away from a working setting just because a listing is
+   * incomplete would be worse than showing an extra row.
+   */
+  const modelOptions = models.some(m => m.id === model) || !model
+    ? models
+    : [{ id: model, label: model }, ...models];
 
   /**
    * Switching provider swaps in that provider's defaults, but only when the
@@ -56,6 +95,9 @@ export default function AiSettingsSection() {
   const handleProvider = (next: Provider) => {
     setProvider(next);
     if (!config || config.provider === next) return;
+    // The list belongs to the old endpoint; it is reloaded after the next save.
+    setModels([]);
+    setTypingModel(false);
     if (baseUrl === config.baseUrl) {
       setBaseUrl(next === 'anthropic' ? 'https://api.anthropic.com' : '');
     }
@@ -84,6 +126,8 @@ export default function AiSettingsSection() {
     setConfig(prev => (prev ? { ...prev, ...data } : prev));
     setStatusOk(true);
     setStatus(t('ai.settings_saved'));
+    // A new key or endpoint means a different set of models.
+    if (data?.hasKey || data?.available) loadModels();
     return data;
   };
 
@@ -144,13 +188,63 @@ export default function AiSettingsSection() {
 
         <div>
           <label className="wb-label">{t('ai.model_label')}</label>
-          <input
-            className="wb-input"
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            placeholder="claude-opus-5"
-            spellCheck={false}
-          />
+
+          {/* Model ids are exact and case-sensitive, so pick from the list the
+              endpoint reports rather than typing one. The text field stays
+              available for endpoints that don't publish a list. */}
+          {modelOptions.length > 0 && !typingModel ? (
+            <>
+              <select
+                className="wb-input"
+                value={model}
+                onChange={e => {
+                  if (e.target.value === CUSTOM_MODEL) {
+                    setTypingModel(true);
+                    return;
+                  }
+                  setModel(e.target.value);
+                }}
+              >
+                {!model && <option value="">{t('ai.model_choose')}</option>}
+                {modelOptions.map(choice => (
+                  <option key={choice.id} value={choice.id}>
+                    {choice.label === choice.id ? choice.id : `${choice.label} (${choice.id})`}
+                  </option>
+                ))}
+                <option value={CUSTOM_MODEL}>{t('ai.model_custom')}</option>
+              </select>
+              <p className="ai-hint" style={{ marginTop: 6 }}>
+                {loadingModels ? t('ai.model_loading') : t('ai.model_from_provider')}
+              </p>
+            </>
+          ) : (
+            <>
+              <input
+                className="wb-input"
+                value={model}
+                onChange={e => setModel(e.target.value)}
+                placeholder="claude-opus-5"
+                spellCheck={false}
+              />
+              <p className="ai-hint" style={{ marginTop: 6 }}>
+                {loadingModels
+                  ? t('ai.model_loading')
+                  : modelOptions.length > 0
+                    ? t('ai.model_typing')
+                    : t('ai.model_hint')}
+              </p>
+              {modelOptions.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ marginTop: 8 }}
+                  onClick={() => setTypingModel(false)}
+                >
+                  {t('ai.model_back_to_list')}
+                </button>
+              )}
+            </>
+          )}
         </div>
 
         <div>
