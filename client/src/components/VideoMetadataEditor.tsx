@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import EquipmentPicker from './EquipmentPicker';
 import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
 import { useMetaLabels } from '../lib/labels';
+import { useAiAvailable } from '../lib/useAiAvailable';
+import { useTranslation } from 'react-i18next';
 import { Video } from '../types/video';
 
 type Props = {
@@ -72,6 +74,14 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const labels = useMetaLabels();
+  const { t } = useTranslation();
+
+  // Optional AI clean-up. Hidden unless the server reports a configured model.
+  const aiAvailable = useAiAvailable();
+  const [cleaning, setCleaning] = useState(false);
+  // The text as it was before the last clean-up, so a result the user dislikes
+  // is one click away from being undone rather than gone.
+  const [beforeClean, setBeforeClean] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingSelection = useRef<[number, number] | null>(null);
 
@@ -146,6 +156,34 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
     setDescription(next);
     const urlStart = start + label.length + 3;
     pendingSelection.current = [urlStart, urlStart + 3];
+  };
+
+  /**
+   * Replace the description with a cleaned-up version.
+   *
+   * Nothing is saved here — the result lands in the textarea for the user to
+   * read, edit or undo, and only reaches the library through the same Save
+   * button as any hand-written description. Tags are untouched.
+   */
+  const handleClean = async () => {
+    if (!description.trim()) return;
+    setCleaning(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/ai/clean-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: description }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Clean-up failed');
+      setBeforeClean(description);
+      setDescription(data.description || '');
+    } catch (err: any) {
+      setError(err.message || 'Clean-up failed');
+    } finally {
+      setCleaning(false);
+    }
   };
 
   const handleSave = async () => {
@@ -249,6 +287,49 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
               <MdButton title="Quote" onClick={() => applyLinePrefix(() => '> ')}>{quoteIcon}</MdButton>
               <span style={{ width: 1, alignSelf: 'stretch', margin: '2px 5px', background: 'var(--glass-border)' }} />
               <MdButton title="Link" onClick={insertLink}>{linkIcon}</MdButton>
+
+              {/* Sits at the end of the toolbar, past the divider, because it
+                  rewrites the whole field rather than formatting a selection. */}
+              {aiAvailable && (
+                <>
+                  <span style={{ width: 1, alignSelf: 'stretch', margin: '2px 5px', background: 'var(--glass-border)' }} />
+                  <button
+                    type="button"
+                    title={t('ai.clean_hint')}
+                    onClick={handleClean}
+                    disabled={cleaning || !description.trim()}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      border: '1px solid var(--glass-border)',
+                      background: 'transparent',
+                      color: 'var(--text-primary)',
+                      cursor: cleaning || !description.trim() ? 'default' : 'pointer',
+                      opacity: cleaning || !description.trim() ? 0.5 : 1,
+                      fontSize: '0.78rem',
+                    }}
+                  >
+                    {cleaning ? t('ai.cleaning') : t('ai.clean_btn')}
+                  </button>
+                  {beforeClean !== null && !cleaning && (
+                    <button
+                      type="button"
+                      onClick={() => { setDescription(beforeClean); setBeforeClean(null); }}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: '1px solid var(--glass-border)',
+                        background: 'transparent',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                        fontSize: '0.78rem',
+                      }}
+                    >
+                      {t('ai.clean_undo')}
+                    </button>
+                  )}
+                </>
+              )}
             </div>
             <textarea
               ref={textareaRef}

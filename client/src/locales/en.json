@@ -397,6 +397,24 @@
     "settings_saved": "AI settings saved.",
     "state_ready": "Ready",
     "state_not_configured": "Not configured",
-    "privacy_note": "When you generate a plan, your description and your videos' titles, tags and descriptions are sent to the provider you chose. Video files are never uploaded, and nothing is sent unless you press Generate."
+    "privacy_note": "When you generate a plan, your description and your videos' titles, tags and descriptions are sent to the provider you chose. Video files are never uploaded, and nothing is sent unless you press Generate.",
+    "clean_btn": "Clean up",
+    "cleaning": "Cleaning…",
+    "clean_undo": "Undo",
+    "clean_hint": "Remove links, sponsor copy and other clutter. Tags are not changed.",
+    "cleanup_album": "Clean up descriptions",
+    "cleanup_album_hint": "Remove links and clutter from every description in this album. Tags are not changed.",
+    "cleanup_confirm": "Clean up descriptions for {{count}} video(s) in this album?\n\nThis rewrites them in your library and cannot be undone. Tags are not changed.",
+    "cleanup_none": "No videos in this album have a description to clean up.",
+    "cleanup_title": "Cleaning descriptions",
+    "cleanup_short": "descriptions",
+    "cleanup_progress": "{{done}} of {{total}}",
+    "cleanup_done": "Done — {{changed}} of {{total}} rewritten.",
+    "cleanup_stopped": "Stopped at {{done}} of {{total}}.",
+    "cleanup_failed": "{{count}} left unchanged.",
+    "cleanup_stop": "Stop",
+    "cleanup_minimize": "Minimize",
+    "cleanup_expand": "Show progress",
+    "cleanup_close": "Close"
   }
 }

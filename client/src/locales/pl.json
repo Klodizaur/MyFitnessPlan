@@ -460,6 +460,24 @@
     "settings_saved": "Ustawienia AI zapisane.",
     "state_ready": "Gotowe",
     "state_not_configured": "Nieskonfigurowane",
-    "privacy_note": "Gdy generujesz plan, Twój opis oraz tytuły, tagi i opisy filmów są wysyłane do wybranego dostawcy. Pliki wideo nigdy nie są przesyłane, a nic nie wychodzi, dopóki nie naciśniesz Wygeneruj."
+    "privacy_note": "Gdy generujesz plan, Twój opis oraz tytuły, tagi i opisy filmów są wysyłane do wybranego dostawcy. Pliki wideo nigdy nie są przesyłane, a nic nie wychodzi, dopóki nie naciśniesz Wygeneruj.",
+    "clean_btn": "Wyczyść",
+    "cleaning": "Czyszczenie…",
+    "clean_undo": "Cofnij",
+    "clean_hint": "Usuń linki, treści sponsorowane i inny bałagan. Tagi pozostają bez zmian.",
+    "cleanup_album": "Wyczyść opisy",
+    "cleanup_album_hint": "Usuń linki i bałagan z każdego opisu w tym albumie. Tagi pozostają bez zmian.",
+    "cleanup_confirm": "Wyczyścić opisy {{count}} filmów w tym albumie?\n\nZostaną nadpisane w bibliotece i nie da się tego cofnąć. Tagi pozostają bez zmian.",
+    "cleanup_none": "Żaden film w tym albumie nie ma opisu do wyczyszczenia.",
+    "cleanup_title": "Czyszczenie opisów",
+    "cleanup_short": "opisy",
+    "cleanup_progress": "{{done}} z {{total}}",
+    "cleanup_done": "Gotowe — nadpisano {{changed}} z {{total}}.",
+    "cleanup_stopped": "Zatrzymano na {{done}} z {{total}}.",
+    "cleanup_failed": "{{count}} pozostawiono bez zmian.",
+    "cleanup_stop": "Zatrzymaj",
+    "cleanup_minimize": "Zminimalizuj",
+    "cleanup_expand": "Pokaż postęp",
+    "cleanup_close": "Zamknij"
   }
 }

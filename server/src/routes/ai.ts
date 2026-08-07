@@ -11,6 +11,13 @@ import { FastifyInstance } from 'fastify';
 import { AiError, callModel, listModels } from '../ai/provider.js';
 import { generatePlan } from '../ai/planBuilder.js';
 import {
+  cancelCleanJob,
+  cleanDescription,
+  dismissCleanJob,
+  getCleanJob,
+  startCleanJob,
+} from '../ai/descriptionCleaner.js';
+import {
   AiProvider,
   getAiSettings,
   isAiConfigured,
@@ -116,6 +123,64 @@ export default async function (fastify: FastifyInstance) {
     } catch (err) {
       return sendAiError(reply, err);
     }
+  });
+
+  /**
+   * Clean one description and hand it back.
+   *
+   * Deliberately does not save: the editor drops the result into the textarea
+   * so the user reads it, keeps editing, and saves through the same path as any
+   * hand-written description.
+   */
+  fastify.post('/clean-description', async (request, reply) => {
+    const text = (request.body as any)?.text;
+    if (typeof text !== 'string' || !text.trim()) {
+      return reply.code(400).send({ error: 'Nothing to clean.', code: 'empty' });
+    }
+    try {
+      return reply.send({ description: await cleanDescription(text) });
+    } catch (err) {
+      return sendAiError(reply, err);
+    }
+  });
+
+  /**
+   * Clean a whole album's descriptions in the background.
+   *
+   * Unlike the single-video route this writes straight to the library — there
+   * is no reviewing a hundred descriptions one at a time — so the client
+   * confirms first. Tags are never touched.
+   */
+  fastify.post('/clean-descriptions', async (request, reply) => {
+    const body = request.body as any;
+    const videoIds = strings(body?.videoIds, 2000);
+    const label = typeof body?.label === 'string' ? body.label.slice(0, 120) : '';
+
+    if (videoIds.length === 0) {
+      return reply.code(400).send({ error: 'No videos to clean.', code: 'empty' });
+    }
+    try {
+      return reply.send({ job: startCleanJob(videoIds, label) });
+    } catch (err) {
+      return sendAiError(reply, err);
+    }
+  });
+
+  /** Progress for the running (or last finished) clean-up. */
+  fastify.get('/clean-descriptions/status', async (_request, reply) => {
+    return reply.send({ job: getCleanJob() });
+  });
+
+  /** Stop after the batch in flight; already-cleaned descriptions are kept. */
+  fastify.post('/clean-descriptions/cancel', async (_request, reply) => {
+    cancelCleanJob();
+    return reply.send({ job: getCleanJob() });
+  });
+
+  /** Forget a finished job, so its progress panel stops coming back. */
+  fastify.post('/clean-descriptions/dismiss', async (_request, reply) => {
+    dismissCleanJob();
+    return reply.send({ success: true });
   });
 
   /**
