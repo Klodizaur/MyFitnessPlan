@@ -378,6 +378,7 @@
     "model_label": "Model",
     "model_choose": "Choose a model…",
     "model_custom": "Other — type the name",
+    "model_unlisted": "not offered by your provider",
     "model_from_provider": "This list comes from your provider, so the names are always current.",
     "model_loading": "Loading models…",
     "model_typing": "Typing a name by hand — it must match exactly, including capitals.",

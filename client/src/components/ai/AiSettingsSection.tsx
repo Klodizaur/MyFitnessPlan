@@ -81,11 +81,14 @@ export default function AiSettingsSection() {
    *
    * A model the user already saved is kept even when the endpoint doesn't list
    * it — switching away from a working setting just because a listing is
-   * incomplete would be worse than showing an extra row.
+   * incomplete would be worse than dropping it silently. It is flagged so a
+   * name that came from a typo is recognisable rather than looking official,
+   * and selecting the empty option clears it.
    */
-  const modelOptions = models.some(m => m.id === model) || !model
-    ? models
-    : [{ id: model, label: model }, ...models];
+  const modelOptions: (ModelChoice & { unlisted?: boolean })[] =
+    !model || models.some(m => m.id === model)
+      ? models
+      : [{ id: model, label: model, unlisted: true }, ...models];
 
   /**
    * Switching provider swaps in that provider's defaults, but only when the
@@ -205,10 +208,16 @@ export default function AiSettingsSection() {
                   setModel(e.target.value);
                 }}
               >
-                {!model && <option value="">{t('ai.model_choose')}</option>}
+                {/* Always selectable, so picking it is how a model — including
+                    a stale hand-typed one — gets cleared. */}
+                <option value="">{t('ai.model_choose')}</option>
                 {modelOptions.map(choice => (
                   <option key={choice.id} value={choice.id}>
-                    {choice.label === choice.id ? choice.id : `${choice.label} (${choice.id})`}
+                    {choice.unlisted
+                      ? `${choice.id} — ${t('ai.model_unlisted')}`
+                      : choice.label === choice.id
+                        ? choice.id
+                        : `${choice.label} (${choice.id})`}
                   </option>
                 ))}
                 <option value={CUSTOM_MODEL}>{t('ai.model_custom')}</option>

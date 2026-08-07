@@ -441,6 +441,7 @@
     "model_label": "Model",
     "model_choose": "Wybierz model…",
     "model_custom": "Inny — wpisz nazwę",
+    "model_unlisted": "niedostępny u Twojego dostawcy",
     "model_from_provider": "Ta lista pochodzi od Twojego dostawcy, więc nazwy są zawsze aktualne.",
     "model_loading": "Wczytywanie modeli…",
     "model_typing": "Wpisujesz nazwę ręcznie — musi zgadzać się dokładnie, łącznie z wielkością liter.",
