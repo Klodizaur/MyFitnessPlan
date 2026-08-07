@@ -7,7 +7,10 @@ import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, BODY_PARTS, INTENSITIES,
 import { matchesTags, matchesQuery, matchesSource, useFilterMatchMode, FilterMatchToggle, SourceFilter, SourceFilterToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
 import { ImportResult, useImportAvailable } from '../lib/externalImport';
+import { BuilderDay, BuilderWeek, createWeek, createInitialBuilderWeeks } from '../lib/builderModel';
+import { useAiAvailable } from '../lib/useAiAvailable';
 import YouTubeImportModal from '../components/YouTubeImportModal';
+import AiPlanModal, { AiPlanResult } from '../components/ai/AiPlanModal';
 import { Video } from '../types/video';
 
 interface Plan {
@@ -31,26 +34,6 @@ const resolveBackgroundUrl = (backgroundImage?: string | null) => {
   if (!backgroundImage) return null;
   return backgroundImage.startsWith('http') ? backgroundImage : `${API_BASE}${backgroundImage}`;
 };
-
-interface BuilderDay {
-  name: string;
-  videoIds: string[];
-}
-
-interface BuilderWeek {
-  name: string;
-  days: BuilderDay[];
-}
-
-const createWeek = (weekNumber: number): BuilderWeek => ({
-  name: `Week ${weekNumber}`,
-  days: Array.from({ length: 7 }, (_, i) => ({
-    name: `Day ${i + 1}`,
-    videoIds: [] as string[]
-  }))
-});
-
-const createInitialBuilderWeeks = () => [createWeek(1)];
 
 // Preset plan categories. Stored as these keys so the label follows the UI
 // language; anything else in `category` is a custom label shown verbatim.
@@ -101,6 +84,12 @@ export default function Plans() {
   // IDs from the most recent import, so the builder can filter down to them.
   const [importedIds, setImportedIds] = useState<string[]>([]);
   const [showOnlyImported, setShowOnlyImported] = useState(false);
+
+  // Optional AI plan drafting. Like the import above, the entry point is hidden
+  // entirely unless the server reports a configured model (see server/src/ai/).
+  // The AI modal only pre-fills this builder — it never saves a plan itself.
+  const aiAvailable = useAiAvailable();
+  const [isAiOpen, setIsAiOpen] = useState(false);
 
   // Background image picker state (scoped per-plan)
   const [bgPickerPlanId, setBgPickerPlanId] = useState<string | null>(null);
@@ -223,6 +212,40 @@ export default function Plans() {
       console.error('Error loading plan for editing:', error);
       setStatus('Error loading plan for editing');
     }
+  };
+
+  /**
+   * Hand an AI draft to the builder.
+   *
+   * Deliberately the same three calls the edit path above makes — the builder
+   * has always been able to open onto pre-filled weeks, so a draft needs no new
+   * machinery and nothing about the manual flow changes. `editingPlanId` stays
+   * null so saving creates a new plan rather than overwriting the last one
+   * edited.
+   */
+  const handleAiGenerated = (result: AiPlanResult) => {
+    setIsAiOpen(false);
+    setPlanName(t('ai.default_plan_name'));
+    setBuilderStartDate(new Date().toISOString().split('T')[0]);
+    setBuilderCategory('');
+    setBuilderCustomCategory('');
+    setBuilderWeeks(result.weeks);
+    setBuilderCurrentWeek(0);
+    setBuilderCurrentDay(0);
+    setEditingPlanId(null);
+    setBuilderStep(2);
+    setIsBuilderOpen(true);
+
+    // The user reviews and edits before saving, so anything the draft couldn't
+    // honour is said out loud here rather than discovered later.
+    const notes = [result.summary];
+    if (result.droppedIds.length > 0) {
+      notes.push(t('ai.dropped_notice', { count: result.droppedIds.length }));
+    }
+    if (result.truncated) {
+      notes.push(t('ai.truncated_notice', { count: result.candidateCount }));
+    }
+    setBuilderStatus(notes.filter(Boolean).join(' '));
   };
 
   useEffect(() => {
@@ -698,6 +721,9 @@ export default function Plans() {
             />
           </label>
           <button className="btn btn-secondary" onClick={() => setIsBuilderOpen(true)}>{t('plans.build_btn')}</button>
+          {aiAvailable && (
+            <button className="btn btn-secondary" onClick={() => setIsAiOpen(true)}>{t('ai.build_btn')}</button>
+          )}
         </div>
       </div>
 
@@ -1186,6 +1212,14 @@ export default function Plans() {
         </div>,
         document.body
       )}
+
+      {/* Renders its own portal; only mounted once the server reports a
+          configured model, so this whole branch is inert by default. */}
+      <AiPlanModal
+        open={isAiOpen}
+        onClose={() => setIsAiOpen(false)}
+        onGenerated={handleAiGenerated}
+      />
     </div>
   );
 }

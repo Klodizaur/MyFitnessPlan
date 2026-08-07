@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import AiSettingsSection from '../components/ai/AiSettingsSection';
 import '../styles/About.css';
 
 const THEMES = [
@@ -399,6 +400,10 @@ export default function Settings() {
           </button>
         )}
       </div>
+
+      {/* Optional AI integration. Saves through its own endpoint, so it is
+          unaffected by (and does not affect) the Save button below. */}
+      <AiSettingsSection />
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
         <button className="btn" onClick={handleSaveSettings} style={{ width: '100%' }}>{t('settings.save_settings')}</button>

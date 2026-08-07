@@ -1,0 +1,99 @@
+/*
+ * Styles for the optional AI plan builder.
+ *
+ * Everything here is namespaced `ai-`; the modal otherwise reuses the existing
+ * `wb-` workout-builder classes so it looks like the rest of the app. Imported
+ * only by the AI components, so removing the feature removes the stylesheet.
+ */
+
+.ai-modal {
+  max-width: 720px;
+}
+
+.ai-textarea {
+  resize: vertical;
+  min-height: 92px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.ai-number-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.ai-hint {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+
+.ai-waiting {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.ai-error {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  font-size: 0.88rem;
+}
+
+/* Album chips cycle neutral → include → exclude, so the two states need to be
+   distinguishable at a glance and not only by the ✓/✕ glyph. */
+.ai-album-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-album-include {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+  color: var(--accent-color);
+}
+
+.ai-album-exclude {
+  border-color: rgba(220, 38, 38, 0.5);
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  text-decoration: line-through;
+}
+
+.ai-album-count {
+  font-size: 0.72rem;
+  opacity: 0.6;
+}
+
+/* Settings panel */
+
+.ai-settings-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ai-settings-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ai-key-state {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.ai-status-ok {
+  color: var(--accent-color);
+}
+
+.ai-status-bad {
+  color: #dc2626;
+}
