@@ -23,6 +23,50 @@
   gap: 12px;
 }
 
+/* Session-length slider. Uses the builder's own input colours so it reads as
+   part of the same form rather than a browser default. */
+
+.ai-slider-value {
+  float: right;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.ai-slider {
+  width: 100%;
+  margin: 4px 0 2px;
+  accent-color: var(--wb-accent, var(--accent-color));
+  cursor: pointer;
+}
+
+.ai-slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.ai-slider-tick {
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.ai-slider-tick:hover {
+  opacity: 1;
+}
+
+.ai-slider-tick.selected {
+  opacity: 1;
+  border-color: var(--wb-selected-border, var(--accent-color));
+  background: var(--wb-selected, var(--accent-soft));
+}
+
 .ai-hint {
   margin: 0 0 8px;
   font-size: 0.82rem;

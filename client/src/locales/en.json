@@ -351,7 +351,7 @@
     "describe_placeholder": "e.g. I want to lose weight and tone my legs. I live upstairs so nothing with jumping. Mornings, before work.",
     "weeks_label": "Weeks",
     "days_label": "Training days per week",
-    "minutes_label": "Minutes per session",
+    "minutes_label": "How long should a workout day be?",
     "equipment_label": "Equipment you have",
     "equipment_hint": "Videos needing anything you haven't selected are left out. Select nothing to allow everything.",
     "styles_label": "Preferred styles",
@@ -420,6 +420,12 @@
     "language_original": "Keep each video's own language",
     "language_hint": "Clean-up removes clutter without changing what language the creator wrote in.",
     "language_translate_warning": "Descriptions will also be translated into this language, replacing the creator's original wording.",
-    "cleanup_confirm_translate": "Clean up and translate descriptions for {{count}} video(s) in this album into {{language}}?\n\nThis replaces the creator's original wording in your library and cannot be undone. Tags are not changed."
+    "cleanup_confirm_translate": "Clean up and translate descriptions for {{count}} video(s) in this album into {{language}}?\n\nThis replaces the creator's original wording in your library and cannot be undone. Tags are not changed.",
+    "minutes_unit": "min",
+    "minutes_hint": "The AI fills the time with whatever fits — one long video, or a warm-up plus several short ones and a stretch.",
+    "minutes_short": "Short",
+    "minutes_medium": "Medium",
+    "minutes_long": "Long",
+    "minutes_very_long": "Very long"
   }
 }

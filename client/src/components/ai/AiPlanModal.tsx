@@ -35,6 +35,26 @@ interface Props {
   onGenerated: (result: AiPlanResult) => void;
 }
 
+/**
+ * Session-length range.
+ *
+ * The low end is a genuine quick session rather than a token one; the high end
+ * covers a long weekend workout without offering lengths nobody trains for.
+ */
+const MIN_SESSION = 10;
+const MAX_SESSION = 90;
+
+/** Jump-to points under the slider, at the lengths people actually pick. */
+const SESSION_MARKS = [10, 20, 30, 45, 60, 90];
+
+/** Plain-language band for the current value, so the number means something. */
+function sessionBand(minutes: number): string {
+  if (minutes <= 20) return 'ai.minutes_short';
+  if (minutes <= 40) return 'ai.minutes_medium';
+  if (minutes <= 60) return 'ai.minutes_long';
+  return 'ai.minutes_very_long';
+}
+
 /** Albums are either included, excluded, or unconstrained. */
 type AlbumState = 'include' | 'exclude';
 
@@ -188,18 +208,40 @@ export default function AiPlanModal({ open, onClose, onGenerated }: Props) {
                 onChange={e => setDaysPerWeek(clamp(Number(e.target.value), 1, 7))}
               />
             </div>
-            <div className="wb-field">
-              <label className="wb-label">{t('ai.minutes_label')}</label>
-              <input
-                className="wb-input"
-                type="number"
-                min={0}
-                max={240}
-                step={5}
-                value={maxMinutes}
-                onChange={e => setMaxMinutes(clamp(Number(e.target.value), 0, 240))}
-              />
+          </div>
+
+          {/* A slider rather than a number box: session length is a feel
+              judgement, and the named bands give it meaning without forcing a
+              choice between fixed presets. */}
+          <div className="wb-field">
+            <label className="wb-label">
+              {t('ai.minutes_label')}
+              <span className="ai-slider-value">
+                {maxMinutes} {t('ai.minutes_unit')} · {t(sessionBand(maxMinutes))}
+              </span>
+            </label>
+            <input
+              className="ai-slider"
+              type="range"
+              min={MIN_SESSION}
+              max={MAX_SESSION}
+              step={5}
+              value={maxMinutes}
+              onChange={e => setMaxMinutes(clamp(Number(e.target.value), MIN_SESSION, MAX_SESSION))}
+            />
+            <div className="ai-slider-ticks">
+              {SESSION_MARKS.map(mark => (
+                <button
+                  type="button"
+                  key={mark}
+                  className={`ai-slider-tick${maxMinutes === mark ? ' selected' : ''}`}
+                  onClick={() => setMaxMinutes(mark)}
+                >
+                  {mark}
+                </button>
+              ))}
             </div>
+            <p className="ai-hint">{t('ai.minutes_hint')}</p>
           </div>
 
           <div className="wb-field">

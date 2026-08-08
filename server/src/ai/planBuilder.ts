@@ -62,10 +62,11 @@ CHOOSING VIDEOS
 - Each entry lists its length in minutes and whatever tags exist. Many videos are untagged: infer what you can from the title and length, and never assume an untagged video is easy.
 
 BUILDING A DAY
-- Add up the listed minutes. A day should land near the requested session length, not far over it.
-- Short videos (roughly under 15 minutes) are components. Combine them into one session: a warm-up, one or two main blocks, then a stretch or cool-down.
+- Build the session by time, never by number of videos. Add up the listed minutes and get close to the requested session length — within about ten minutes of it.
+- Short videos (roughly under 15 minutes) are components, not sessions. Stack as many as the time budget needs. A warm-up, six six-minute blocks and a stretch is a perfectly normal 45-minute session; do not stop at two or three videos and leave the session half the length that was asked for.
+- Order a multi-video day properly: a warm-up first, the main work in the middle, a stretch or cool-down last. Never open with hard work and never end on it.
+- If the catalogue has nothing tagged as a warm-up or cool-down, use the shortest and gentlest videos available for those slots, or leave them out — never substitute hard work into them.
 - A long video (roughly 30 minutes or more) is a complete session on its own — it almost always contains its own warm-up and cool-down. Never put two long videos on the same day, and do not bolt extra work onto one. After a hard long session you may add a short stretch or cool-down, nothing more.
-- Never put more than four videos in one day.
 
 BUILDING A WEEK
 - Respect the requested number of training days. Every other day is a rest day and must be left empty. Rest is part of the plan, not a gap in it.
@@ -137,9 +138,11 @@ function buildUserPrompt(
     // Worth stating: the catalogue was already filtered to fit, so the model
     // should be budgeting a day's total rather than re-checking each video.
     lines.push(
-      `Target session length: about ${request.maxMinutes} minutes. ` +
-      'No single video in the catalogue is longer than that, so combine short ' +
-      'ones to reach it and let a long one stand alone.'
+      `Target session length: about ${request.maxMinutes} minutes per training day. ` +
+      'No single video in the catalogue is longer than that, so reach the target ' +
+      'by stacking as many short videos as it takes, or let one long video ' +
+      'stand alone. Getting close to the target matters more than keeping the ' +
+      'number of videos low.'
     );
   }
   if (request.intensity) lines.push(`Preferred intensity: ${request.intensity}.`);

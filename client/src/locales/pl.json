@@ -414,7 +414,7 @@
     "describe_placeholder": "np. Chcę schudnąć i wysmuklić nogi. Mieszkam na piętrze, więc nic ze skakaniem. Rano, przed pracą.",
     "weeks_label": "Tygodnie",
     "days_label": "Dni treningowe w tygodniu",
-    "minutes_label": "Minut na sesję",
+    "minutes_label": "Jak długi ma być dzień treningowy?",
     "equipment_label": "Sprzęt, który masz",
     "equipment_hint": "Filmy wymagające czegoś, czego nie zaznaczysz, zostaną pominięte. Nie zaznaczaj nic, aby dopuścić wszystko.",
     "styles_label": "Preferowane style",
@@ -483,6 +483,12 @@
     "language_original": "Zachowaj język każdego filmu",
     "language_hint": "Czyszczenie usuwa bałagan, nie zmieniając języka, w którym pisał twórca.",
     "language_translate_warning": "Opisy zostaną też przetłumaczone na ten język, zastępując oryginalne słowa twórcy.",
-    "cleanup_confirm_translate": "Wyczyścić i przetłumaczyć opisy {{count}} filmów w tym albumie na {{language}}?\n\nZastąpi to oryginalne słowa twórcy w bibliotece i nie da się tego cofnąć. Tagi pozostają bez zmian."
+    "cleanup_confirm_translate": "Wyczyścić i przetłumaczyć opisy {{count}} filmów w tym albumie na {{language}}?\n\nZastąpi to oryginalne słowa twórcy w bibliotece i nie da się tego cofnąć. Tagi pozostają bez zmian.",
+    "minutes_unit": "min",
+    "minutes_hint": "AI wypełni ten czas tym, co pasuje — jednym długim filmem albo rozgrzewką, kilkoma krótkimi i rozciąganiem.",
+    "minutes_short": "Krótki",
+    "minutes_medium": "Średni",
+    "minutes_long": "Długi",
+    "minutes_very_long": "Bardzo długi"
   }
 }
