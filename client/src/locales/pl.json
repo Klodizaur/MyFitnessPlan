@@ -478,6 +478,11 @@
     "cleanup_stop": "Zatrzymaj",
     "cleanup_minimize": "Zminimalizuj",
     "cleanup_expand": "Pokaż postęp",
-    "cleanup_close": "Zamknij"
+    "cleanup_close": "Zamknij",
+    "language_label": "Język opisów",
+    "language_original": "Zachowaj język każdego filmu",
+    "language_hint": "Czyszczenie usuwa bałagan, nie zmieniając języka, w którym pisał twórca.",
+    "language_translate_warning": "Opisy zostaną też przetłumaczone na ten język, zastępując oryginalne słowa twórcy.",
+    "cleanup_confirm_translate": "Wyczyścić i przetłumaczyć opisy {{count}} filmów w tym albumie na {{language}}?\n\nZastąpi to oryginalne słowa twórcy w bibliotece i nie da się tego cofnąć. Tagi pozostają bez zmian."
   }
 }

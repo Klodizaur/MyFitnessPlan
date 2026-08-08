@@ -22,11 +22,27 @@ export const AI_SETTINGS_PREFIX = 'ai_';
  */
 export type AiProvider = 'anthropic' | 'openai';
 
+/**
+ * Language descriptions are written in.
+ *
+ * Empty means keep whatever the original used, which is the default: cleaning
+ * up clutter shouldn't change what language a creator wrote in. A value here
+ * turns clean-up into a translation as well.
+ */
+export type DescriptionLanguage = '' | 'en' | 'pl';
+
+/** Names as they should appear in the instruction sent to the model. */
+export const DESCRIPTION_LANGUAGE_NAMES: Record<Exclude<DescriptionLanguage, ''>, string> = {
+  en: 'English',
+  pl: 'Polish',
+};
+
 export interface AiSettings {
   provider: AiProvider;
   apiKey: string;
   baseUrl: string;
   model: string;
+  descriptionLanguage: DescriptionLanguage;
 }
 
 const DEFAULT_BASE_URL: Record<AiProvider, string> = {
@@ -62,11 +78,13 @@ function write(key: string, value: string): void {
 
 export function getAiSettings(): AiSettings {
   const provider: AiProvider = read('provider') === 'openai' ? 'openai' : 'anthropic';
+  const language = read('description_language');
   return {
     provider,
     apiKey: read('api_key'),
     baseUrl: read('base_url') || DEFAULT_BASE_URL[provider],
     model: read('model') || DEFAULT_MODEL[provider],
+    descriptionLanguage: language === 'en' || language === 'pl' ? language : '',
   };
 }
 
@@ -76,6 +94,7 @@ export function saveAiSettings(patch: {
   apiKey?: string | null;
   baseUrl?: string;
   model?: string;
+  descriptionLanguage?: DescriptionLanguage;
 }): void {
   if (patch.provider !== undefined) {
     write('provider', patch.provider === 'openai' ? 'openai' : 'anthropic');
@@ -88,6 +107,10 @@ export function saveAiSettings(patch: {
   }
   if (patch.model !== undefined) {
     write('model', patch.model.trim());
+  }
+  if (patch.descriptionLanguage !== undefined) {
+    const value = patch.descriptionLanguage;
+    write('description_language', value === 'en' || value === 'pl' ? value : '');
   }
 }
 

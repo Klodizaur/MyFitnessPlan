@@ -415,6 +415,11 @@
     "cleanup_stop": "Stop",
     "cleanup_minimize": "Minimize",
     "cleanup_expand": "Show progress",
-    "cleanup_close": "Close"
+    "cleanup_close": "Close",
+    "language_label": "Description language",
+    "language_original": "Keep each video's own language",
+    "language_hint": "Clean-up removes clutter without changing what language the creator wrote in.",
+    "language_translate_warning": "Descriptions will also be translated into this language, replacing the creator's original wording.",
+    "cleanup_confirm_translate": "Clean up and translate descriptions for {{count}} video(s) in this album into {{language}}?\n\nThis replaces the creator's original wording in your library and cannot be undone. Tags are not changed."
   }
 }

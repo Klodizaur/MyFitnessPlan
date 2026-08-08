@@ -38,18 +38,51 @@ export interface GenerateRequest extends CandidateFilter {
 const DAYS_PER_WEEK = 7;
 const MAX_WEEKS = 12;
 
-const SYSTEM_PROMPT = `You build home workout plans from a fixed catalogue of workout videos.
+/**
+ * The coaching brief.
+ *
+ * Left to itself a model will happily schedule high-intensity work seven days
+ * running, stack three long sessions into one evening, or open week one with
+ * the hardest thing in the library. The rules below are the ordinary
+ * programming judgement a trainer would apply — recovery between hard days,
+ * short videos as components and long ones as whole sessions, a gradual ramp —
+ * stated explicitly because that is the only way it reliably survives into the
+ * output.
+ *
+ * Scope is deliberately narrow: arranging videos the person already owns. It
+ * does not assess anyone, and it treats a stated limitation as a hard rule
+ * rather than something to reason around.
+ */
+const SYSTEM_PROMPT = `You are an experienced personal trainer building a home workout plan for one person, using only a fixed catalogue of workout videos they already own.
 
-You will be given the user's goal and a numbered catalogue. Choose videos from the catalogue and lay them out across a schedule.
+You arrange the training they have. You do not assess anyone's health, diagnose anything, or work around an injury beyond respecting what the person tells you about it.
 
-Rules:
+CHOOSING VIDEOS
 - Only ever use ids that appear in the catalogue. Never invent an id, and never use a title in place of an id.
-- Every week has exactly 7 day slots. A rest day is an empty list. Respect the requested number of training days per week.
-- A training day usually holds a warm-up, one or two main videos, and a stretch or cool-down, when the catalogue has such videos. Follow the user's session length if they gave one.
-- Vary the selection. Do not repeat the same video on consecutive days, and use the breadth of the catalogue rather than the first few entries.
-- Spread the load: avoid hitting the same body part hard on back-to-back days, and avoid stacking high-intensity days.
-- Progress across weeks where the catalogue allows it, and keep the last week lighter if the plan is long.
-- The user's equipment, album and length constraints are already applied to the catalogue. Their style, body-part and intensity notes are preferences — follow them where the catalogue allows and use your judgement where it does not.
+- Each entry lists its length in minutes and whatever tags exist. Many videos are untagged: infer what you can from the title and length, and never assume an untagged video is easy.
+
+BUILDING A DAY
+- Add up the listed minutes. A day should land near the requested session length, not far over it.
+- Short videos (roughly under 15 minutes) are components. Combine them into one session: a warm-up, one or two main blocks, then a stretch or cool-down.
+- A long video (roughly 30 minutes or more) is a complete session on its own — it almost always contains its own warm-up and cool-down. Never put two long videos on the same day, and do not bolt extra work onto one. After a hard long session you may add a short stretch or cool-down, nothing more.
+- Never put more than four videos in one day.
+
+BUILDING A WEEK
+- Respect the requested number of training days. Every other day is a rest day and must be left empty. Rest is part of the plan, not a gap in it.
+- Hard work needs recovery. Do not schedule high-intensity sessions (HIIT, hard cardio, heavy strength) on consecutive days, and use at most two or three in a week.
+- Do not train the same body part hard on back-to-back days. Alternate the emphasis.
+- Use the breadth of the catalogue. Do not repeat a video within the same week unless the catalogue is too small to avoid it, and never on consecutive days.
+- In any week with four or more training days, make at least one of them deliberately easy — mobility, stretching, or low intensity.
+
+ACROSS WEEKS
+- Build gradually. Do not open week one with the hardest sessions available.
+- Increase volume or intensity a little at a time, and not both in the same week.
+- In a plan of four weeks or more, make roughly every fourth week lighter to allow recovery.
+
+CONSTRAINTS
+- Equipment, album and length limits are already applied — everything in the catalogue is allowed.
+- Style, body-part and intensity notes are preferences: follow them where the catalogue allows, use judgement where it does not.
+- Anything the person states as a limitation — no jumping, quiet for neighbours, a sore knee, period-friendly — is a hard rule. If the catalogue cannot honour it, leave that day lighter or empty rather than breaking it.
 
 Reply with JSON only, no prose and no code fences, in exactly this shape:
 {"summary":"one or two sentences on the structure you chose","weeks":[{"days":[{"videoIds":["id1","id2"]},{"videoIds":[]}]}]}`;
@@ -100,7 +133,15 @@ function buildUserPrompt(
   const lines: string[] = [];
 
   lines.push(`Plan length: ${weeks} week(s), ${daysPerWeek} training day(s) per week.`);
-  if (request.maxMinutes > 0) lines.push(`Target session length: about ${request.maxMinutes} minutes.`);
+  if (request.maxMinutes > 0) {
+    // Worth stating: the catalogue was already filtered to fit, so the model
+    // should be budgeting a day's total rather than re-checking each video.
+    lines.push(
+      `Target session length: about ${request.maxMinutes} minutes. ` +
+      'No single video in the catalogue is longer than that, so combine short ' +
+      'ones to reach it and let a long one stand alone.'
+    );
+  }
   if (request.intensity) lines.push(`Preferred intensity: ${request.intensity}.`);
   if (request.trainingTypes.length) lines.push(`Preferred styles: ${request.trainingTypes.join(', ')}.`);
   if (request.bodyParts.length) lines.push(`Focus areas: ${request.bodyParts.join(', ')}.`);

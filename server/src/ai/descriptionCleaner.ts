@@ -11,6 +11,7 @@
  */
 import db from '../db.js';
 import { callModel, AiError } from './provider.js';
+import { DESCRIPTION_LANGUAGE_NAMES, getAiSettings } from './settings.js';
 
 /**
  * How many descriptions go in one request.
@@ -23,18 +24,30 @@ const BATCH_SIZE = 6;
 /** Descriptions longer than this are truncated before being sent. */
 const MAX_INPUT_CHARS = 4000;
 
-const SYSTEM_PROMPT = `You clean up workout video descriptions.
+/**
+ * The instruction set, built per call because the language rule depends on a
+ * setting: by default the original language is preserved, but a chosen target
+ * language turns clean-up into a translation as well.
+ */
+function systemPrompt(): string {
+  const target = getAiSettings().descriptionLanguage;
+  const languageRule = target
+    ? `- Write the result in ${DESCRIPTION_LANGUAGE_NAMES[target]}, translating it when the original is in another language.`
+    : '- Keep the original language. Do not translate.';
+
+  return `You clean up workout video descriptions.
 
 Remove: URLs and links, social media handles and "follow me" lines, sponsor and affiliate copy, discount codes, subscribe/like/comment requests, timestamps and chapter lists, hashtags, email addresses, cross-promotion for other videos or channels, copyright and music credits, and repeated boilerplate.
 
 Keep: what the workout actually is — its focus, length, intensity, equipment, structure, and any genuine instruction or warning from the creator.
 
 Rules:
-- Keep the original language. Do not translate.
+${languageRule}
 - Keep the creator's own wording where it survives. Rewrite only to join up what's left into readable sentences.
 - Do not invent anything that is not in the original.
 - If nothing useful remains, return an empty string for that video.
 - Aim for one to three sentences.`;
+}
 
 /** Clean a single description. Used by the editor, which previews the result. */
 export async function cleanDescription(text: string): Promise<string> {
@@ -42,7 +55,7 @@ export async function cleanDescription(text: string): Promise<string> {
   if (!trimmed) return '';
 
   const reply = await callModel({
-    system: SYSTEM_PROMPT,
+    system: systemPrompt(),
     user:
       'Clean this description. Reply with the cleaned text only — no preamble, ' +
       'no quotes, no explanation.\n\n' +
@@ -188,7 +201,7 @@ async function cleanBatch(
   }));
 
   const reply = await callModel({
-    system: SYSTEM_PROMPT,
+    system: systemPrompt(),
     user:
       'Clean each description below. Reply with JSON only, no code fences, in ' +
       'exactly this shape, using the same ids:\n' +

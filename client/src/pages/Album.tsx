@@ -186,7 +186,26 @@ export default function Album() {
       window.alert(t('ai.cleanup_none'));
       return;
     }
-    if (!window.confirm(t('ai.cleanup_confirm', { count: withDescriptions.length }))) return;
+    // Translating is a bigger commitment than tidying — it replaces the
+    // creator's own words rather than trimming around them — so the warning
+    // says which one is about to happen. Read at click time rather than on
+    // page load, since it only matters here.
+    let language = '';
+    try {
+      const cfg = await (await fetch('/api/ai/settings')).json();
+      language = cfg?.descriptionLanguage || '';
+    } catch {
+      // Settings unreadable; warn about the tidy-only case, which is the default.
+    }
+
+    const message = language
+      ? t('ai.cleanup_confirm_translate', {
+          count: withDescriptions.length,
+          language: language === 'pl' ? 'Polski' : 'English',
+        })
+      : t('ai.cleanup_confirm', { count: withDescriptions.length });
+
+    if (!window.confirm(message)) return;
 
     try {
       const res = await fetch('/api/ai/clean-descriptions', {

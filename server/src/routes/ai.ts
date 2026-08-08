@@ -62,6 +62,7 @@ export default async function (fastify: FastifyInstance) {
       provider: settings.provider,
       baseUrl: settings.baseUrl,
       model: settings.model,
+      descriptionLanguage: settings.descriptionLanguage,
       hasKey: Boolean(settings.apiKey),
       isLocal: isLocalBaseUrl(settings.baseUrl),
       available: isAiConfigured(settings),
@@ -80,11 +81,15 @@ export default async function (fastify: FastifyInstance) {
     if (body?.apiKey === null) apiKey = null;
     else if (typeof body?.apiKey === 'string') apiKey = body.apiKey;
 
+    const language = body?.descriptionLanguage;
+
     saveAiSettings({
       provider,
       apiKey,
       baseUrl: typeof body?.baseUrl === 'string' ? body.baseUrl : undefined,
       model: typeof body?.model === 'string' ? body.model : undefined,
+      descriptionLanguage:
+        language === '' || language === 'en' || language === 'pl' ? language : undefined,
     });
 
     const settings = getAiSettings();
@@ -93,6 +98,7 @@ export default async function (fastify: FastifyInstance) {
       provider: settings.provider,
       baseUrl: settings.baseUrl,
       model: settings.model,
+      descriptionLanguage: settings.descriptionLanguage,
       hasKey: Boolean(settings.apiKey),
       available: isAiConfigured(settings),
     });

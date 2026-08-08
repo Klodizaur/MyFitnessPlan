@@ -14,10 +14,14 @@ import '../../styles/AiPlan.css';
 
 type Provider = 'anthropic' | 'openai';
 
+/** '' keeps whatever language each description was already written in. */
+type DescriptionLanguage = '' | 'en' | 'pl';
+
 interface AiConfig {
   provider: Provider;
   baseUrl: string;
   model: string;
+  descriptionLanguage: DescriptionLanguage;
   hasKey: boolean;
   isLocal: boolean;
   available: boolean;
@@ -38,6 +42,7 @@ export default function AiSettingsSection() {
   const [baseUrl, setBaseUrl] = useState('');
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [language, setLanguage] = useState<DescriptionLanguage>('');
   const [status, setStatus] = useState('');
   const [statusOk, setStatusOk] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -56,6 +61,7 @@ export default function AiSettingsSection() {
         setProvider(data.provider);
         setBaseUrl(data.baseUrl);
         setModel(data.model);
+        setLanguage(data.descriptionLanguage || '');
         if (data.hasKey || data.isLocal) loadModels();
       })
       .catch(() => setConfig(null));
@@ -118,6 +124,7 @@ export default function AiSettingsSection() {
         provider,
         baseUrl,
         model,
+        descriptionLanguage: language,
         // Omitted rather than sent empty, so saving a model change doesn't
         // wipe a key the user never retyped.
         ...(apiKey ? { apiKey } : {}),
@@ -254,6 +261,22 @@ export default function AiSettingsSection() {
               )}
             </>
           )}
+        </div>
+
+        <div>
+          <label className="wb-label">{t('ai.language_label')}</label>
+          <select
+            className="wb-input"
+            value={language}
+            onChange={e => setLanguage(e.target.value as DescriptionLanguage)}
+          >
+            <option value="">{t('ai.language_original')}</option>
+            <option value="en">English</option>
+            <option value="pl">Polski</option>
+          </select>
+          <p className="ai-hint" style={{ marginTop: 6 }}>
+            {language ? t('ai.language_translate_warning') : t('ai.language_hint')}
+          </p>
         </div>
 
         <div>
