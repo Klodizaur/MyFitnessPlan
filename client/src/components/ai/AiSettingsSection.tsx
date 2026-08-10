@@ -35,6 +35,20 @@ interface ModelChoice {
 /** Sentinel option that reveals the free-text field. */
 const CUSTOM_MODEL = '__custom__';
 
+/**
+ * Where an OpenAI-compatible endpoint usually lives.
+ *
+ * Each is the origin only — the request path (`/v1/chat/completions`) is added
+ * server-side — which is the part people most often get wrong when typing it
+ * by hand, along with the local port numbers.
+ */
+const OPENAI_PRESETS = [
+  { name: 'OpenAI', url: 'https://api.openai.com' },
+  { name: 'OpenRouter', url: 'https://openrouter.ai/api' },
+  { name: 'Ollama', url: 'http://localhost:11434' },
+  { name: 'LM Studio', url: 'http://localhost:1234' },
+];
+
 export default function AiSettingsSection() {
   const { t } = useTranslation();
   const [config, setConfig] = useState<AiConfig | null>(null);
@@ -52,6 +66,9 @@ export default function AiSettingsSection() {
   const [models, setModels] = useState<ModelChoice[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [typingModel, setTypingModel] = useState(false);
+  // The Anthropic base URL only matters behind a proxy, so it stays out of the
+  // way until asked for.
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const load = () => {
     fetch('/api/ai/settings')
@@ -184,16 +201,72 @@ export default function AiSettingsSection() {
       </div>
 
       <div className="ai-settings-grid">
+        {/* Only worth showing where it means something. On Anthropic the URL
+            is always the same and the field is just a way to break things, so
+            it hides behind a disclosure for the proxy case. On an
+            OpenAI-compatible endpoint the URL *is* the choice of service, so it
+            leads, with the common ones one click away. */}
+        {provider === 'anthropic' ? (
+          <div>
+            {showAdvanced ? (
+              <>
+                <label className="wb-label">{t('ai.base_url_label')}</label>
+                <input
+                  className="wb-input"
+                  value={baseUrl}
+                  onChange={e => setBaseUrl(e.target.value)}
+                  placeholder="https://api.anthropic.com"
+                  spellCheck={false}
+                />
+                <p className="ai-hint" style={{ marginTop: 6 }}>{t('ai.base_url_proxy_hint')}</p>
+              </>
+            ) : (
+              <button type="button" className="ai-link-btn" onClick={() => setShowAdvanced(true)}>
+                {t('ai.base_url_advanced')}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div>
+            <label className="wb-label">{t('ai.base_url_label')}</label>
+            <div className="wb-chip-row" style={{ marginBottom: 8 }}>
+              {OPENAI_PRESETS.map(preset => (
+                <button
+                  type="button"
+                  key={preset.url}
+                  className={`wb-chip${baseUrl === preset.url ? ' selected' : ''}`}
+                  onClick={() => setBaseUrl(preset.url)}
+                >
+                  {preset.name}
+                </button>
+              ))}
+            </div>
+            <input
+              className="wb-input"
+              value={baseUrl}
+              onChange={e => setBaseUrl(e.target.value)}
+              placeholder="https://api.openai.com"
+              spellCheck={false}
+            />
+            <p className="ai-hint" style={{ marginTop: 6 }}>{t('ai.base_url_openai_hint')}</p>
+          </div>
+        )}
+
+        {/* The key comes before the model on purpose: the model list is fetched
+            using it, so asking for a model first is asking for something that
+            cannot be answered yet. */}
         <div>
-          <label className="wb-label">{t('ai.base_url_label')}</label>
+          <label className="wb-label">{t('ai.key_label')}</label>
           <input
             className="wb-input"
-            value={baseUrl}
-            onChange={e => setBaseUrl(e.target.value)}
-            placeholder="https://api.anthropic.com"
+            type="password"
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+            placeholder={config?.hasKey ? t('ai.key_stored') : t('ai.key_placeholder')}
+            autoComplete="off"
             spellCheck={false}
           />
-          <p className="ai-hint" style={{ marginTop: 6 }}>{t('ai.base_url_hint')}</p>
+          <p className="ai-hint" style={{ marginTop: 6 }}>{t('ai.key_hint')}</p>
         </div>
 
         <div>
@@ -239,7 +312,10 @@ export default function AiSettingsSection() {
                 className="wb-input"
                 value={model}
                 onChange={e => setModel(e.target.value)}
-                placeholder="claude-opus-5"
+                // Provider-specific: showing a Claude model name to someone on
+                // OpenAI reads as a hardcoded value they can't change, not as
+                // an example of what to type.
+                placeholder={provider === 'anthropic' ? 'claude-opus-5' : t('ai.model_placeholder')}
                 spellCheck={false}
               />
               <p className="ai-hint" style={{ marginTop: 6 }}>
@@ -249,6 +325,20 @@ export default function AiSettingsSection() {
                     ? t('ai.model_typing')
                     : t('ai.model_hint')}
               </p>
+              {/* Without this the hint asks for a save that lives in another
+                  part of the panel, so the list never appears for someone who
+                  has just pasted a key. */}
+              {modelOptions.length === 0 && !loadingModels && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ marginTop: 8 }}
+                  onClick={() => save()}
+                  disabled={!apiKey && !config?.hasKey && !config?.isLocal}
+                >
+                  {t('ai.model_load')}
+                </button>
+              )}
               {modelOptions.length > 0 && (
                 <button
                   type="button"
@@ -277,20 +367,6 @@ export default function AiSettingsSection() {
           <p className="ai-hint" style={{ marginTop: 6 }}>
             {language ? t('ai.language_translate_warning') : t('ai.language_hint')}
           </p>
-        </div>
-
-        <div>
-          <label className="wb-label">{t('ai.key_label')}</label>
-          <input
-            className="wb-input"
-            type="password"
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            placeholder={config?.hasKey ? t('ai.key_stored') : t('ai.key_placeholder')}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <p className="ai-hint" style={{ marginTop: 6 }}>{t('ai.key_hint')}</p>
         </div>
       </div>
 

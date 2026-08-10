@@ -244,6 +244,17 @@
   align-items: center;
 }
 
+/* Reads as a link, so it doesn't compete with the real buttons in the panel. */
+.ai-link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-color);
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+
 .ai-key-state {
   font-size: 0.85rem;
   opacity: 0.75;

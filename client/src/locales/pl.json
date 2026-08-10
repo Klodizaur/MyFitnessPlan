@@ -438,7 +438,6 @@
     "provider_anthropic": "Claude (Anthropic)",
     "provider_openai": "Zgodne z OpenAI",
     "base_url_label": "Adres API",
-    "base_url_hint": "Wskaż lokalne narzędzie, np. Ollama lub LM Studio, aby wszystko zostało na Twoim komputerze.",
     "model_label": "Model",
     "model_choose": "Wybierz model…",
     "model_custom": "Inny — wpisz nazwę",
@@ -447,7 +446,7 @@
     "model_loading": "Wczytywanie modeli…",
     "model_typing": "Wpisujesz nazwę ręcznie — musi zgadzać się dokładnie, łącznie z wielkością liter.",
     "model_back_to_list": "Wybierz z listy",
-    "model_hint": "Zapisz klucz, aby wczytać listę modeli oferowanych przez dostawcę.",
+    "model_hint": "Zapisz klucz, a lista modeli oferowanych przez dostawcę pojawi się tutaj.",
     "key_label": "Klucz API",
     "key_placeholder": "Wklej swój klucz API",
     "key_stored": "Klucz jest zapisany — wpisz, aby go zmienić",
@@ -490,6 +489,11 @@
     "minutes_short": "Krótki",
     "minutes_medium": "Średni",
     "minutes_long": "Długi",
-    "minutes_very_long": "Bardzo długi"
+    "minutes_very_long": "Bardzo długi",
+    "base_url_advanced": "Używasz proxy lub bramy? Ustaw własny adres API",
+    "base_url_proxy_hint": "Zostaw https://api.anthropic.com, chyba że kierujesz Claude przez własne proxy.",
+    "base_url_openai_hint": "Z jakiej usługi korzystać. Wybierz powyżej albo wpisz adres dowolnego endpointu zgodnego z OpenAI — sam adres, bez /v1.",
+    "model_placeholder": "Nazwa modelu od Twojego dostawcy",
+    "model_load": "Zapisz klucz i wczytaj modele"
   }
 }

@@ -375,7 +375,6 @@
     "provider_anthropic": "Claude (Anthropic)",
     "provider_openai": "OpenAI-compatible",
     "base_url_label": "API base URL",
-    "base_url_hint": "Point this at a local runtime such as Ollama or LM Studio to keep everything on your machine.",
     "model_label": "Model",
     "model_choose": "Choose a model…",
     "model_custom": "Other — type the name",
@@ -384,7 +383,7 @@
     "model_loading": "Loading models…",
     "model_typing": "Typing a name by hand — it must match exactly, including capitals.",
     "model_back_to_list": "Pick from the list instead",
-    "model_hint": "Save your key to load the list of models your provider offers.",
+    "model_hint": "Save your key and the list of models your provider offers will load here.",
     "key_label": "API key",
     "key_placeholder": "Paste your API key",
     "key_stored": "A key is saved — type to replace it",
@@ -427,6 +426,11 @@
     "minutes_short": "Short",
     "minutes_medium": "Medium",
     "minutes_long": "Long",
-    "minutes_very_long": "Very long"
+    "minutes_very_long": "Very long",
+    "base_url_advanced": "Using a proxy or gateway? Set a custom API URL",
+    "base_url_proxy_hint": "Leave as https://api.anthropic.com unless you route Claude through your own proxy.",
+    "base_url_openai_hint": "Which service to call. Pick one above, or type the address of any OpenAI-compatible endpoint — origin only, no /v1.",
+    "model_placeholder": "Model name from your provider",
+    "model_load": "Save key and load models"
   }
 }
