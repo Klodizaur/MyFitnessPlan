@@ -809,16 +809,61 @@ nav .nav-links a:hover, nav .nav-links a.active {
   margin-top: 2.25rem;
 }
 
+.plans-category.collapsed + .plans-category {
+  margin-top: 0.85rem;
+}
+
 .plans-category-heading {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  padding: 0.35rem 0.15rem;
+  margin: 0 0 1rem;
+  border: none;
+  background: transparent;
+  font: inherit;
   font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--text-secondary);
-  margin: 0 0 1rem;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.plans-category.collapsed .plans-category-heading {
+  margin-bottom: 0;
+}
+
+.plans-category-heading:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.plans-category-heading:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.plans-category-chevron {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.plans-category-chevron.open {
+  transform: rotate(45deg);
+}
+
+.plans-category-heading-label {
+  min-width: 0;
 }
 
 .plans-category-count {
@@ -2327,4 +2372,41 @@ nav .nav-links a:hover, nav .nav-links a.active {
 .log-day:hover { opacity: 1 !important; }
 @media (hover: none) {
   .log-day-add { opacity: 0.5; }
+}
+
+/* Settings tabs. Grouping only — the page's fields and behaviour are unchanged;
+   there was simply too much on one screen to scan. */
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 2rem;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.settings-tab {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  opacity: 0.65;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: background 140ms, opacity 140ms;
+}
+
+.settings-tab:hover {
+  opacity: 1;
+  background: var(--surface-hover);
+}
+
+.settings-tab.selected {
+  opacity: 1;
+  background: var(--accent-soft);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }

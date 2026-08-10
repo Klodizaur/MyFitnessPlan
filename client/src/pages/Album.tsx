@@ -7,6 +7,7 @@ import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PAR
 import { matchesTags, matchesQuery, useFilterMatchMode, FilterMatchToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
 import { fromAlbumRouteParam, toAlbumRouteParam, toPosixPath, isExternalVideo, isExternalAlbumKey, playlistIdFromAlbumKey } from '../lib/paths';
+import { useAiAvailable } from '../lib/useAiAvailable';
 import { Video } from '../types/video';
 
 const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -30,6 +31,8 @@ export default function Album() {
   const [matchMode, setMatchMode] = useFilterMatchMode();
   const labels = useMetaLabels();
   const { t } = useTranslation();
+  // Optional AI description clean-up for the whole album.
+  const aiAvailable = useAiAvailable();
 
   useEffect(() => {
     const key = fromAlbumRouteParam(albumId);
@@ -168,6 +171,58 @@ export default function Album() {
     }
   };
 
+  /**
+   * Clean every description in this album.
+   *
+   * Unlike the per-video button in the editor this writes straight to the
+   * library — a hundred descriptions can't be reviewed one at a time — so it
+   * asks first and says exactly how many videos it will rewrite. Progress is
+   * reported by the panel mounted at the app root, which survives navigating
+   * away. Tags are never touched.
+   */
+  const handleCleanDescriptions = async () => {
+    const withDescriptions = mainVideos.filter(v => (v.description || '').trim());
+    if (withDescriptions.length === 0) {
+      window.alert(t('ai.cleanup_none'));
+      return;
+    }
+    // Translating is a bigger commitment than tidying — it replaces the
+    // creator's own words rather than trimming around them — so the warning
+    // says which one is about to happen. Read at click time rather than on
+    // page load, since it only matters here.
+    let language = '';
+    try {
+      const cfg = await (await fetch('/api/ai/settings')).json();
+      language = cfg?.descriptionLanguage || '';
+    } catch {
+      // Settings unreadable; warn about the tidy-only case, which is the default.
+    }
+
+    const message = language
+      ? t('ai.cleanup_confirm_translate', {
+          count: withDescriptions.length,
+          language: language === 'pl' ? 'Polski' : 'English',
+        })
+      : t('ai.cleanup_confirm', { count: withDescriptions.length });
+
+    if (!window.confirm(message)) return;
+
+    try {
+      const res = await fetch('/api/ai/clean-descriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoIds: withDescriptions.map(v => v.id),
+          label: isExternalAlbum ? playlistTitle : albumKey === '.' ? 'Root' : albumKey,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) window.alert(data?.error || t('ai.error_generic'));
+    } catch {
+      window.alert(t('ai.error_unreachable'));
+    }
+  };
+
   return (
     <div className="page-root">
       {/* Header */}
@@ -186,8 +241,10 @@ export default function Album() {
               {mainVideos.length} videos in this collection
               {isExternalAlbum && ` — ${t('library.external_album_hint')}`}
             </div>
-            {isExternalAlbum && (
+            {(isExternalAlbum || aiAvailable) && (
               <div className="album-actions">
+                {isExternalAlbum && (
+                <>
                 <button
                   type="button"
                   className="album-action-btn"
@@ -204,6 +261,19 @@ export default function Album() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" /></svg>
                   {t('library.delete_playlist')}
                 </button>
+                </>
+                )}
+                {aiAvailable && (
+                  <button
+                    type="button"
+                    className="album-action-btn"
+                    onClick={handleCleanDescriptions}
+                    title={t('ai.cleanup_album_hint')}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16" /><path d="M4 12h10" /><path d="M4 18h6" /><path d="m17 15 2 2 4-4" /></svg>
+                    {t('ai.cleanup_album')}
+                  </button>
+                )}
               </div>
             )}
           </div>

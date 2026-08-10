@@ -11,6 +11,7 @@ import planRoutes from './routes/plan.js';
 import scheduleRoutes from './routes/schedule.js';
 import profileRoutes from './routes/profile.js';
 import externalRoutes from './routes/external.js';
+import aiRoutes from './routes/ai.js';
 
 const fastify = Fastify({ logger: true });
 
@@ -223,6 +224,7 @@ fastify.register(planRoutes, { prefix: '/api/plan' });
 fastify.register(scheduleRoutes, { prefix: '/api/schedule' });
 fastify.register(profileRoutes, { prefix: '/api/profile' });
 fastify.register(externalRoutes, { prefix: '/api/external' });
+fastify.register(aiRoutes, { prefix: '/api/ai' });
 
 // App version. The packaged desktop app injects MYFITNESSPLAN_VERSION; otherwise
 // we fall back to this package's version. Exposed so the UI shows it automatically.
@@ -241,8 +243,12 @@ fastify.get('/api/version', async (_request, reply) => reply.send({ version: app
 fastify.get('/api/settings', async (request, reply) => {
   const settings = db.prepare('SELECT * FROM settings').all();
   const settingsObj = settings.reduce((acc: any, curr: any) => {
-    acc[curr.key] = (curr.key === 'workout_pattern' || curr.key === 'exclude_paths') 
-      ? JSON.parse(curr.value) 
+    // `ai_*` rows hold the optional AI integration's config, including an API
+    // key. They are served by /api/ai/settings, which never returns the key —
+    // this endpoint must not leak it through the generic dump.
+    if (curr.key.startsWith('ai_')) return acc;
+    acc[curr.key] = (curr.key === 'workout_pattern' || curr.key === 'exclude_paths')
+      ? JSON.parse(curr.value)
       : curr.value;
     return acc;
   }, {});

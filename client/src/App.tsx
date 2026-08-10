@@ -10,6 +10,7 @@ import Plans from './pages/Plans';
 import Library from './pages/Library';
 import Album from './pages/Album';
 import LanguageSwitcher from './components/LanguageSwitcher';
+import AiCleanupProgress from './components/ai/AiCleanupProgress';
 
 function App() {
   const { t } = useTranslation();
@@ -74,6 +75,10 @@ function App() {
           <Route path="/player/:videoId" element={<Player />} />
         </Routes>
       </main>
+
+      {/* Renders nothing unless a bulk description clean-up is running, so a
+          run started on an album keeps reporting across navigation. */}
+      <AiCleanupProgress />
     </div>
   );
 }

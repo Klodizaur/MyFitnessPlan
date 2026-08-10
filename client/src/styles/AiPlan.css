@@ -1,0 +1,303 @@
+/*
+ * Styles for the optional AI plan builder.
+ *
+ * Everything here is namespaced `ai-`; the modal otherwise reuses the existing
+ * `wb-` workout-builder classes so it looks like the rest of the app. Imported
+ * only by the AI components, so removing the feature removes the stylesheet.
+ */
+
+.ai-modal {
+  max-width: 720px;
+}
+
+.ai-textarea {
+  resize: vertical;
+  min-height: 92px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.ai-number-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+/* Session-length slider. Uses the builder's own input colours so it reads as
+   part of the same form rather than a browser default. */
+
+.ai-slider-value {
+  float: right;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.ai-slider {
+  width: 100%;
+  margin: 4px 0 2px;
+  accent-color: var(--wb-accent, var(--accent-color));
+  cursor: pointer;
+}
+
+/* Positioned on the same linear scale as the range input, so a "60" mark
+   sits under the thumb when the value is 60 — not evenly spaced by count. */
+.ai-slider-ticks {
+  position: relative;
+  height: 1.6rem;
+  margin-bottom: 6px;
+}
+
+.ai-slider-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 0.74rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ai-slider-tick:first-child {
+  transform: translateX(0);
+}
+
+.ai-slider-tick:last-child {
+  transform: translateX(-100%);
+}
+
+.ai-slider-tick:hover {
+  opacity: 1;
+}
+
+.ai-slider-tick.selected {
+  opacity: 1;
+  border-color: var(--wb-selected-border, var(--accent-color));
+  background: var(--wb-selected, var(--accent-soft));
+}
+
+.ai-hint {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+
+.ai-waiting {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.ai-error {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  font-size: 0.88rem;
+}
+
+/* Album chips cycle neutral → include → exclude, so the two states need to be
+   distinguishable at a glance and not only by the ✓/✕ glyph. */
+.ai-album-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-album-include {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+  color: var(--accent-color);
+}
+
+.ai-album-exclude {
+  border-color: rgba(220, 38, 38, 0.5);
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  text-decoration: line-through;
+}
+
+.ai-album-count {
+  font-size: 0.72rem;
+  opacity: 0.6;
+}
+
+/* Bulk clean-up progress — fixed to the corner, above page content but below
+   the workout builder's overlay so it can never cover a modal's controls. */
+
+.ai-job-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 900;
+  width: 280px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  background: var(--card-bg, var(--surface-hover));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  color: var(--text-primary);
+  backdrop-filter: blur(8px);
+}
+
+.ai-job-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ai-job-title {
+  font-size: 0.9rem;
+}
+
+.ai-job-head-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.ai-job-head-actions button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.ai-job-label {
+  margin: 6px 0 10px;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-job-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--glass-border);
+  overflow: hidden;
+}
+
+.ai-job-bar-fill {
+  height: 100%;
+  background: var(--accent-color);
+  transition: width 300ms ease;
+}
+
+.ai-job-bar-fill.done {
+  opacity: 0.55;
+}
+
+.ai-job-count {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+}
+
+.ai-job-note {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.ai-job-error {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: #dc2626;
+}
+
+.ai-job-stop {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+/* Minimized state: a small pill that stays out of the way. */
+.ai-job-pill {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 900;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--card-bg, var(--surface-hover));
+  color: var(--text-primary);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+/* Settings panel
+ *
+ * The panel reuses the workout builder's `wb-input` / `wb-chip` / `wb-label`
+ * so it matches the rest of the app, but those rules read `--wb-*` variables
+ * that index.css only declares on `.wb-modal`. Outside the modal they resolve
+ * to nothing and the fields render with no border or background. Mapping them
+ * onto the global theme variables here fixes that for every theme at once,
+ * without touching the builder's own styles. */
+.ai-settings {
+  --wb-text: var(--text-primary);
+  --wb-text-dim: var(--text-secondary);
+  --wb-border: var(--glass-border);
+  --wb-input-bg: var(--surface-hover);
+  --wb-selected: var(--accent-soft);
+  --wb-selected-border: var(--accent-color);
+  --wb-accent: var(--accent-color);
+}
+
+.ai-settings-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ai-settings-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Reads as a link, so it doesn't compete with the real buttons in the panel. */
+.ai-link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-color);
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+
+.ai-key-state {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.ai-status-ok {
+  color: var(--accent-color);
+}
+
+.ai-status-bad {
+  color: #dc2626;
+}
+
+.ai-required {
+  color: #dc2626;
+  font-weight: 600;
+}
