@@ -229,7 +229,23 @@
   font-size: 0.82rem;
 }
 
-/* Settings panel */
+/* Settings panel
+ *
+ * The panel reuses the workout builder's `wb-input` / `wb-chip` / `wb-label`
+ * so it matches the rest of the app, but those rules read `--wb-*` variables
+ * that index.css only declares on `.wb-modal`. Outside the modal they resolve
+ * to nothing and the fields render with no border or background. Mapping them
+ * onto the global theme variables here fixes that for every theme at once,
+ * without touching the builder's own styles. */
+.ai-settings {
+  --wb-text: var(--text-primary);
+  --wb-text-dim: var(--text-secondary);
+  --wb-border: var(--glass-border);
+  --wb-input-bg: var(--surface-hover);
+  --wb-selected: var(--accent-soft);
+  --wb-selected-border: var(--accent-color);
+  --wb-accent: var(--accent-color);
+}
 
 .ai-settings-grid {
   display: grid;

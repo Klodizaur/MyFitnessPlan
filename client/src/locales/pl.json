@@ -255,7 +255,11 @@
     "failed_save": "Błąd: Nie udało się zapisać ustawień.",
     "failed_connect": "Błąd: Nie udało się połączyć z serwerem.",
     "appearance_msg": "Wybierz swój ulubiony motyw.",
-    "scan_incomplete": "Nie udało się odczytać niektórych folderów, więc nic nie zostało usunięte z biblioteki. Sprawdź, czy folder istnieje i jest dostępny, a potem zeskanuj ponownie."
+    "scan_incomplete": "Nie udało się odczytać niektórych folderów, więc nic nie zostało usunięte z biblioteki. Sprawdź, czy folder istnieje i jest dostępny, a potem zeskanuj ponownie.",
+    "tab_workouts": "Treningi",
+    "tab_appearance": "Wygląd",
+    "tab_ai": "AI",
+    "tab_about": "O aplikacji"
   },
   "about": {
     "version": "Wersja",

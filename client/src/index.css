@@ -2328,3 +2328,40 @@ nav .nav-links a:hover, nav .nav-links a.active {
 @media (hover: none) {
   .log-day-add { opacity: 0.5; }
 }
+
+/* Settings tabs. Grouping only — the page's fields and behaviour are unchanged;
+   there was simply too much on one screen to scan. */
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 2rem;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.settings-tab {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  opacity: 0.65;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: background 140ms, opacity 140ms;
+}
+
+.settings-tab:hover {
+  opacity: 1;
+  background: var(--surface-hover);
+}
+
+.settings-tab.selected {
+  opacity: 1;
+  background: var(--accent-soft);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}

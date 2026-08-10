@@ -13,6 +13,15 @@ const THEMES = [
   { id: 'watermelon', primary: '#d81b45', bg: '#e8f8ea' },
 ];
 
+/**
+ * Settings tabs, in the order they're shown.
+ *
+ * Workouts leads because it holds the things a new install has to set before
+ * anything works — where the videos are, and the training pattern.
+ */
+const SETTINGS_TABS = ['workouts', 'appearance', 'ai', 'about'] as const;
+type SettingsTab = typeof SETTINGS_TABS[number];
+
 type ScanProgress = {
   active: boolean;
   phase: 'idle' | 'discovering' | 'processing' | 'done';
@@ -29,6 +38,7 @@ export default function Settings() {
   const [newExclude, setNewExclude] = useState('');
   const [theme, setTheme] = useState('midnight');
   const [calendarView, setCalendarView] = useState('list');
+  const [tab, setTab] = useState<SettingsTab>('workouts');
   const [status, setStatus] = useState('');
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
@@ -161,7 +171,24 @@ export default function Settings() {
     <>
     <div className="glass-card" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1>{t('nav.settings')}</h1>
-      
+
+      {/* Grouping only — every field keeps the behaviour it had, including the
+          shared Save button, which still writes the pattern, exclusions, theme
+          and calendar layout together regardless of which tab is open. */}
+      <div className="settings-tabs">
+        {SETTINGS_TABS.map(id => (
+          <button
+            key={id}
+            type="button"
+            className={`settings-tab${tab === id ? ' selected' : ''}`}
+            onClick={() => setTab(id)}
+          >
+            {t(`settings.tab_${id}`)}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'appearance' && (<>
       <div style={{ marginBottom: '2rem' }}>
         <h2>{t('settings.appearance')}</h2>
         <p style={{ marginBottom: '1rem' }}>{t('settings.appearance_msg')}</p>
@@ -241,6 +268,9 @@ export default function Settings() {
         </div>
       </div>
 
+      </>)}
+
+      {tab === 'workouts' && (<>
       <div style={{ marginBottom: '2rem' }}>
         <h2>{t('settings.video_library_path')}</h2>
         <p style={{ marginBottom: '1rem' }}>{t('settings.video_library_path_msg')}</p>
@@ -407,13 +437,18 @@ export default function Settings() {
         )}
       </div>
 
+      </>)}
+
       {/* Optional AI integration. Saves through its own endpoint, so it is
           unaffected by (and does not affect) the Save button below. */}
-      <AiSettingsSection />
+      {tab === 'ai' && <AiSettingsSection />}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-        <button className="btn" onClick={handleSaveSettings} style={{ width: '100%' }}>{t('settings.save_settings')}</button>
-      </div>
+      {/* Only on the tabs that hold fields this button writes. */}
+      {(tab === 'workouts' || tab === 'appearance') && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+          <button className="btn" onClick={handleSaveSettings} style={{ width: '100%' }}>{t('settings.save_settings')}</button>
+        </div>
+      )}
 
       {status && (
         <div style={{ marginTop: '2rem', padding: '1rem', background: 'var(--surface-hover)', borderRadius: '8px', color: 'var(--accent-color)', textAlign: 'center' }}>
@@ -422,6 +457,7 @@ export default function Settings() {
       )}
     </div>
 
+    {tab === 'about' && (
     <div className="about-card" style={{ maxWidth: '800px', margin: '2rem auto' }}>
       <h1>MyFitnessPlan</h1>
 
@@ -494,6 +530,7 @@ export default function Settings() {
         </p>
       </div>
     </div>
+    )}
     </>
   );
 }

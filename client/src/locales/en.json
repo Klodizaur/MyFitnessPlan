@@ -200,7 +200,11 @@
     "failed_save": "Error: Failed to save settings.",
     "failed_connect": "Error: Failed to connect to server.",
     "appearance_msg": "Choose your favorite theme.",
-    "scan_incomplete": "Some folders couldn't be read, so nothing was removed from your library. Check that the folder exists and is accessible, then scan again."
+    "scan_incomplete": "Some folders couldn't be read, so nothing was removed from your library. Check that the folder exists and is accessible, then scan again.",
+    "tab_workouts": "Workouts",
+    "tab_appearance": "Appearance",
+    "tab_ai": "AI",
+    "tab_about": "About"
   },
   "about": {
     "version": "Version",

@@ -181,7 +181,7 @@ export default function AiSettingsSection() {
   };
 
   return (
-    <div style={{ marginBottom: '2rem' }}>
+    <div className="ai-settings" style={{ marginBottom: '2rem' }}>
       <h2>{t('ai.settings_title')}</h2>
       <p style={{ marginBottom: '1rem' }}>{t('ai.settings_msg')}</p>
 
