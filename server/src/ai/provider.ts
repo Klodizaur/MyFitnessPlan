@@ -19,7 +19,7 @@ export class AiError extends Error {
  * Generous: a plan for a large library is a big reply, and reasoning models
  * spend part of the same budget thinking before they answer.
  */
-const MAX_TOKENS = 16000;
+const MAX_COMPLETION_TOKENS = 16000;
 
 /** Long enough for a slow local model, short enough to fail rather than hang. */
 const TIMEOUT_MS = 180_000;
@@ -162,7 +162,7 @@ function anthropicRequest(settings: AiSettings, system: string, user: string) {
     // user typed, the portable request is the minimal one.
     body: {
       model: settings.model,
-      max_tokens: MAX_TOKENS,
+      max_completion_tokens: MAX_COMPLETION_TOKENS,
       system,
       messages: [{ role: 'user', content: user }],
     },
@@ -181,7 +181,7 @@ function openAiRequest(settings: AiSettings, system: string, user: string) {
     headers,
     body: {
       model: settings.model,
-      max_tokens: MAX_TOKENS,
+      max_completion_tokens: MAX_COMPLETION_TOKENS,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
