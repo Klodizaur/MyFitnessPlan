@@ -160,9 +160,10 @@ function anthropicRequest(settings: AiSettings, system: string, user: string) {
     // thinking budgets are rejected outright by the current models, and
     // `effort` errors on older ones — since the model name is whatever the
     // user typed, the portable request is the minimal one.
+    // Anthropic requires `max_tokens` (not the OpenAI-style completion field).
     body: {
       model: settings.model,
-      max_completion_tokens: MAX_COMPLETION_TOKENS,
+      max_tokens: MAX_COMPLETION_TOKENS,
       system,
       messages: [{ role: 'user', content: user }],
     },
@@ -176,18 +177,37 @@ function openAiRequest(settings: AiSettings, system: string, user: string) {
   // header upsets some of them, so omit it entirely.
   if (settings.apiKey) headers.authorization = `Bearer ${settings.apiKey}`;
 
+  // Official OpenAI (and Azure OpenAI) want `max_completion_tokens` —
+  // newer/reasoning models reject the older `max_tokens` name. Local
+  // runtimes and most other OpenAI-compatible gateways still speak `max_tokens`.
+  const body: Record<string, unknown> = {
+    model: settings.model,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  };
+  if (usesMaxCompletionTokens(settings.baseUrl)) {
+    body.max_completion_tokens = MAX_COMPLETION_TOKENS;
+  } else {
+    body.max_tokens = MAX_COMPLETION_TOKENS;
+  }
+
   return {
     url: `${settings.baseUrl}/v1/chat/completions`,
     headers,
-    body: {
-      model: settings.model,
-      max_completion_tokens: MAX_COMPLETION_TOKENS,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-    },
+    body,
   };
+}
+
+/** Hosts that reject `max_tokens` in favour of `max_completion_tokens`. */
+function usesMaxCompletionTokens(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname.toLowerCase();
+    return host === 'api.openai.com' || host.endsWith('.openai.azure.com');
+  } catch {
+    return false;
+  }
 }
 
 function extractAnthropicText(payload: any): string {

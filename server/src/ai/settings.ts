@@ -23,11 +23,12 @@ export const AI_SETTINGS_PREFIX = 'ai_';
 export type AiProvider = 'anthropic' | 'openai';
 
 /**
- * Language descriptions are written in.
+ * Preferred language for AI-written text.
  *
- * Empty means keep whatever the original used, which is the default: cleaning
- * up clutter shouldn't change what language a creator wrote in. A value here
- * turns clean-up into a translation as well.
+ * Empty means match the source: plan name/summary follow the user's prompt
+ * language, and description clean-up keeps whatever each video already used.
+ * A value here forces plan text into that language and turns clean-up into a
+ * translation as well.
  */
 export type DescriptionLanguage = '' | 'en' | 'pl';
 

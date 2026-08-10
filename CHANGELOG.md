@@ -5,6 +5,30 @@ All notable changes to MyFitnessPlan are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-08-10
+
+### Fixed
+
+- AI session-length slider marks now line up with the thumb (e.g. 60 sits at 60).
+- AI provider token limits: Anthropic uses `max_tokens`; official OpenAI/Azure use
+  `max_completion_tokens`; other OpenAI-compatible endpoints keep `max_tokens`.
+- OpenAI-compatible AI settings require an API base URL / service preset so models
+  can load correctly.
+- AI plan names and summaries follow the AI language setting instead of drifting
+  to the catalogue language.
+
+### Changed
+
+- Removed "training days per week" from the AI plan builder. Session count now
+  follows your workout schedule pattern in Settings.
+
+### Added
+
+- Plan categories on the Plans page can be collapsed and expanded; the choice is
+  remembered.
+- AI plan drafts suggest a short plan name (editable before save) instead of
+  always using "AI plan".
+
 ## [1.4.0] - 2026-08-01
 
 ### ⚠️ Upgrade notes
@@ -303,6 +327,7 @@ built around your own video files.
   and **English / Polish** UI.
 - Runs entirely on your machine — no cloud account and no subscription.
 
+[1.4.1]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v1.4.1
 [1.4.0]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Klodizaur/MyFitnessPlan/releases/tag/v1.2.0

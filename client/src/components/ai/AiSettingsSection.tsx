@@ -124,8 +124,10 @@ export default function AiSettingsSection() {
     // The list belongs to the old endpoint; it is reloaded after the next save.
     setModels([]);
     setTypingModel(false);
-    if (baseUrl === config.baseUrl) {
-      setBaseUrl(next === 'anthropic' ? 'https://api.anthropic.com' : '');
+    if (baseUrl === config.baseUrl || !baseUrl.trim()) {
+      // OpenAI-compatible needs an explicit endpoint — default to OpenAI so a
+      // preset is selected and model listing has somewhere to call.
+      setBaseUrl(next === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com');
     }
     if (model === config.model) {
       setModel(next === 'anthropic' ? 'claude-opus-5' : '');
@@ -134,6 +136,13 @@ export default function AiSettingsSection() {
 
   const save = async (patch: Record<string, unknown> = {}) => {
     setStatus('');
+    // Without a base URL the OpenAI-compatible path can't list models or send
+    // requests to the right host — treat it as required, not optional.
+    if (provider === 'openai' && !baseUrl.trim()) {
+      setStatusOk(false);
+      setStatus(t('ai.base_url_required'));
+      return null;
+    }
     const res = await fetch('/api/ai/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -159,7 +168,8 @@ export default function AiSettingsSection() {
   };
 
   const clearKey = async () => {
-    await save({ apiKey: null });
+    const data = await save({ apiKey: null });
+    if (!data) return;
     setStatusOk(true);
     setStatus(t('ai.key_cleared'));
   };
@@ -167,7 +177,11 @@ export default function AiSettingsSection() {
   const test = async () => {
     setTesting(true);
     setStatus('');
-    await save();
+    const saved = await save();
+    if (!saved) {
+      setTesting(false);
+      return;
+    }
     try {
       const res = await fetch('/api/ai/test', { method: 'POST' });
       const data = await res.json();
@@ -228,7 +242,10 @@ export default function AiSettingsSection() {
           </div>
         ) : (
           <div>
-            <label className="wb-label">{t('ai.base_url_label')}</label>
+            <label className="wb-label">
+              {t('ai.base_url_label')}
+              <span className="ai-required" aria-hidden="true"> *</span>
+            </label>
             <div className="wb-chip-row" style={{ marginBottom: 8 }}>
               {OPENAI_PRESETS.map(preset => (
                 <button
@@ -247,6 +264,8 @@ export default function AiSettingsSection() {
               onChange={e => setBaseUrl(e.target.value)}
               placeholder="https://api.openai.com"
               spellCheck={false}
+              required
+              aria-required="true"
             />
             <p className="ai-hint" style={{ marginTop: 6 }}>{t('ai.base_url_openai_hint')}</p>
           </div>
@@ -334,7 +353,10 @@ export default function AiSettingsSection() {
                   className="btn btn-secondary"
                   style={{ marginTop: 8 }}
                   onClick={() => save()}
-                  disabled={!apiKey && !config?.hasKey && !config?.isLocal}
+                  disabled={
+                    (provider === 'openai' && !baseUrl.trim()) ||
+                    (!apiKey && !config?.hasKey && !(provider === 'openai' && isLikelyLocalUrl(baseUrl)))
+                  }
                 >
                   {t('ai.model_load')}
                 </button>
@@ -371,8 +393,18 @@ export default function AiSettingsSection() {
       </div>
 
       <div className="ai-settings-row">
-        <button className="btn" onClick={() => save()}>{t('ai.save')}</button>
-        <button className="btn btn-secondary" onClick={test} disabled={testing}>
+        <button
+          className="btn"
+          onClick={() => save()}
+          disabled={provider === 'openai' && !baseUrl.trim()}
+        >
+          {t('ai.save')}
+        </button>
+        <button
+          className="btn btn-secondary"
+          onClick={test}
+          disabled={testing || (provider === 'openai' && !baseUrl.trim())}
+        >
           {testing ? t('ai.testing') : t('ai.test')}
         </button>
         {config?.hasKey && (
@@ -392,4 +424,14 @@ export default function AiSettingsSection() {
       <p className="ai-hint" style={{ marginTop: 12 }}>{t('ai.privacy_note')}</p>
     </div>
   );
+}
+
+/** Same idea as the server's local-URL check — used only to enable model load. */
+function isLikelyLocalUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  } catch {
+    return false;
+  }
 }

@@ -8,6 +8,7 @@
  * schema.
  */
 import { FastifyInstance } from 'fastify';
+import db from '../db.js';
 import { AiError, callModel, listModels } from '../ai/provider.js';
 import { generatePlan } from '../ai/planBuilder.js';
 import {
@@ -200,7 +201,10 @@ export default async function (fastify: FastifyInstance) {
       const plan = await generatePlan({
         description: typeof body?.description === 'string' ? body.description : '',
         weeks: Number(body?.weeks) || 1,
-        daysPerWeek: Number(body?.daysPerWeek) || 3,
+        // Calendar rest comes from Settings → workout pattern; empty AI day
+        // slots are discarded on save. Training-day count therefore follows
+        // that pattern rather than a separate control in the builder.
+        daysPerWeek: trainingDaysFromWorkoutPattern(),
         maxMinutes: Number(body?.maxMinutes) || 0,
         equipment: whitelist(body?.equipment, VALID_EQUIPMENT),
         trainingTypes: whitelist(body?.trainingTypes, VALID_TRAINING_TYPES),
@@ -227,4 +231,25 @@ function sendAiError(reply: any, err: unknown) {
   }
   reply.log.error(err);
   return reply.code(500).send({ error: 'Unexpected error while contacting the model.', code: 'unknown' });
+}
+
+/**
+ * How many training sessions to put in each drafted week.
+ *
+ * Taken from the user's workout pattern so the AI densifies the same number of
+ * workouts that the calendar will actually place. Falls back to 3 when the
+ * pattern is missing or empty.
+ */
+function trainingDaysFromWorkoutPattern(): number {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'workout_pattern'").get() as
+    | { value?: string }
+    | undefined;
+  try {
+    const pattern = JSON.parse(row?.value || '[]');
+    if (!Array.isArray(pattern) || pattern.length === 0) return 3;
+    const workouts = pattern.filter(day => Boolean(day)).length;
+    return Math.min(7, Math.max(1, workouts || 3));
+  } catch {
+    return 3;
+  }
 }

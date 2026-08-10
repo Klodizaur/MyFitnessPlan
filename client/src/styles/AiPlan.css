@@ -39,15 +39,19 @@
   cursor: pointer;
 }
 
+/* Positioned on the same linear scale as the range input, so a "60" mark
+   sits under the thumb when the value is 60 — not evenly spaced by count. */
 .ai-slider-ticks {
-  display: flex;
-  justify-content: space-between;
-  gap: 4px;
+  position: relative;
+  height: 1.6rem;
   margin-bottom: 6px;
 }
 
 .ai-slider-tick {
-  padding: 2px 8px;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  padding: 2px 6px;
   border-radius: 6px;
   border: 1px solid transparent;
   background: transparent;
@@ -55,6 +59,15 @@
   opacity: 0.6;
   font-size: 0.74rem;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.ai-slider-tick:first-child {
+  transform: translateX(0);
+}
+
+.ai-slider-tick:last-child {
+  transform: translateX(-100%);
 }
 
 .ai-slider-tick:hover {
@@ -282,4 +295,9 @@
 
 .ai-status-bad {
   color: #dc2626;
+}
+
+.ai-required {
+  color: #dc2626;
+  font-weight: 600;
 }

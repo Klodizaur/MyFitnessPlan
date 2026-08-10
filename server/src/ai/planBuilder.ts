@@ -8,6 +8,7 @@
  */
 import { callModel, AiError } from './provider.js';
 import { Candidate, CandidateSet, CandidateFilter, selectCandidates } from './candidates.js';
+import { DESCRIPTION_LANGUAGE_NAMES, getAiSettings } from './settings.js';
 
 /** One day of a drafted plan. An empty list is a rest day. */
 export interface DraftDay {
@@ -19,6 +20,8 @@ export interface DraftWeek {
 }
 
 export interface DraftPlan {
+  /** Short title for the plan, shown in the builder and used on save. */
+  name: string;
   summary: string;
   weeks: DraftWeek[];
   /** Ids the model returned that aren't in the library, after validation. */
@@ -53,7 +56,13 @@ const MAX_WEEKS = 12;
  * does not assess anyone, and it treats a stated limitation as a hard rule
  * rather than something to reason around.
  */
-const SYSTEM_PROMPT = `You are an experienced personal trainer building a home workout plan for one person, using only a fixed catalogue of workout videos they already own.
+/**
+ * Coaching brief. Language rules are filled in per call from AI settings so
+ * name/summary follow the user's preferred language rather than drifting to
+ * whatever language dominates the video catalogue.
+ */
+function buildSystemPrompt(): string {
+  return `You are an experienced personal trainer building a home workout plan for one person, using only a fixed catalogue of workout videos they already own.
 
 You arrange the training they have. You do not assess anyone's health, diagnose anything, or work around an injury beyond respecting what the person tells you about it.
 
@@ -69,10 +78,11 @@ BUILDING A DAY
 - A long video (roughly 30 minutes or more) is a complete session on its own — it almost always contains its own warm-up and cool-down. Never put two long videos on the same day, and do not bolt extra work onto one. After a hard long session you may add a short stretch or cool-down, nothing more.
 
 BUILDING A WEEK
-- Respect the requested number of training days. Every other day is a rest day and must be left empty. Rest is part of the plan, not a gap in it.
-- Hard work needs recovery. Do not schedule high-intensity sessions (HIIT, hard cardio, heavy strength) on consecutive days, and use at most two or three in a week.
-- Do not train the same body part hard on back-to-back days. Alternate the emphasis.
-- Use the breadth of the catalogue. Do not repeat a video within the same week unless the catalogue is too small to avoid it, and never on consecutive days.
+- Respect the requested number of training days. Put those sessions in consecutive day slots from the start of the week, and leave every later slot empty.
+- Empty slots are rest in the training sequence. The person's calendar pattern decides which weekdays are rest days, so do not try to place rests on specific calendar days — just leave unused slots empty.
+- Hard work needs recovery. Do not schedule high-intensity sessions (HIIT, hard cardio, heavy strength) on consecutive training days, and use at most two or three in a week.
+- Do not train the same body part hard on back-to-back training days. Alternate the emphasis.
+- Use the breadth of the catalogue. Do not repeat a video within the same week unless the catalogue is too small to avoid it, and never on consecutive training days.
 - In any week with four or more training days, make at least one of them deliberately easy — mobility, stretching, or low intensity.
 
 ACROSS WEEKS
@@ -85,8 +95,32 @@ CONSTRAINTS
 - Style, body-part and intensity notes are preferences: follow them where the catalogue allows, use judgement where it does not.
 - Anything the person states as a limitation — no jumping, quiet for neighbours, a sore knee, period-friendly — is a hard rule. If the catalogue cannot honour it, leave that day lighter or empty rather than breaking it.
 
+LANGUAGE
+- ${planLanguageRule()}
+
+NAMING
+- Give the plan a short, specific title (roughly 2–6 words) that reflects the goal or focus — not a generic label like "Workout Plan" or "AI Plan".
+
 Reply with JSON only, no prose and no code fences, in exactly this shape:
-{"summary":"one or two sentences on the structure you chose","weeks":[{"days":[{"videoIds":["id1","id2"]},{"videoIds":[]}]}]}`;
+{"name":"short plan title","summary":"one or two sentences on the structure you chose","weeks":[{"days":[{"videoIds":["id1","id2"]},{"videoIds":[]}]}]}`;
+}
+
+/** Which language the model must use for name and summary. */
+function planLanguageRule(): string {
+  const target = getAiSettings().descriptionLanguage;
+  if (target) {
+    return (
+      `Write the "name" and "summary" fields in ${DESCRIPTION_LANGUAGE_NAMES[target]}. ` +
+      'Do not use any other language for those fields, even if the catalogue titles ' +
+      'or the person\'s description are written differently.'
+    );
+  }
+  return (
+    'Write the "name" and "summary" fields in the same language the person used in ' +
+    'their description. If they wrote nothing, use English. Catalogue video titles ' +
+    'may be in another language — that must not change the language of name and summary.'
+  );
+}
 
 export async function generatePlan(request: GenerateRequest): Promise<DraftPlan> {
   const weeks = clamp(Math.round(request.weeks) || 1, 1, MAX_WEEKS);
@@ -101,7 +135,7 @@ export async function generatePlan(request: GenerateRequest): Promise<DraftPlan>
   }
 
   const raw = await callModel({
-    system: SYSTEM_PROMPT,
+    system: buildSystemPrompt(),
     user: buildUserPrompt(request, weeks, daysPerWeek, candidateSet),
   });
 
@@ -117,6 +151,7 @@ export async function generatePlan(request: GenerateRequest): Promise<DraftPlan>
   }
 
   return {
+    name: sanitizePlanName(parsed?.name),
     summary: typeof parsed?.summary === 'string' ? parsed.summary.trim().slice(0, 500) : '',
     weeks: draftWeeks,
     droppedIds,
@@ -133,7 +168,11 @@ function buildUserPrompt(
 ): string {
   const lines: string[] = [];
 
-  lines.push(`Plan length: ${weeks} week(s), ${daysPerWeek} training day(s) per week.`);
+  lines.push(
+    `Plan length: ${weeks} week(s), ${daysPerWeek} training day(s) per week ` +
+    `(from the user's workout schedule pattern). ` +
+    `Fill that many consecutive day slots in each week; leave the rest empty.`
+  );
   if (request.maxMinutes > 0) {
     // Worth stating: the catalogue was already filtered to fit, so the model
     // should be budgeting a day's total rather than re-checking each video.
@@ -243,6 +282,14 @@ function validateWeeks(
   }
 
   return { draftWeeks, droppedIds: Array.from(dropped) };
+}
+
+/** Keep a model-suggested title short and safe to drop into the builder field. */
+function sanitizePlanName(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const cleaned = value.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+  return cleaned.slice(0, 80);
 }
 
 function clamp(value: number, min: number, max: number): number {

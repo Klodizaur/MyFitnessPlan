@@ -43,6 +43,27 @@ type PlanCategory = typeof PLAN_CATEGORIES[number];
 const isPresetCategory = (value: string): boolean =>
   (PLAN_CATEGORIES as readonly string[]).includes(value);
 
+/** Stable key for the uncategorized group in collapse state / localStorage. */
+const UNCATEGORIZED_KEY = '__uncategorized';
+const COLLAPSED_CATEGORIES_KEY = 'plansCollapsedCategories';
+
+function readCollapsedCategories(): Set<string> {
+  try {
+    const raw = localStorage.getItem(COLLAPSED_CATEGORIES_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((key): key is string => typeof key === 'string'))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function categoryStorageKey(key: string): string {
+  return key || UNCATEGORIZED_KEY;
+}
+
 // Display-only: the extension is noise when browsing for videos to add.
 const stripVideoExt = (filename: string) => filename.replace(/\.[^/.]+$/, '');
 
@@ -52,6 +73,7 @@ export default function Plans() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [status, setStatus] = useState('');
   const [activationDate, setActivationDate] = useState(new Date().toISOString().split('T')[0]);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(readCollapsedCategories);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [builderStep, setBuilderStep] = useState(1);
@@ -225,7 +247,7 @@ export default function Plans() {
    */
   const handleAiGenerated = (result: AiPlanResult) => {
     setIsAiOpen(false);
-    setPlanName(t('ai.default_plan_name'));
+    setPlanName(result.name.trim() || t('ai.default_plan_name'));
     setBuilderStartDate(new Date().toISOString().split('T')[0]);
     setBuilderCategory('');
     setBuilderCustomCategory('');
@@ -614,6 +636,21 @@ export default function Plans() {
   // Only show headings once there is something to distinguish.
   const showCategoryHeadings = planGroups.some(g => g.key !== '');
 
+  const toggleCategoryCollapsed = (key: string) => {
+    const storageKey = categoryStorageKey(key);
+    setCollapsedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(storageKey)) next.delete(storageKey);
+      else next.add(storageKey);
+      try {
+        localStorage.setItem(COLLAPSED_CATEGORIES_KEY, JSON.stringify([...next]));
+      } catch {
+        /* localStorage unavailable — keep the choice in memory only */
+      }
+      return next;
+    });
+  };
+
   // Preset categories are translated; custom labels are shown exactly as typed.
   const categoryLabel = (key: string) =>
     isPresetCategory(key) ? t(`plans.category_${key}`) : key;
@@ -804,14 +841,25 @@ export default function Plans() {
         </div>
       )}
 
-      {planGroups.map(group => (
-        <section key={group.key || '__uncategorized'} className="plans-category">
+      {planGroups.map(group => {
+        const storageKey = categoryStorageKey(group.key);
+        const collapsed = showCategoryHeadings && collapsedCategories.has(storageKey);
+        const headingLabel = group.key ? categoryLabel(group.key) : t('plans.category_none');
+        return (
+        <section key={storageKey} className={`plans-category${collapsed ? ' collapsed' : ''}`}>
           {showCategoryHeadings && (
-            <h2 className="plans-category-heading">
-              {group.key ? categoryLabel(group.key) : t('plans.category_none')}
+            <button
+              type="button"
+              className="plans-category-heading"
+              aria-expanded={!collapsed}
+              onClick={() => toggleCategoryCollapsed(group.key)}
+            >
+              <span className={`plans-category-chevron${collapsed ? '' : ' open'}`} aria-hidden="true" />
+              <span className="plans-category-heading-label">{headingLabel}</span>
               <span className="plans-category-count">{group.plans.length}</span>
-            </h2>
+            </button>
           )}
+          {!collapsed && (
           <div className="plans-grid">
             {group.plans.map(plan => {
           const bgUrl = resolveBackgroundUrl(plan.background_image);
@@ -860,8 +908,10 @@ export default function Plans() {
           );
             })}
           </div>
+          )}
         </section>
-      ))}
+        );
+      })}
 
       {plans.length === 0 && (
         <div style={{ textAlign: 'center', padding: '4rem', color: '#888' }}>

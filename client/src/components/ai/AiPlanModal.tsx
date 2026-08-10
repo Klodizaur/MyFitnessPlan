@@ -22,6 +22,8 @@ import '../../styles/AiPlan.css';
 /** What the server drafted, translated into the builder's own shape. */
 export interface AiPlanResult {
   weeks: BuilderWeek[];
+  /** Model-suggested title; empty when the reply omitted one. */
+  name: string;
   summary: string;
   /** Ids the model returned that no longer exist; dropped before handoff. */
   droppedIds: string[];
@@ -70,7 +72,6 @@ export default function AiPlanModal({ open, onClose, onGenerated }: Props) {
 
   const [description, setDescription] = useState('');
   const [weeks, setWeeks] = useState(4);
-  const [daysPerWeek, setDaysPerWeek] = useState(3);
   const [maxMinutes, setMaxMinutes] = useState(45);
   const [equipment, setEquipment] = useState<string[]>([]);
   const [trainingTypes, setTrainingTypes] = useState<string[]>([]);
@@ -134,7 +135,6 @@ export default function AiPlanModal({ open, onClose, onGenerated }: Props) {
         body: JSON.stringify({
           description,
           weeks,
-          daysPerWeek,
           maxMinutes,
           equipment,
           trainingTypes,
@@ -185,29 +185,17 @@ export default function AiPlanModal({ open, onClose, onGenerated }: Props) {
             />
           </div>
 
-          <div className="ai-number-row">
-            <div className="wb-field">
-              <label className="wb-label">{t('ai.weeks_label')}</label>
-              <input
-                className="wb-input"
-                type="number"
-                min={1}
-                max={12}
-                value={weeks}
-                onChange={e => setWeeks(clamp(Number(e.target.value), 1, 12))}
-              />
-            </div>
-            <div className="wb-field">
-              <label className="wb-label">{t('ai.days_label')}</label>
-              <input
-                className="wb-input"
-                type="number"
-                min={1}
-                max={7}
-                value={daysPerWeek}
-                onChange={e => setDaysPerWeek(clamp(Number(e.target.value), 1, 7))}
-              />
-            </div>
+          <div className="wb-field">
+            <label className="wb-label">{t('ai.weeks_label')}</label>
+            <input
+              className="wb-input"
+              type="number"
+              min={1}
+              max={12}
+              value={weeks}
+              onChange={e => setWeeks(clamp(Number(e.target.value), 1, 12))}
+            />
+            <p className="ai-hint">{t('ai.weeks_hint')}</p>
           </div>
 
           {/* A slider rather than a number box: session length is a feel
@@ -235,6 +223,9 @@ export default function AiPlanModal({ open, onClose, onGenerated }: Props) {
                   type="button"
                   key={mark}
                   className={`ai-slider-tick${maxMinutes === mark ? ' selected' : ''}`}
+                  style={{
+                    left: `${((mark - MIN_SESSION) / (MAX_SESSION - MIN_SESSION)) * 100}%`,
+                  }}
                   onClick={() => setMaxMinutes(mark)}
                 >
                   {mark}
@@ -380,6 +371,7 @@ function toBuilderWeeks(data: any, videos: Video[]): AiPlanResult {
 
   return {
     weeks: weeks.length > 0 ? weeks : [createWeek(1)],
+    name: typeof data?.name === 'string' ? data.name.trim() : '',
     summary: typeof data?.summary === 'string' ? data.summary : '',
     droppedIds: Array.from(dropped),
     candidateCount: Number(data?.candidateCount) || 0,
