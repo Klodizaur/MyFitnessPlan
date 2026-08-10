@@ -112,34 +112,67 @@ export function formatVideoRow(row: {
   };
 }
 
-function scanDirectory(dir: string, excludePaths: string[], fileList: string[] = []): string[] {
+/**
+ * Result of walking the library folder.
+ *
+ * `unreadable` is the part that matters. A directory the scan could not read is
+ * not the same thing as a directory with no videos in it, and the difference is
+ * the whole library: the caller deletes every local video it did not find, so a
+ * silently swallowed read error reads as "the user deleted everything" and
+ * takes their tags and descriptions with it. Anything that goes wrong is
+ * reported here so the caller can decline to reconcile against a partial view.
+ */
+interface ScanResult {
+  files: string[];
+  unreadable: string[];
+}
+
+function scanDirectory(
+  dir: string,
+  excludePaths: string[],
+  result: ScanResult = { files: [], unreadable: [] }
+): ScanResult {
+  const normalizedDir = path.resolve(dir);
+
+  // Check if current directory is in exclude list
+  if (excludePaths.some(ex => {
+    const normalizedEx = path.resolve(ex.trim().replace(/^~/, process.env.HOME || '~'));
+    return normalizedDir === normalizedEx || normalizedDir.startsWith(normalizedEx + path.sep);
+  })) {
+    console.log(`[Library] Excluding directory: ${normalizedDir}`);
+    return result;
+  }
+
+  let entries: string[];
   try {
-    const normalizedDir = path.resolve(dir);
-    
-    // Check if current directory is in exclude list
-    if (excludePaths.some(ex => {
-      const normalizedEx = path.resolve(ex.trim().replace(/^~/, process.env.HOME || '~'));
-      return normalizedDir === normalizedEx || normalizedDir.startsWith(normalizedEx + path.sep);
-    })) {
-      console.log(`[Library] Excluding directory: ${normalizedDir}`);
-      return fileList;
+    entries = fs.readdirSync(dir);
+  } catch (err) {
+    console.error(`[Library] Could not read directory ${dir}:`, err);
+    result.unreadable.push(dir);
+    return result;
+  }
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry);
+    let isDirectory: boolean;
+    try {
+      isDirectory = fs.statSync(fullPath).isDirectory();
+    } catch (err) {
+      // An entry we can't stat might be a folder full of videos, so treat it as
+      // an incomplete read rather than skipping past it.
+      console.error(`[Library] Could not read ${fullPath}:`, err);
+      result.unreadable.push(fullPath);
+      continue;
     }
 
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-      const fullPath = path.join(dir, file);
-      if (fs.statSync(fullPath).isDirectory()) {
-        scanDirectory(fullPath, excludePaths, fileList);
-      } else {
-        if (VIDEO_EXTENSIONS.includes(path.extname(fullPath).toLowerCase())) {
-          fileList.push(fullPath);
-        }
-      }
+    if (isDirectory) {
+      scanDirectory(fullPath, excludePaths, result);
+    } else if (VIDEO_EXTENSIONS.includes(path.extname(fullPath).toLowerCase())) {
+      result.files.push(fullPath);
     }
-  } catch (err) {
-    console.error(`Error scanning directory ${dir}:`, err);
   }
-  return fileList;
+
+  return result;
 }
 
 // Reads a video's runtime in seconds. Uses `ffmpeg -i` rather than ffprobe
@@ -255,7 +288,7 @@ normalizedDir = path.resolve(normalizedDir);
     const excludePaths = JSON.parse(excludeRow?.value || '[]');
 
     // Scan directory
-    const videoFiles = scanDirectory(normalizedDir, excludePaths);
+    const { files: videoFiles, unreadable } = scanDirectory(normalizedDir, excludePaths);
     const scannedIds = new Set<string>();
 
     scanProgress.phase = 'processing';
@@ -288,17 +321,49 @@ normalizedDir = path.resolve(normalizedDir);
       scanProgress.processed++;
     }
 
-    // Delete videos that no longer exist in filesystem
-    const toDelete = existingVideos.filter(v => !scannedIds.has(v.id));
-    for (const v of toDelete) {
-      db.prepare('DELETE FROM videos WHERE id = ?').run(v.id);
+    // Remove videos whose files are gone — but only when the scan actually saw
+    // the whole folder. A video row carries tags and a description the user
+    // typed by hand and cannot get back, while a stale row is a cosmetic
+    // nuisance, so anything less than a complete, trustworthy read of the
+    // filesystem means adding and updating only.
+    //
+    // Two ways the view can be untrustworthy: a directory that couldn't be
+    // read (permissions, an unplugged drive, a folder renamed mid-scan), or a
+    // find of nothing at all where the library previously had videos — which
+    // in practice is never a user deleting their entire collection between
+    // scans, and always something wrong with the path.
+    const emptiedEverything = videoFiles.length === 0 && existingVideos.length > 0;
+    const canReconcile = unreadable.length === 0 && !emptiedEverything;
+
+    let removed = 0;
+    if (canReconcile) {
+      const toDelete = existingVideos.filter(v => !scannedIds.has(v.id));
+      for (const v of toDelete) {
+        db.prepare('DELETE FROM videos WHERE id = ?').run(v.id);
+      }
+      removed = toDelete.length;
+    } else {
+      console.warn(
+        `[Library] Skipped removing missing videos: ` +
+        `${unreadable.length} unreadable path(s), found ${videoFiles.length} file(s), ` +
+        `${existingVideos.length} already in the library.`
+      );
     }
 
     // Rematch all plans to fix any stale video IDs or paths
     rematchAllPlans();
 
     scanProgress.phase = 'done';
-    return reply.send({ success: true, count: videoFiles.length });
+    return reply.send({
+      success: true,
+      count: videoFiles.length,
+      removed,
+      // The client warns rather than reporting a clean scan, so a folder that
+      // has silently become unreadable is visible instead of looking empty.
+      skippedCleanup: !canReconcile,
+      unreadableCount: unreadable.length,
+      unreadableSample: unreadable.slice(0, 3),
+    });
     } finally {
       // The client reads the final counts from the response, so the shared slot
       // is released either way — including when the scan throws partway through.

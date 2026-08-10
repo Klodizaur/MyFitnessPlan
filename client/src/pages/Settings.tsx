@@ -88,7 +88,13 @@ export default function Settings() {
       });
       const data = await res.json();
       if (data.error) setStatus(`Error: ${data.error}`);
-      else setStatus(t('settings.found_videos', { count: data.count }));
+      else if (data.skippedCleanup) {
+        // The scan couldn't see the whole folder, so nothing was removed from
+        // the library. Say so — a silent "found 0 videos" looks like success.
+        setStatus(
+          `${t('settings.found_videos', { count: data.count })} ${t('settings.scan_incomplete')}`
+        );
+      } else setStatus(t('settings.found_videos', { count: data.count }));
     } catch (err) {
       setStatus(t('settings.failed_connect'));
     } finally {
