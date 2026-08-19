@@ -202,6 +202,26 @@ if (!hasCategory) {
   db.exec('ALTER TABLE workout_plans ADD COLUMN category TEXT');
 }
 
+// Free-text note the user writes about a plan — what it's for, how it should
+// feel. Shown on the active plan's card and in the plan details view.
+const hasPlanDescription = planInfo.some(col => col.name === 'description');
+if (!hasPlanDescription) {
+  db.exec('ALTER TABLE workout_plans ADD COLUMN description TEXT');
+}
+
+// This plan's own workout/rest rhythm, as a JSON array of 0/1 — the same shape
+// as the global `workout_pattern` setting, which stays the default for new
+// plans. NULL means "follow the global one", so every existing plan keeps
+// behaving exactly as it did.
+//
+// Per-plan rather than global because two plans can now be active at once, and
+// a gentle mobility plan alongside a five-day strength plan has no business
+// being forced onto the same rhythm.
+const hasPlanPattern = planInfo.some(col => col.name === 'workout_pattern');
+if (!hasPlanPattern) {
+  db.exec('ALTER TABLE workout_plans ADD COLUMN workout_pattern TEXT');
+}
+
 // One-time backfill of the durable workout_log from the existing history table.
 // This runs at startup (before any request) only when workout_log is empty, so on
 // the first launch after this feature ships it seeds the log with past completions.

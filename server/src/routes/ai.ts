@@ -50,7 +50,13 @@ export default async function (fastify: FastifyInstance) {
    * exactly like an install without the feature.
    */
   fastify.get('/status', async (_request, reply) => {
-    return reply.send({ available: isAiConfigured() });
+    const settings = getAiSettings();
+    return reply.send({
+      available: isAiConfigured(settings),
+      // Shapes the plan modal's form. Not a secret, and served here so opening
+      // the modal doesn't need a second request to the settings endpoint.
+      planFlow: settings.planFlow,
+    });
   });
 
   /**
@@ -64,6 +70,7 @@ export default async function (fastify: FastifyInstance) {
       baseUrl: settings.baseUrl,
       model: settings.model,
       descriptionLanguage: settings.descriptionLanguage,
+      planFlow: settings.planFlow,
       hasKey: Boolean(settings.apiKey),
       isLocal: isLocalBaseUrl(settings.baseUrl),
       available: isAiConfigured(settings),
@@ -87,6 +94,7 @@ export default async function (fastify: FastifyInstance) {
     saveAiSettings({
       provider,
       apiKey,
+      planFlow: body?.planFlow === 'guided' || body?.planFlow === 'all' ? body.planFlow : undefined,
       baseUrl: typeof body?.baseUrl === 'string' ? body.baseUrl : undefined,
       model: typeof body?.model === 'string' ? body.model : undefined,
       descriptionLanguage:
@@ -100,6 +108,7 @@ export default async function (fastify: FastifyInstance) {
       baseUrl: settings.baseUrl,
       model: settings.model,
       descriptionLanguage: settings.descriptionLanguage,
+      planFlow: settings.planFlow,
       hasKey: Boolean(settings.apiKey),
       available: isAiConfigured(settings),
     });
@@ -200,11 +209,14 @@ export default async function (fastify: FastifyInstance) {
     try {
       const plan = await generatePlan({
         description: typeof body?.description === 'string' ? body.description : '',
-        weeks: Number(body?.weeks) || 1,
-        // Calendar rest comes from Settings → workout pattern; empty AI day
-        // slots are discarded on save. Training-day count therefore follows
-        // that pattern rather than a separate control in the builder.
-        daysPerWeek: trainingDaysFromWorkoutPattern(),
+        // The user picks a number of workout days, not weeks: empty AI day slots
+        // are discarded on save, so a week count promised a length the saved
+        // plan never had.
+        workoutDays: Number(body?.workoutDays) || 1,
+        // Pacing only — how often this person trains, so the model can space
+        // hard sessions out. Taken from the rhythm the new plan will actually
+        // use (sent by the builder), falling back to the global default.
+        daysPerWeek: trainingDaysFromWorkoutPattern(body?.workoutPattern),
         maxMinutes: Number(body?.maxMinutes) || 0,
         equipment: whitelist(body?.equipment, VALID_EQUIPMENT),
         trainingTypes: whitelist(body?.trainingTypes, VALID_TRAINING_TYPES),
@@ -234,21 +246,27 @@ function sendAiError(reply: any, err: unknown) {
 }
 
 /**
- * How many training sessions to put in each drafted week.
+ * Roughly how often this person trains in a week.
  *
- * Taken from the user's workout pattern so the AI densifies the same number of
- * workouts that the calendar will actually place. Falls back to 3 when the
- * pattern is missing or empty.
+ * Used only to pace the draft — spacing hard sessions, judging progression. The
+ * plan's own rhythm decides it when the builder sends one; otherwise the global
+ * pattern from Settings stands in, and 3 covers a missing or unusable pattern.
  */
-function trainingDaysFromWorkoutPattern(): number {
+function trainingDaysFromWorkoutPattern(requested?: unknown): number {
+  const countWorkouts = (pattern: unknown): number | null => {
+    if (!Array.isArray(pattern) || pattern.length === 0) return null;
+    const workouts = pattern.filter(day => Boolean(day)).length;
+    return workouts > 0 ? Math.min(7, workouts) : null;
+  };
+
+  const fromRequest = countWorkouts(requested);
+  if (fromRequest) return fromRequest;
+
   const row = db.prepare("SELECT value FROM settings WHERE key = 'workout_pattern'").get() as
     | { value?: string }
     | undefined;
   try {
-    const pattern = JSON.parse(row?.value || '[]');
-    if (!Array.isArray(pattern) || pattern.length === 0) return 3;
-    const workouts = pattern.filter(day => Boolean(day)).length;
-    return Math.min(7, Math.max(1, workouts || 3));
+    return countWorkouts(JSON.parse(row?.value || '[]')) ?? 3;
   } catch {
     return 3;
   }

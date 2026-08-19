@@ -83,6 +83,16 @@ function formatDuration(totalSeconds: number): string {
   return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
 }
 
+/** How far through each plan the user is, from the plan's own completion marks. */
+interface PlanProgress {
+  id: string;
+  name: string;
+  slot: 'main' | 'extra' | null;
+  totalWorkouts: number;
+  completedWorkouts: number;
+  isFinished: boolean;
+}
+
 function StatCard({ value, label, icon }: { value: number | string; label: string; icon: string }) {
   return (
     <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -176,12 +186,26 @@ export default function Profile() {
   const [videosById, setVideosById] = useState<Map<string, Video>>(new Map());
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
 
+  const [planProgress, setPlanProgress] = useState<PlanProgress[]>([]);
+
+  // Reloaded alongside history, since removing a completion changes both.
+  const loadPlanProgress = async () => {
+    try {
+      const res = await fetch(`${API}/api/profile/plan-progress`);
+      const data = await res.json();
+      setPlanProgress(data.plans || []);
+    } catch {
+      setPlanProgress([]);
+    }
+  };
+
   const loadHistory = async (): Promise<LogEntry[]> => {
     try {
       const res = await fetch(`${API}/api/profile/history`);
       const data = await res.json();
       const list: LogEntry[] = data.entries || [];
       setEntries(list);
+      loadPlanProgress();
       return list;
     } catch {
       setEntries([]);
@@ -233,22 +257,36 @@ export default function Profile() {
     const timedEntries = entries.filter(e => e.durationSeconds).length;
     const activeDays = new Set(entries.map(e => e.completedDate));
     const workoutSet = new Set(entries.map(e => `${e.completedDate}|${e.workoutId || e.workoutName || e.id}`));
-    const now = new Date();
-    const monthPrefix = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-    const thisMonthSet = new Set(
-      entries
-        .filter(e => e.completedDate.startsWith(monthPrefix))
-        .map(e => `${e.completedDate}|${e.workoutId || e.workoutName || e.id}`)
+    // Days you trained in the month on screen, not workouts logged — two
+    // sessions in a day is still one day you showed up. This one follows the
+    // calendar below as you page through months; every other tile is all-time
+    // and deliberately stays put.
+    const monthPrefix = `${viewYear}-${pad(viewMonth + 1)}`;
+    const viewMonthSet = new Set(
+      entries.filter(e => e.completedDate.startsWith(monthPrefix)).map(e => e.completedDate)
     );
     return {
       workouts: workoutSet.size,
       activeDays: activeDays.size,
-      thisMonth: thisMonthSet.size,
+      viewMonthDays: viewMonthSet.size,
       totalSeconds,
       timedEntries,
       untimedEntries: entries.length - timedEntries,
     };
-  }, [entries]);
+  }, [entries, viewYear, viewMonth]);
+
+  const planStats = useMemo(() => {
+    const started = planProgress.filter(p => p.completedWorkouts > 0);
+    return {
+      finished: planProgress.filter(p => p.isFinished).length,
+      // Only plans you've actually touched are worth listing; a library of
+      // untouched plans would bury the ones you're working through.
+      started: started.sort((a, b) => {
+        const ratio = (p: PlanProgress) => (p.totalWorkouts ? p.completedWorkouts / p.totalWorkouts : 0);
+        return ratio(b) - ratio(a);
+      }),
+    };
+  }, [planProgress]);
 
   const rangeEntries = useMemo(() => {
     if (range === 'all') return entries;
@@ -394,13 +432,20 @@ export default function Profile() {
     }
   };
 
-  const handleDeleteManual = async (workoutKey: string) => {
-    if (!window.confirm(t('profile.delete_confirm'))) return;
+  /**
+   * Remove a logged workout, however it got here.
+   *
+   * A workout marked done inside a plan also clears the ✓ from that plan's
+   * calendar, since the log and the plan are two records of the same event and
+   * leaving one behind would have them disagree. The confirm says so.
+   */
+  const handleDeleteEntry = async (workoutKey: string, isManual: boolean) => {
+    if (!window.confirm(t(isManual ? 'profile.delete_confirm' : 'profile.delete_planned_confirm'))) return;
     try {
       await fetch(`${API}/api/profile/history/${encodeURIComponent(workoutKey)}`, { method: 'DELETE' });
       await loadHistory();
     } catch (err) {
-      console.error('Failed to delete manual entry', err);
+      console.error('Failed to delete log entry', err);
     }
   };
 
@@ -459,7 +504,11 @@ export default function Profile() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         <StatCard value={stats.workouts} label={t('profile.stats_workouts')} icon="🏋️" />
         <StatCard value={stats.activeDays} label={t('profile.stats_active_days')} icon="📅" />
-        <StatCard value={stats.thisMonth} label={t('profile.stats_this_month')} icon="🗓️" />
+        <StatCard
+          value={stats.viewMonthDays}
+          label={t('profile.stats_active_days_in', { month: monthLabel })}
+          icon="🗓️"
+        />
         <StatCard
           value={stats.timedEntries > 0 ? formatDuration(stats.totalSeconds) : '—'}
           label={stats.timedEntries === 0
@@ -469,6 +518,7 @@ export default function Profile() {
             : t('profile.stats_total_time')}
           icon="⏱️"
         />
+        <StatCard value={planStats.finished} label={t('profile.stats_plans_finished')} icon="🏆" />
       </div>
 
       {/* Activity calendar */}
@@ -614,15 +664,13 @@ export default function Profile() {
                           >
                             {group.notes ? t('profile.notes_edit') : t('profile.notes_add')}
                           </button>
-                          {group.isManual && (
-                            <button
-                              className="btn btn-secondary"
-                              style={{ fontSize: '0.78rem', padding: '6px 12px', color: '#ef4444', borderColor: '#ef4444' }}
-                              onClick={() => handleDeleteManual(group.key)}
-                            >
-                              {t('profile.delete_entry')}
-                            </button>
-                          )}
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.78rem', padding: '6px 12px', color: '#ef4444', borderColor: '#ef4444' }}
+                            onClick={() => handleDeleteEntry(group.key, group.isManual)}
+                          >
+                            {t('profile.delete_entry')}
+                          </button>
                         </div>
                       ) : (
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -728,7 +776,9 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Activity summary */}
+      {/* Activity summary, paired with plan progress: one says how you've been
+          training, the other what you're working through. */}
+      <div className="log-summary-row">
       <div className="glass-card" style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
           <h3 style={{ margin: 0 }}>{t('profile.summary_heading')}</h3>
@@ -795,6 +845,55 @@ export default function Profile() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Plans you've made a start on, and how far through each one you are. */}
+      {planStats.started.length > 0 && (
+        <div className="glass-card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ margin: '0 0 0.35rem' }}>{t('profile.plans_heading')}</h3>
+          <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            {t('profile.plans_hint')}
+          </p>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {planStats.started.map(plan => {
+              const percent = plan.totalWorkouts
+                ? Math.round((plan.completedWorkouts / plan.totalWorkouts) * 100)
+                : 0;
+              return (
+                <div key={plan.id}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.75rem', marginBottom: 6 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      {plan.isFinished && <span aria-hidden="true">🏆</span>}
+                      <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {plan.name}
+                      </span>
+                      {plan.slot && (
+                        <span className="log-plan-slot">
+                          {t(plan.slot === 'extra' ? 'plans.slot_extra' : 'plans.slot_main')}
+                        </span>
+                      )}
+                    </span>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      {plan.completedWorkouts} / {plan.totalWorkouts}
+                    </span>
+                  </div>
+                  <div style={{ width: '100%', height: 8, background: 'var(--progress-bg)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${percent}%`,
+                        height: '100%',
+                        background: plan.isFinished ? '#10b981' : 'var(--accent-color)',
+                        transition: 'width 0.3s ease',
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       </div>
 
       {addModal}

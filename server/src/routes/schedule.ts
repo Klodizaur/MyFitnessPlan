@@ -1,6 +1,22 @@
 import { FastifyInstance } from 'fastify';
 import db from '../db.js';
 
+// Active plans occupy one of two slots: the main plan (is_active = 1) and an
+// optional second plan (is_active = 2) that runs alongside it. Both are
+// scheduled independently from their own start date, over the same
+// workout/rest pattern.
+type Slot = 'main' | 'extra';
+const SLOT_BY_FLAG: Record<number, Slot> = { 1: 'main', 2: 'extra' };
+
+function parseTags(raw: string | null): string[] {
+  try {
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export default async function (fastify: FastifyInstance) {
   fastify.get('/', async (request, reply) => {
     // Get pattern and start date
@@ -8,28 +24,38 @@ export default async function (fastify: FastifyInstance) {
     const patternSetting = settings.find(s => s.key === 'workout_pattern')?.value;
     const globalStartDate = settings.find(s => s.key === 'start_date')?.value;
     
-    let pattern: number[] = [1, 1, 1, 1, 1, 0]; // Default
+    const FALLBACK_PATTERN = [1, 1, 1, 1, 1, 0];
+    let globalPattern: number[] = FALLBACK_PATTERN;
     if (patternSetting) {
-      try { pattern = JSON.parse(patternSetting); } catch (e) {}
+      try { globalPattern = JSON.parse(patternSetting); } catch (e) {}
     }
 
-    // Get active plan
-    const plan = db.prepare('SELECT id, name, start_date FROM workout_plans WHERE is_active = 1').get() as any;
-    if (!plan) {
-      return reply.send({ schedule: [] });
+    /**
+     * A plan's own rhythm, or the global one when it hasn't set one.
+     *
+     * Guarded rather than trusted: a pattern with no workout day would spin the
+     * schedule loop below forever, so anything unusable falls back.
+     */
+    const patternFor = (raw: string | null): number[] => {
+      let pattern = globalPattern;
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) pattern = parsed.map(v => (v ? 1 : 0));
+        } catch (e) {}
+      }
+      return pattern.some(day => day === 1) ? pattern : FALLBACK_PATTERN;
+    };
+
+    // Active plans, main slot first.
+    const activePlans = db.prepare(
+      'SELECT id, name, start_date, is_active, workout_pattern FROM workout_plans WHERE is_active IN (1, 2) ORDER BY is_active ASC'
+    ).all() as any[];
+    if (!activePlans.length) {
+      return reply.send({ schedule: [], schedules: [], pattern: globalPattern });
     }
 
-    const startDateStr = plan.start_date || globalStartDate || new Date().toISOString().split('T')[0];
-    const startDate = new Date(startDateStr);
-
-    const rawWorkouts = db.prepare(`
-      SELECT w.id, w.name, w.sequence_order, w.video_ids
-      FROM workouts w
-      WHERE w.plan_id = ?
-      ORDER BY w.sequence_order ASC
-    `).all(plan.id) as any[];
-
-    const allVideos = db.prepare('SELECT id, filename, relative_path, thumbnail_path, description, equipment, source, external_id FROM videos').all() as any[];
+    const allVideos = db.prepare('SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, source, external_id FROM videos').all() as any[];
     const videoMap = new Map(allVideos.map(v => [v.id, {
       filename: v.filename,
       path: v.relative_path,
@@ -37,14 +63,11 @@ export default async function (fastify: FastifyInstance) {
       description: v.description || '',
       source: v.source || 'local',
       externalId: v.external_id || null,
-      equipment: (() => {
-        try {
-          const parsed = JSON.parse(v.equipment || '[]');
-          return Array.isArray(parsed) ? parsed : [];
-        } catch {
-          return [];
-        }
-      })(),
+      equipment: parseTags(v.equipment),
+      // Metadata tags, shown as chips on the calendar's video previews.
+      trainingType: parseTags(v.training_type),
+      bodyParts: parseTags(v.body_parts),
+      intensity: v.intensity || '',
     }]));
     
     // Get history (both workout-level and video-level)
@@ -52,67 +75,105 @@ export default async function (fastify: FastifyInstance) {
     const completedWorkouts = new Set(history.filter(h => !h.video_id).map(h => h.workout_id));
     const completedVideos = new Set(history.filter(h => h.video_id).map(h => `${h.workout_id}:${h.video_id}`));
 
-    const workouts = rawWorkouts.map(w => {
-      let videoIds = [];
-      try {
-        videoIds = JSON.parse(w.video_ids || '[]');
-      } catch (e) {}
+    const workoutsByPlan = db.prepare(`
+      SELECT w.id, w.plan_id, w.name, w.sequence_order, w.video_ids
+      FROM workouts w
+      WHERE w.plan_id IN (${activePlans.map(() => '?').join(', ')})
+      ORDER BY w.sequence_order ASC
+    `).all(...activePlans.map(p => p.id)) as any[];
 
-      const videos = videoIds.map((vid: string) => {
-        const videoInfo = videoMap.get(vid);
-        return videoInfo ? {
-          id: vid,
-          filename: videoInfo.filename,
-          path: videoInfo.path,
-          thumbnail: videoInfo.thumbnail,
-          description: videoInfo.description,
-          equipment: videoInfo.equipment,
-          source: videoInfo.source,
-          externalId: videoInfo.externalId,
-          isCompleted: completedVideos.has(`${w.id}:${vid}`)
-        } : null;
-      }).filter((v: any) => v !== null);
+    const buildSchedule = (plan: any) => {
+      const startDateStr = plan.start_date || globalStartDate || new Date().toISOString().split('T')[0];
+      const startDate = new Date(startDateStr);
+      // Each active plan lays out on its own rhythm, so two plans running side
+      // by side don't have to share one.
+      const pattern = patternFor(plan.workout_pattern);
 
-      // A workout is considered completed if it has a workout-level entry 
-      // OR if all its videos are completed
-      const allVideosDone = videos.length > 0 && videos.every((v: any) => v.isCompleted);
-      const workoutDone = completedWorkouts.has(w.id) || allVideosDone;
+      const workouts = workoutsByPlan.filter(w => w.plan_id === plan.id).map(w => {
+        let videoIds = [];
+        try {
+          videoIds = JSON.parse(w.video_ids || '[]');
+        } catch (e) {}
 
-      return {
-        id: w.id,
-        name: w.name,
-        sequence_order: w.sequence_order,
-        videos,
-        isCompleted: workoutDone,
-        videosCompletedCount: videos.filter((v: any) => v.isCompleted).length,
-        totalVideosCount: videos.length
-      };
-    });
+        const videos = videoIds.map((vid: string) => {
+          const videoInfo = videoMap.get(vid);
+          return videoInfo ? {
+            id: vid,
+            filename: videoInfo.filename,
+            path: videoInfo.path,
+            thumbnail: videoInfo.thumbnail,
+            description: videoInfo.description,
+            equipment: videoInfo.equipment,
+            trainingType: videoInfo.trainingType,
+            bodyParts: videoInfo.bodyParts,
+            intensity: videoInfo.intensity,
+            source: videoInfo.source,
+            externalId: videoInfo.externalId,
+            isCompleted: completedVideos.has(`${w.id}:${vid}`)
+          } : null;
+        }).filter((v: any) => v !== null);
 
-    // Generate schedule
-    const schedule = [];
-    let workoutIndex = 0;
-    let patternIndex = 0;
-    const currentDate = new Date(startDate);
+        // A workout is considered completed if it has a workout-level entry 
+        // OR if all its videos are completed
+        const allVideosDone = videos.length > 0 && videos.every((v: any) => v.isCompleted);
+        const workoutDone = completedWorkouts.has(w.id) || allVideosDone;
 
-    while (workoutIndex < workouts.length) {
-      const isWorkoutDay = pattern[patternIndex] === 1;
-      
-      schedule.push({
-        date: currentDate.toISOString().split('T')[0],
-        isWorkoutDay,
-        workout: isWorkoutDay ? workouts[workoutIndex] : null
+        return {
+          id: w.id,
+          name: w.name,
+          sequence_order: w.sequence_order,
+          videos,
+          isCompleted: workoutDone,
+          videosCompletedCount: videos.filter((v: any) => v.isCompleted).length,
+          totalVideosCount: videos.length
+        };
       });
 
-      if (isWorkoutDay) {
-        workoutIndex++;
+      // Generate schedule
+      const schedule = [];
+      let workoutIndex = 0;
+      let patternIndex = 0;
+      const currentDate = new Date(startDate);
+
+      while (workoutIndex < workouts.length) {
+        const isWorkoutDay = pattern[patternIndex] === 1;
+        
+        schedule.push({
+          date: currentDate.toISOString().split('T')[0],
+          isWorkoutDay,
+          workout: isWorkoutDay ? workouts[workoutIndex] : null
+        });
+
+        if (isWorkoutDay) {
+          workoutIndex++;
+        }
+
+        currentDate.setDate(currentDate.getDate() + 1);
+        patternIndex = (patternIndex + 1) % pattern.length;
       }
 
-      currentDate.setDate(currentDate.getDate() + 1);
-      patternIndex = (patternIndex + 1) % pattern.length;
-    }
+      return {
+        slot: SLOT_BY_FLAG[plan.is_active as number] || 'main',
+        planId: plan.id,
+        planName: plan.name,
+        startDate: startDateStr,
+        pattern,
+        schedule,
+      };
+    };
 
-    return reply.send({ schedule, pattern, startDate: startDateStr, planName: plan.name });
+    const schedules = activePlans.map(buildSchedule);
+    const main = schedules.find(s => s.slot === 'main') || schedules[0];
+
+    return reply.send({
+      schedules,
+      // Single-plan fields, mirroring the main plan. Callers that only care
+      // about the primary schedule (the dashboard) keep reading these.
+      pattern: main.pattern,
+      schedule: main.schedule,
+      startDate: main.startDate,
+      planName: main.planName,
+    });
   });
 
   fastify.post('/toggle-done', async (request, reply) => {

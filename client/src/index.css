@@ -384,16 +384,28 @@ body {
   padding: 1.25rem 1.5rem;
 }
 
+/* Description and tags as two panels side by side, the description wider. With
+   no tags to show, the description panel takes the full width on its own. */
 .player-details-grid {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
-  gap: 24px;
+  gap: 1.25rem;
   align-items: start;
 }
 
-@media (max-width: 720px) {
+.player-details-grid.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.player-details-heading {
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+@media (max-width: 860px) {
   .player-details-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -645,6 +657,100 @@ nav .nav-links a:hover, nav .nav-links a.active {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
+/* Row holding the active plans' featured cards. With one active plan this is a
+   plain wrapper and the card keeps its own full-width layout; with two, it
+   becomes a horizontal scroller where each card is narrowed just enough that
+   the next one peeks in and reads as scrollable. */
+.plans-featured-wrap.multi {
+  position: relative;
+  margin-bottom: 2.5rem;
+}
+
+.plans-featured-row.multi {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  /* The scrollbar is hidden; .plans-featured-nav is the affordance instead. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.plans-featured-row.multi::-webkit-scrollbar {
+  display: none;
+}
+
+.plans-featured-row.multi .plan-featured {
+  flex: 0 0 85%;
+  margin-bottom: 0;
+  scroll-snap-align: start;
+}
+
+/* The trailing card is narrower than the row's remaining scroll distance, so it
+   can never sit flush left. Snapping it to the right edge instead gives it a
+   reachable snap point — without this, mandatory snapping drags the row back to
+   the start and the next arrow appears to do nothing. */
+.plans-featured-row.multi .plan-featured:last-child {
+  scroll-snap-align: end;
+}
+
+/* Same treatment as the calendar's slider arrows, so the two read as one
+   control. Faded rather than removed at the ends, to keep the row's width
+   stable and the arrow position predictable. */
+.plans-featured-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, opacity 0.2s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.plans-featured-nav span {
+  font-size: 32px;
+  line-height: 1;
+  margin-top: -4px;
+}
+
+.plans-featured-nav.prev {
+  left: 12px;
+}
+
+.plans-featured-nav.next {
+  right: 12px;
+}
+
+.plans-featured-nav:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.plans-featured-nav:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .plans-featured-row.multi .plan-featured {
+    flex-basis: 90%;
+  }
+  .plans-featured-nav {
+    width: 38px;
+    height: 38px;
+  }
+}
+
 /* Featured card for the active plan: a full-bleed hero above the plan grid.
    Everything sits on a dark scrim, so all text is white and stays readable in
    every theme (the pastel themes have very light accent colors). */
@@ -728,6 +834,20 @@ nav .nav-links a:hover, nav .nav-links a.active {
   text-shadow: 0 3px 14px rgba(0, 0, 0, 0.55);
 }
 
+/* The plan's own note on the featured card. Clamped: the card is a summary, and
+   the full text is one click away in the details view. */
+.plan-featured-description {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.82);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .plan-featured-date {
   display: flex;
   align-items: baseline;
@@ -778,6 +898,11 @@ nav .nav-links a:hover, nav .nav-links a.active {
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.6);
   margin-bottom: 8px;
+}
+
+.plan-featured-equipment-none {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .plan-featured-tags {
@@ -1839,6 +1964,19 @@ nav .nav-links a:hover, nav .nav-links a.active {
   font-size: 0.95rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
+.wb-textarea {
+  resize: vertical;
+  min-height: 84px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+/* Explanatory line under a builder field. */
+.wb-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--wb-text-dim);
+}
 .wb-input::placeholder { color: var(--wb-text-dim); opacity: 0.85; }
 .wb-input:focus {
   outline: none;
@@ -2338,9 +2476,15 @@ nav .nav-links a:hover, nav .nav-links a.active {
 
 /* Dashboard hero: scale padding and the oversized rest-day title down on phones. */
 .dashboard-hero-inner { padding: 3rem; }
+/* Make room for the pager arrows so they never sit against the hero's text. */
+.dashboard-hero-paged .dashboard-hero-inner { padding-left: 4.75rem; padding-right: 4.75rem; }
+/* The pager dots sit along the bottom edge, where the hero's buttons would
+   otherwise run into them. */
+.dashboard-hero-paged .dashboard-hero-inner { padding-bottom: 3.75rem; }
 .dashboard-rest-title { font-size: 5rem; }
 @media (max-width: 600px) {
   .dashboard-hero-inner { padding: 1.5rem; }
+  .dashboard-hero-paged .dashboard-hero-inner { padding-left: 3.25rem; padding-right: 3.25rem; padding-bottom: 3rem; }
   .dashboard-rest-title { font-size: 2.75rem; }
 }
 
@@ -2409,4 +2553,571 @@ nav .nav-links a:hover, nav .nav-links a.active {
   background: var(--accent-soft);
   border-color: var(--accent-color);
   color: var(--accent-color);
+}
+
+/* ── Video metadata chips ─────────────────────────────────────────────────
+   Shared by the calendar's day previews and the plan details modal. The icons
+   the metadata library exports are 18px, which overwhelms a chip, so they are
+   scaled down here rather than duplicating every icon at a second size. */
+.video-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.video-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--text-primary);
+  background: var(--surface-hover);
+  border: 1px solid var(--glass-border);
+}
+
+.video-tag-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.video-tag-chip-icon svg,
+.video-tag-chip-icon span {
+  width: 13px !important;
+  height: 13px !important;
+}
+
+/* The overflow chip opens the rest of the tags, and collapses them again. */
+.video-tag-chip-more {
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.video-tag-chip-more:hover {
+  border-color: var(--accent-color);
+}
+
+/* Tag row sitting between a calendar card's preview and its body. */
+.calendar-card-tags {
+  padding: 0.6rem 1.25rem 0;
+}
+
+/* Tabs shown on the calendar when a second plan is also active. */
+.calendar-plan-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 2rem;
+}
+
+.calendar-plan-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  padding: 8px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-secondary);
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.calendar-plan-tab:hover {
+  border-color: var(--accent-color);
+}
+
+.calendar-plan-tab.selected {
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+  box-shadow: inset 0 -3px 0 var(--accent-color);
+}
+
+.calendar-plan-tab-slot {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-color);
+}
+
+.calendar-plan-tab-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Slot buttons on a plan card: "Activate as [Main] [Extra]". */
+.plan-card-activate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.plan-card-activate-label {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.75);
+  white-space: nowrap;
+}
+
+.plan-card-activate .btn {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  backdrop-filter: blur(6px);
+}
+
+.plan-card-activate .btn:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+/* Plan cards open their details view, so make that affordance visible. */
+.plan-card,
+.plan-featured {
+  cursor: pointer;
+}
+
+.plan-card:focus-visible,
+.plan-featured:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* ── Plan details modal ─────────────────────────────────────────────────── */
+.plan-details-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 1.5rem;
+}
+
+.plan-details-panel {
+  width: 100%;
+  max-width: 900px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: 0 30px 90px rgba(0,0,0,0.5);
+}
+
+.plan-details-header {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 200px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.plan-details-header-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  padding: 1.75rem;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.plan-details-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.plan-details-close:hover {
+  background: rgba(0,0,0,0.7);
+}
+
+.plan-details-header .plan-card-info {
+  margin-bottom: 0;
+}
+
+/* Same note in the details view, in full. */
+.plan-details-description {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.88);
+  white-space: pre-wrap;
+}
+
+.plan-details-body {
+  padding: 1.5rem 1.75rem 1.75rem;
+  overflow-y: auto;
+}
+
+.plan-details-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+
+.plan-details-video-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 20px;
+  color: var(--text-secondary);
+  background: var(--surface-hover);
+}
+
+/* The plan's days, laid out like the calendar's: one card per day, each with
+   the same slider when the day holds more than one video. */
+.plan-day-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1.1rem;
+}
+
+.plan-day-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.plan-day-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plan-day-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The calendar's arrows are sized for a full-width card; these sit on a grid
+   tile roughly half that, so they are scaled down to match. */
+.plan-day-thumb .slider-nav-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.plan-day-thumb .slider-nav-btn span {
+  font-size: 22px;
+  margin-top: -5px;
+}
+
+.plan-day-noimg {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.plan-day-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--accent-color);
+}
+
+.plan-day-runtime {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  z-index: 3;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.plan-day-counter {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.plan-day-video-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (max-width: 700px) {
+  .plan-day-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  .plan-details-header-content,
+  .plan-details-body {
+    padding-left: 1.1rem;
+    padding-right: 1.1rem;
+  }
+}
+
+/* Dashboard hero pager, shown only when a second plan is also active. */
+.dashboard-plan-nav {
+  z-index: 4;
+}
+
+.dashboard-plan-dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+}
+
+.dashboard-plan-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.25);
+  transition: background 0.2s ease;
+}
+
+.dashboard-plan-dot.selected {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+/* Action bar pinned to the bottom of the plan details view. */
+.plan-details-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 1rem 1.75rem 1.25rem;
+  border-top: 1px solid var(--glass-border);
+  background: var(--surface-color);
+}
+
+.plan-details-date {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.plan-details-date input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-hover);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+.plan-details-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.plan-details-action-buttons .btn {
+  padding: 9px 14px;
+  font-size: 0.82rem;
+}
+
+/* The details panel sits on the app surface rather than a photo, so the ghost
+   buttons need the surface treatment instead of the on-image white one. */
+.plan-details-actions .btn-ghost {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+}
+
+.plan-details-actions .btn-ghost:hover {
+  border-color: var(--accent-color);
+}
+
+@media (max-width: 700px) {
+  .plan-details-actions {
+    padding-left: 1.1rem;
+    padding-right: 1.1rem;
+  }
+}
+
+/* Compact workout/rest cycle editor, used in the plan builder and the AI modal.
+   The Settings page keeps its own full-size version, which is a page-level
+   control rather than one field among several in a modal. */
+.pattern-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.pattern-picker-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pattern-day {
+  width: 46px;
+  height: 52px;
+  padding: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid var(--wb-border);
+  background: var(--wb-input-bg);
+  color: var(--wb-text-dim);
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.pattern-day:hover:not(:disabled) {
+  border-color: var(--accent-color);
+}
+
+.pattern-day.workout {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+  color: var(--wb-text);
+}
+
+.pattern-day-n {
+  font-size: 0.62rem;
+  font-weight: 800;
+  opacity: 0.75;
+}
+
+.pattern-day-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.pattern-day-add {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--wb-text-dim);
+}
+
+.pattern-day-add:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pattern-picker-summary {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--wb-text);
+}
+
+/* Read-only display of the default rhythm a plan will inherit. */
+.pattern-picker.readonly .pattern-day {
+  cursor: default;
+  opacity: 0.75;
+}
+
+/* Slot marker beside a plan name in the log's progress list. */
+.log-plan-slot {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--accent-color);
+}
+
+/* The log's two summary panels — how you've trained, and what you're training
+   toward — sit side by side on a wide screen and stack on a narrow one. The
+   summary carries the charts, so it takes the larger share. */
+.log-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .log-summary-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The hero's floating thumbnail is absolutely positioned over the right of the
+   card, so the text beside it needs to stop short of it. Without this a long
+   workout title runs underneath the image — which it did at every width between
+   the 600px phone breakpoint and a wide desktop. */
+@media (min-width: 901px) {
+  .dashboard-hero-has-thumb .dashboard-hero-inner > div {
+    max-width: calc(100% - 320px) !important;
+  }
+}
+
+/* Below that there isn't room for both, so the decorative thumbnail goes. */
+@media (max-width: 900px) {
+  .dashboard-hero-thumb { display: none !important; }
 }

@@ -7,7 +7,11 @@ export type EquipmentId =
   | 'resistance_bands'
   | 'pilates_ball'
   | 'pilates_bar'
-  | 'kettlebell';
+  | 'kettlebell'
+  | 'barbell'
+  | 'step'
+  | 'bench'
+  | 'no_equipment';
 
 export type EquipmentItem = {
   id: EquipmentId;
@@ -98,6 +102,53 @@ export const EQUIPMENT_ITEMS: EquipmentItem[] = [
         <path d="M12 3a3 3 0 0 1 3 3v1" />
         <path d="M9 7h6" />
         <path d="M8 10c-2 1-3 3-3 5.5a7 7 0 0 0 14 0C19 13 18 11 16 10" />
+      </svg>
+    ),
+  },
+  {
+    id: 'barbell',
+    label: 'Barbell',
+    icon: (
+      <svg {...iconProps}>
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <rect x="4" y="8.5" width="2.5" height="7" rx="0.8" />
+        <rect x="7.5" y="10" width="2" height="4" rx="0.6" />
+        <rect x="17.5" y="8.5" width="2.5" height="7" rx="0.8" />
+        <rect x="14.5" y="10" width="2" height="4" rx="0.6" />
+      </svg>
+    ),
+  },
+  {
+    id: 'step',
+    label: 'Step',
+    icon: (
+      <svg {...iconProps}>
+        <rect x="3" y="9" width="18" height="3.5" rx="1" />
+        <path d="M6 12.5V16M18 12.5V16" />
+      </svg>
+    ),
+  },
+  {
+    id: 'bench',
+    label: 'Bench',
+    icon: (
+      <svg {...iconProps}>
+        <rect x="3" y="8" width="18" height="3" rx="1.2" />
+        <path d="M6 11v4M18 11v4" />
+        <path d="M4 19h4M16 19h4" />
+        <path d="M6 15l-2 4M18 15l2 4" />
+      </svg>
+    ),
+  },
+  {
+    id: 'no_equipment',
+    label: 'No Equipment',
+    icon: (
+      <svg {...iconProps}>
+        <rect x="2.5" y="9.5" width="3" height="5" rx="1" />
+        <rect x="18.5" y="9.5" width="3" height="5" rx="1" />
+        <line x1="5.5" y1="12" x2="18.5" y2="12" />
+        <line x1="4" y1="20" x2="20" y2="4" />
       </svg>
     ),
   },

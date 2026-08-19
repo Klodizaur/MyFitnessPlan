@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import VideoTagChips from '../components/VideoTagChips';
+
+interface ScheduleVideo {
+  id: string;
+  filename: string;
+  thumbnail?: string;
+  isCompleted?: boolean;
+  equipment?: string[];
+  trainingType?: string[];
+  bodyParts?: string[];
+  intensity?: string;
+}
 
 interface ScheduleDay {
   date: string;
@@ -9,16 +21,20 @@ interface ScheduleDay {
     id: string;
     name: string;
     sequence_order: number;
-    videos: {
-      id: string;
-      filename: string;
-      thumbnail?: string;
-      isCompleted?: boolean;
-    }[];
+    videos: ScheduleVideo[];
     isCompleted?: boolean;
     videosCompletedCount: number;
     totalVideosCount: number;
   } | null;
+}
+
+/** One active plan's schedule. Two plans can be active at once (main + extra). */
+interface PlanSchedule {
+  slot: 'main' | 'extra';
+  planId: string;
+  planName: string;
+  startDate: string;
+  schedule: ScheduleDay[];
 }
 
 function CalendarCard({ day, calendarView, navigate }: { day: ScheduleDay, calendarView: string, navigate: (path: string) => void }) {
@@ -185,6 +201,18 @@ function CalendarCard({ day, calendarView, navigate }: { day: ScheduleDay, calen
         </div>
       )}
 
+      {/* Tags for whatever the preview above is currently showing — the slider's
+          selected part, or the day's first video in list view. */}
+      {day.isWorkoutDay && currentVideo && (
+        <VideoTagChips
+          className="calendar-card-tags"
+          intensity={currentVideo.intensity}
+          trainingType={currentVideo.trainingType}
+          bodyParts={currentVideo.bodyParts}
+          equipment={currentVideo.equipment}
+        />
+      )}
+
       <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -303,9 +331,11 @@ function CalendarCard({ day, calendarView, navigate }: { day: ScheduleDay, calen
 
 export default function Calendar() {
   const { t } = useTranslation();
-  const [schedule, setSchedule] = useState<ScheduleDay[]>([]);
+  const [planSchedules, setPlanSchedules] = useState<PlanSchedule[]>([]);
   const [calendarView, setCalendarView] = useState('list');
-  const [planName, setPlanName] = useState<string | null>(null);
+  // Which active plan's calendar is on screen. The two plans run on their own
+  // dates, so they're shown one at a time rather than interleaved by day.
+  const [selectedSlot, setSelectedSlot] = useState<'main' | 'extra'>('main');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -318,16 +348,11 @@ export default function Calendar() {
     fetch('/api/schedule')
       .then(res => res.json())
       .then(data => {
-        if (data.schedule) {
-          setSchedule(data.schedule);
-        }
-        if (data.planName) {
-          setPlanName(data.planName);
-        }
+        setPlanSchedules(data.schedules || []);
       });
   }, []);
 
-  if (schedule.length === 0) {
+  if (planSchedules.length === 0) {
     return (
       <div className="glass-card" style={{ padding: '2rem', textAlign: 'center' }}>
         <h2>{t('calendar.no_active_schedule')}</h2>
@@ -336,16 +361,43 @@ export default function Calendar() {
     );
   }
 
+  // Falls back to the first schedule so activating only an extra plan (or
+  // deactivating the main one) still shows a calendar.
+  const selected = planSchedules.find(p => p.slot === selectedSlot) || planSchedules[0];
+
   return (
     <div className="animate-fade-in">
-      <h1 style={{ marginBottom: '2rem' }}>{planName || t('calendar.workout_calendar')}</h1>
+      <h1 style={{ marginBottom: planSchedules.length > 1 ? '1rem' : '2rem' }}>
+        {selected.planName || t('calendar.workout_calendar')}
+      </h1>
+
+      {planSchedules.length > 1 && (
+        <div className="calendar-plan-tabs" role="tablist">
+          {planSchedules.map(plan => (
+            <button
+              key={plan.planId}
+              type="button"
+              role="tab"
+              aria-selected={plan.slot === selected.slot}
+              className={`calendar-plan-tab${plan.slot === selected.slot ? ' selected' : ''}`}
+              onClick={() => setSelectedSlot(plan.slot)}
+            >
+              <span className="calendar-plan-tab-slot">
+                {plan.slot === 'main' ? t('plans.slot_main') : t('plans.slot_extra')}
+              </span>
+              <span className="calendar-plan-tab-name">{plan.planName}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
         gap: '2rem'
       }}>
-        {schedule.map((day, index) => (
-          <CalendarCard key={index} day={day} calendarView={calendarView} navigate={navigate} />
+        {selected.schedule.map((day, index) => (
+          <CalendarCard key={`${selected.planId}:${index}`} day={day} calendarView={calendarView} navigate={navigate} />
         ))}
       </div>
     </div>
