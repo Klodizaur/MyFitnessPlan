@@ -83,6 +83,17 @@ function formatDuration(totalSeconds: number): string {
   return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
 }
 
+/** A plan carried to the end. Kept even after the plan is edited or deleted. */
+interface FinishedPlan {
+  id: string;
+  planId: string | null;
+  planName: string;
+  workoutCount: number;
+  startedOn: string | null;
+  finishedOn: string;
+  daysTaken: number | null;
+}
+
 /** How far through each plan the user is, from the plan's own completion marks. */
 interface PlanProgress {
   id: string;
@@ -187,6 +198,7 @@ export default function Profile() {
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
 
   const [planProgress, setPlanProgress] = useState<PlanProgress[]>([]);
+  const [finishedPlans, setFinishedPlans] = useState<FinishedPlan[]>([]);
 
   // Reloaded alongside history, since removing a completion changes both.
   const loadPlanProgress = async () => {
@@ -194,8 +206,20 @@ export default function Profile() {
       const res = await fetch(`${API}/api/profile/plan-progress`);
       const data = await res.json();
       setPlanProgress(data.plans || []);
+      setFinishedPlans(data.finished || []);
     } catch {
       setPlanProgress([]);
+      setFinishedPlans([]);
+    }
+  };
+
+  const handleDeleteFinished = async (id: string) => {
+    if (!window.confirm(t('profile.plans_forget_confirm'))) return;
+    try {
+      await fetch(`${API}/api/profile/plan-completions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await loadPlanProgress();
+    } catch (err) {
+      console.error('Failed to remove finished plan', err);
     }
   };
 
@@ -276,9 +300,13 @@ export default function Profile() {
   }, [entries, viewYear, viewMonth]);
 
   const planStats = useMemo(() => {
-    const started = planProgress.filter(p => p.completedWorkouts > 0);
+    // In-progress plans that aren't finished. A finished one is represented by
+    // its durable record below instead, so it doesn't appear twice.
+    const started = planProgress.filter(p => p.completedWorkouts > 0 && !p.isFinished);
     return {
-      finished: planProgress.filter(p => p.isFinished).length,
+      // All-time, from the durable record — not a count of plans that happen to
+      // still exist and still hold their marks.
+      finished: finishedPlans.length,
       // Only plans you've actually touched are worth listing; a library of
       // untouched plans would bury the ones you're working through.
       started: started.sort((a, b) => {
@@ -286,7 +314,7 @@ export default function Profile() {
         return ratio(b) - ratio(a);
       }),
     };
-  }, [planProgress]);
+  }, [planProgress, finishedPlans]);
 
   const rangeEntries = useMemo(() => {
     if (range === 'all') return entries;
@@ -848,12 +876,50 @@ export default function Profile() {
       </div>
 
       {/* Plans you've made a start on, and how far through each one you are. */}
-      {planStats.started.length > 0 && (
+      {(planStats.started.length > 0 || finishedPlans.length > 0) && (
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <h3 style={{ margin: '0 0 0.35rem' }}>{t('profile.plans_heading')}</h3>
           <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             {t('profile.plans_hint')}
           </p>
+
+          {finishedPlans.length > 0 && (
+            <div style={{ marginBottom: planStats.started.length > 0 ? '1.5rem' : 0 }}>
+              <div className="log-plans-subheading">{t('profile.plans_finished_heading')}</div>
+              <div style={{ display: 'grid', gap: '0.6rem' }}>
+                {finishedPlans.map(plan => (
+                  <div key={plan.id} className="log-finished-plan">
+                    <span aria-hidden="true">🏆</span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="log-finished-plan-name">{plan.planName}</div>
+                      <div className="log-finished-plan-meta">
+                        {t('profile.plans_finished_on', {
+                          date: new Date(plan.finishedOn + 'T00:00:00').toLocaleDateString(i18n.language, {
+                            year: 'numeric', month: 'short', day: 'numeric',
+                          }),
+                        })}
+                        {plan.daysTaken ? ` · ${t('profile.plans_took_days', { count: plan.daysTaken })}` : ''}
+                        {plan.workoutCount ? ` · ${t('plans.workout_count', { count: plan.workoutCount })}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="log-finished-plan-forget"
+                      title={t('profile.plans_forget')}
+                      aria-label={t('profile.plans_forget')}
+                      onClick={() => handleDeleteFinished(plan.id)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {planStats.started.length > 0 && finishedPlans.length > 0 && (
+            <div className="log-plans-subheading">{t('profile.plans_progress_heading')}</div>
+          )}
           <div style={{ display: 'grid', gap: '1rem' }}>
             {planStats.started.map(plan => {
               const percent = plan.totalWorkouts
@@ -863,7 +929,6 @@ export default function Profile() {
                 <div key={plan.id}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.75rem', marginBottom: 6 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                      {plan.isFinished && <span aria-hidden="true">🏆</span>}
                       <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {plan.name}
                       </span>

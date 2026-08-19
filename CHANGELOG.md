@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ⚠️ Upgrade notes
 
+- A `plan_completions` table is added, and seeded once from any plan already
+  finished, so existing completions aren't lost.
 - Two columns are added to `workout_plans` (`description`, `workout_pattern`).
   Both are additive and NULL on existing rows, and NULL means "as before": no
   description, and follow the workout pattern in Settings. Existing plans,
@@ -75,8 +77,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   used to be undeletable there — only hand-added entries had a Remove button.
   Removing one also clears its ✓ from the plan's calendar, since the log and the
   plan are two records of the same event.
-- New **Plans finished** stat and a **Plan progress** panel showing how far
-  through each started plan you are, beside the activity summary.
+- New **Plans finished** stat and a **Plan progress** panel beside the activity
+  summary, split into **Finished** and **In progress**.
+- Finishing a plan is now **recorded permanently** — name, finish date, how many
+  days it took and how many workouts — and kept even if you later edit or delete
+  the plan. A plan counts as finished when every one of its workout days is
+  marked, in whatever order you did them. Un-marking a day removes the record
+  again; editing or deleting the plan does not. Each finished plan can be
+  forgotten individually, which is the only way to erase one. Plans finished
+  before this shipped are backfilled on first run.
 
 **AI plan builder**
 
@@ -118,6 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   videos looked identical to one that was never checked.
 - The plan builder says **"Workout Day N"** rather than "Day N", and its
   wording points at the plan's own rhythm rather than the global setting.
+- Uploading a CSV/TSV plan claims the **main slot only**. It used to deactivate
+  everything, which would now silently drop your extra plan as well.
 
 ### Fixed
 
@@ -128,6 +139,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A long workout title ran underneath the hero's floating thumbnail at any width
   between 600px and a wide desktop. The text now stops short of the image, and
   the image hides below 900px instead of 600px.
+
+### Internal
+
+- `GET /api/schedule` returns a `schedules[]` array, one entry per active plan,
+  each with its own pattern and start date. The previous single-plan fields
+  (`schedule`, `planName`, `startDate`, `pattern`) remain, mirroring the main
+  plan.
+- `GET /api/plan/:id` additionally returns `days[]` (each day's videos resolved)
+  and a de-duplicated `videos[]`, so plan views don't fetch and filter the whole
+  library.
+- New endpoints: `POST /api/plan/deactivate/:id`, `POST /api/plan/:id/duplicate`,
+  `GET /api/profile/plan-progress`, `DELETE /api/profile/plan-completions/:id`.
+- `is_active` on `workout_plans` now carries the slot: 0 inactive, 1 main,
+  2 extra. Every existing `WHERE is_active = 1` still means "the main plan".
 
 ## [1.4.1] - 2026-08-10
 

@@ -268,11 +268,38 @@ export default async function (fastify: FastifyInstance) {
       };
     });
 
+    // Plans you've carried to the end, kept whatever happens to the plan
+    // afterwards. This is the durable half: `progress` above describes plans
+    // that still exist, this describes things you did.
+    const finished = db.prepare(`
+      SELECT id, plan_id, plan_name, workout_count, started_on, finished_on, days_taken
+      FROM plan_completions
+      ORDER BY finished_on DESC, finished_at DESC
+    `).all() as any[];
+
     return reply.send({
       plans: progress,
-      finished: progress.filter(p => p.isFinished).length,
+      finished: finished.map(row => ({
+        id: row.id,
+        planId: row.plan_id,
+        planName: row.plan_name,
+        workoutCount: row.workout_count,
+        startedOn: row.started_on,
+        finishedOn: row.finished_on,
+        daysTaken: row.days_taken,
+      })),
+      finishedCount: finished.length,
       inProgress: progress.filter(p => !p.isFinished && p.completedWorkouts > 0).length,
     });
+  });
+
+  // Remove a finished-plan record. The only way to erase one, since nothing
+  // else does: deleting or editing the plan itself deliberately leaves it.
+  fastify.delete('/plan-completions/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!id) return reply.code(400).send({ error: 'id is required' });
+    const result = db.prepare('DELETE FROM plan_completions WHERE id = ?').run(id);
+    return reply.send({ success: true, deleted: result.changes });
   });
 
   // Remove a logged workout (all its rows), whether it was added by hand or

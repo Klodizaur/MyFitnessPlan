@@ -3121,3 +3121,54 @@ nav .nav-links a:hover, nav .nav-links a.active {
 @media (max-width: 900px) {
   .dashboard-hero-thumb { display: none !important; }
 }
+
+/* Finished-plan records in the log's plans panel. */
+.log-plans-subheading {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.7rem;
+}
+
+.log-finished-plan {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-hover);
+  border: 1px solid var(--glass-border);
+}
+
+.log-finished-plan-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-finished-plan-meta {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.log-finished-plan-forget {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.log-finished-plan-forget:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}

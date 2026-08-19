@@ -347,8 +347,15 @@
     "delete_planned_confirm": "Remove this workout from your log?\n\nIt was completed in a plan, so this also clears its ✓ from that plan's calendar.",
     "stats_plans_finished": "Plans finished",
     "plans_heading": "Plan progress",
-    "plans_hint": "Plans you've started, and how many of their workout days you've completed. Editing a plan clears its progress, and deleting one removes it from here.",
-    "stats_active_days_in": "Active days in {{month}}"
+    "plans_hint": "Plans you've finished are kept here for good. Plans still in progress are read from the plan itself, so editing one clears its progress and deleting one removes it.",
+    "stats_active_days_in": "Active days in {{month}}",
+    "plans_finished_heading": "Finished",
+    "plans_progress_heading": "In progress",
+    "plans_finished_on": "Finished {{date}}",
+    "plans_took_days_one": "took 1 day",
+    "plans_took_days_other": "took {{count}} days",
+    "plans_forget": "Remove from finished plans",
+    "plans_forget_confirm": "Remove this plan from your finished plans?\n\nThis only erases the record that you completed it."
   },
   "player": {
     "youtube_error_embed_blocked": "The person who uploaded this video doesn't allow it to play outside YouTube.",

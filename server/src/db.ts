@@ -70,6 +70,28 @@ db.exec(`
   );
 `);
 
+/**
+ * Durable record of plans carried through to the end.
+ *
+ * Deliberately mirrors `workout_log`: no foreign keys, and every field the UI
+ * needs copied in at the moment it happens. A finished plan is a thing you did,
+ * not a property of a plan that still exists — editing a plan wipes its
+ * completion marks and deleting it takes them with it, and neither should erase
+ * the fact that you once finished it.
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS plan_completions (
+    id TEXT PRIMARY KEY,
+    plan_id TEXT,
+    plan_name TEXT NOT NULL,
+    workout_count INTEGER NOT NULL DEFAULT 0,
+    started_on TEXT,
+    finished_on TEXT NOT NULL,
+    days_taken INTEGER,
+    finished_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
 // Insert default settings if they don't exist
 const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 insertSetting.run('workout_pattern', JSON.stringify([1, 1, 1, 1, 1, 0])); // 5 work, 1 rest
@@ -262,6 +284,56 @@ if (!workoutLogInfo.some((c: any) => c.name === 'notes')) {
 }
 
 db.exec('CREATE INDEX IF NOT EXISTS idx_workout_log_date ON workout_log(completed_date)');
+
+// One-time seeding of plan_completions from plans that are already finished.
+// Runs only while the table is empty, so a plan finished before this shipped
+// still shows up. The finish date comes from the last completion mark on that
+// plan; the elapsed days from its start date.
+const planCompletionCount = (db.prepare('SELECT COUNT(*) AS c FROM plan_completions').get() as { c: number }).c;
+if (planCompletionCount === 0) {
+  const seedPlans = db.prepare('SELECT id, name, start_date FROM workout_plans').all() as any[];
+  const insertCompletion = db.prepare(`
+    INSERT INTO plan_completions
+      (id, plan_id, plan_name, workout_count, started_on, finished_on, days_taken, finished_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const plan of seedPlans) {
+    const workouts = db.prepare('SELECT id, video_ids FROM workouts WHERE plan_id = ?').all(plan.id) as any[];
+    if (workouts.length === 0) continue;
+
+    const done = db.prepare(`
+      SELECT workout_id, video_id, completed_at FROM history
+      WHERE workout_id IN (SELECT id FROM workouts WHERE plan_id = ?)
+    `).all(plan.id) as any[];
+    const dayMarks = new Set(done.filter(h => !h.video_id).map(h => h.workout_id));
+    const videoMarks = new Set(done.filter(h => h.video_id).map(h => `${h.workout_id}:${h.video_id}`));
+
+    const allDone = workouts.every(w => {
+      if (dayMarks.has(w.id)) return true;
+      let ids: string[] = [];
+      try {
+        const parsed = JSON.parse(w.video_ids || '[]');
+        if (Array.isArray(parsed)) ids = parsed;
+      } catch {}
+      return ids.length > 0 && ids.every(vid => videoMarks.has(`${w.id}:${vid}`));
+    });
+    if (!allDone) continue;
+
+    const last = done.map(h => h.completed_at).filter(Boolean).sort().pop();
+    const finishedAt = last || new Date().toISOString();
+    const finishedOn = String(finishedAt).slice(0, 10);
+    const daysTaken = plan.start_date
+      ? Math.max(1, Math.round((Date.parse(finishedOn) - Date.parse(plan.start_date)) / 86400000) + 1)
+      : null;
+
+    insertCompletion.run(
+      `seed-${plan.id}`, plan.id, plan.name, workouts.length,
+      plan.start_date ?? null, finishedOn, daysTaken, finishedAt
+    );
+  }
+}
+
+db.exec('CREATE INDEX IF NOT EXISTS idx_plan_completions_date ON plan_completions(finished_on)');
 
 // The 'snow' theme was removed. Anyone still on it would fall back to the bare
 // :root variables, so move them onto the default theme explicitly.

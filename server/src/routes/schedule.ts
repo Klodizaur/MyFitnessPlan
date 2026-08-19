@@ -17,6 +17,86 @@ function parseTags(raw: string | null): string[] {
   }
 }
 
+/**
+ * Whether every workout day in a plan is marked done — order irrelevant, since
+ * this asks "are any left?", not "was the last one done?".
+ *
+ * A day counts by the same rule the schedule uses: it has a day-level mark, or
+ * all of its videos are marked.
+ */
+function isPlanComplete(planId: string): { complete: boolean; workoutCount: number } {
+  const workouts = db.prepare('SELECT id, video_ids FROM workouts WHERE plan_id = ?').all(planId) as any[];
+  if (workouts.length === 0) return { complete: false, workoutCount: 0 };
+
+  const marks = db.prepare(`
+    SELECT workout_id, video_id FROM history
+    WHERE workout_id IN (SELECT id FROM workouts WHERE plan_id = ?)
+  `).all(planId) as any[];
+  const dayMarks = new Set(marks.filter(h => !h.video_id).map(h => h.workout_id));
+  const videoMarks = new Set(marks.filter(h => h.video_id).map(h => `${h.workout_id}:${h.video_id}`));
+
+  const complete = workouts.every(w => {
+    if (dayMarks.has(w.id)) return true;
+    const ids = parseTags(w.video_ids);
+    return ids.length > 0 && ids.every(vid => videoMarks.has(`${w.id}:${vid}`));
+  });
+  return { complete, workoutCount: workouts.length };
+}
+
+/**
+ * Keep the durable record of finished plans in step with the plan's marks.
+ *
+ * A plan is finished when *every* workout day in it is marked — not when some
+ * particular final one is. People skip around, do day 7 before day 5, and come
+ * back to fill gaps; whichever mark happens to complete the set is the one that
+ * finishes the plan, and its date is the finish date.
+ *
+ * Un-marking a day afterwards removes the record again, because you haven't
+ * finished after all. Only un-marking does that — editing a plan also clears its
+ * marks, but that must not erase a plan you genuinely completed, and edits never
+ * come through here.
+ */
+async function syncPlanCompletion(planId: string, completedDate: string): Promise<void> {
+  const plan = db.prepare('SELECT id, name, start_date FROM workout_plans WHERE id = ?').get(planId) as any;
+  if (!plan) return;
+
+  const { complete, workoutCount } = isPlanComplete(planId);
+  const existing = db.prepare(
+    'SELECT id FROM plan_completions WHERE plan_id = ? ORDER BY finished_at DESC LIMIT 1'
+  ).get(planId) as { id: string } | undefined;
+
+  if (!complete) {
+    if (existing) db.prepare('DELETE FROM plan_completions WHERE id = ?').run(existing.id);
+    return;
+  }
+  if (existing) return;
+
+  const daysTaken = plan.start_date
+    ? Math.max(1, Math.round((Date.parse(completedDate) - Date.parse(plan.start_date)) / 86400000) + 1)
+    : null;
+
+  const { nanoid } = await import('nanoid');
+  db.prepare(`
+    INSERT INTO plan_completions
+      (id, plan_id, plan_name, workout_count, started_on, finished_on, days_taken)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(nanoid(), plan.id, plan.name, workoutCount, plan.start_date ?? null, completedDate, daysTaken);
+}
+
+/** The plan a workout belongs to, or '' when the workout is already gone. */
+function planIdOf(workoutId: string): string {
+  const row = db.prepare('SELECT plan_id FROM workouts WHERE id = ?').get(workoutId) as
+    | { plan_id?: string }
+    | undefined;
+  return row?.plan_id ?? '';
+}
+
+/** Local date for this desktop app, where the server clock is the user's clock. */
+function todayLocal(): string {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+}
+
 export default async function (fastify: FastifyInstance) {
   fastify.get('/', async (request, reply) => {
     // Get pattern and start date
@@ -195,6 +275,7 @@ export default async function (fastify: FastifyInstance) {
         db.prepare('DELETE FROM history WHERE workout_id = ? AND video_id IS NULL').run(workoutId);
         db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id IS NULL').run(workoutId);
       }
+      await syncPlanCompletion(planIdOf(workoutId), todayLocal());
       return reply.send({ success: true, completed: false });
     } else {
       const { nanoid } = await import('nanoid');
@@ -236,6 +317,9 @@ export default async function (fastify: FastifyInstance) {
           (id, workout_id, video_id, plan_name, workout_name, video_filename, thumbnail_path, completed_date)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(nanoid(), workoutId, videoId ?? null, planName, workout?.name ?? null, videoFilename, thumbnailPath, completedDate);
+
+      // Did that leave the plan with nothing outstanding?
+      if (workout?.plan_id) await syncPlanCompletion(workout.plan_id, completedDate);
 
       return reply.send({ success: true, completed: true });
     }

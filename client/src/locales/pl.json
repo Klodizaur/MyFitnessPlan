@@ -408,8 +408,17 @@
     "delete_planned_confirm": "Usunąć ten trening z dziennika?\n\nZostał ukończony w planie, więc zniknie też jego ✓ z kalendarza tego planu.",
     "stats_plans_finished": "Ukończone plany",
     "plans_heading": "Postęp planów",
-    "plans_hint": "Plany, które zaczęłaś/zacząłeś, i ile ich dni treningowych masz już za sobą. Edycja planu zeruje jego postęp, a usunięcie planu usuwa go stąd.",
-    "stats_active_days_in": "Aktywne dni: {{month}}"
+    "plans_hint": "Ukończone plany zostają tu na stałe. Plany w toku są odczytywane z samego planu, więc edycja zeruje postęp, a usunięcie planu usuwa go stąd.",
+    "stats_active_days_in": "Aktywne dni: {{month}}",
+    "plans_finished_heading": "Ukończone",
+    "plans_progress_heading": "W toku",
+    "plans_finished_on": "Ukończono {{date}}",
+    "plans_took_days_one": "zajęło 1 dzień",
+    "plans_took_days_few": "zajęło {{count}} dni",
+    "plans_took_days_many": "zajęło {{count}} dni",
+    "plans_took_days_other": "zajęło {{count}} dni",
+    "plans_forget": "Usuń z ukończonych planów",
+    "plans_forget_confirm": "Usunąć ten plan z ukończonych planów?\n\nSkasuje to tylko zapis o jego ukończeniu."
   },
   "player": {
     "youtube_error_embed_blocked": "Autor tego filmu nie zezwala na odtwarzanie go poza YouTube.",
