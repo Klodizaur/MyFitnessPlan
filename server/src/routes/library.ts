@@ -21,6 +21,12 @@ export const VALID_EQUIPMENT = [
   'pilates_ball',
   'pilates_bar',
   'kettlebell',
+  'barbell',
+  'step',
+  'bench',
+  // Bodyweight-only. A tag rather than the absence of one, so "needs nothing"
+  // is something a video can actually say.
+  'no_equipment',
 ] as const;
 
 export const VALID_TRAINING_TYPES = ['HIIT', 'Cardio', 'Strength', 'Mobility', 'Yoga', 'Pilates', 'Functional Strength Training', 'Warmup', 'Cooldown', 'Stretching', 'Standing', 'No Jumping', 'Period-Friendly'] as const;

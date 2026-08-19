@@ -5,6 +5,155 @@ All notable changes to MyFitnessPlan are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-08-19
+
+### ⚠️ Upgrade notes
+
+- A `plan_completions` table is added, and seeded once from any plan already
+  finished, so existing completions aren't lost.
+- Two columns are added to `workout_plans` (`description`, `workout_pattern`).
+  Both are additive and NULL on existing rows, and NULL means "as before": no
+  description, and follow the workout pattern in Settings. Existing plans,
+  schedules and history are untouched — no plan changes its rhythm until you
+  give it one.
+- Desktop app data lives in the per-user data directory, which installing over
+  the current app never touches.
+
+### Added
+
+**Two active plans**
+
+- A plan can be activated as your **main plan** or as an **extra plan** running
+  alongside it, so a short mobility or core block can sit next to the main
+  programme instead of replacing it. Each plan card offers both slots.
+- The Calendar shows tabs when both slots are filled, one plan's schedule at a
+  time; each plan is scheduled from its own start date.
+- The **dashboard** pages between active plans inside its hero, with arrows and
+  dots; the banner, progress and upcoming panels follow the selection.
+- Active plans can be **deactivated** without deleting them, freeing their slot.
+
+**Per-plan workout rhythm**
+
+- A plan can carry its **own workout/rest cycle** instead of sharing one global
+  setting — which mattered once two plans could be active at once, since a
+  gentle mobility plan and a five-day strength plan were forced onto the same
+  rhythm. Each active plan now lays out on its own.
+- It's an **override, not a replacement**: a plan uses the pattern from Settings
+  unless you choose *Set for this plan*. Change the Settings pattern and every
+  plan still following it moves with it.
+- Editable in the plan builder next to the name and start date, and in the AI
+  builder beside the workout-day count, where it also paces the draft.
+
+**Plan details**
+
+- Clicking a plan (anywhere but its buttons) opens a **details view**: category,
+  start date, workout count, equipment, description and offline warning, plus
+  the plan laid out **day by day** — each day a card with the same slider the
+  calendar uses when a day holds several videos.
+- The details view carries the plan's actions: activate into either slot (with
+  a start date), deactivate, edit, **duplicate**, and delete — so looking at a
+  plan and acting on it aren't two separate trips.
+- Duplicating copies the days, category, description, rhythm and background into
+  a new inactive plan, for branching a plan you're already running.
+
+**Plan descriptions**
+
+- Plans can carry a **description** — what the plan is for, how it should feel.
+  Written in the plan builder, shown on the active plan's card and in full in
+  the plan details view.
+- An AI draft pre-fills it with the summary of the structure the model chose,
+  editable like everything else before saving.
+
+**Tags on calendar previews**
+
+- Calendar day cards show the previewed video's **intensity, training type,
+  body parts and equipment** as chips under the thumbnail. In slider view the
+  chips follow the part you're looking at.
+- Tag chips that overflow into a **"+2"** can be clicked to show the rest.
+
+**Log**
+
+- Workouts marked done in the player can now be **removed from the log**. They
+  used to be undeletable there — only hand-added entries had a Remove button.
+  Removing one also clears its ✓ from the plan's calendar, since the log and the
+  plan are two records of the same event.
+- New **Plans finished** stat and a **Plan progress** panel beside the activity
+  summary, split into **Finished** and **In progress**.
+- Finishing a plan is now **recorded permanently** — name, finish date, how many
+  days it took and how many workouts — and kept even if you later edit or delete
+  the plan. A plan counts as finished when every one of its workout days is
+  marked, in whatever order you did them. Un-marking a day removes the record
+  again; editing or deleting the plan does not. Each finished plan can be
+  forgotten individually, which is the only way to erase one. Plans finished
+  before this shipped are backfilled on first run.
+
+**AI plan builder**
+
+- The album step shows **album covers** instead of text chips — the same artwork
+  the Library uses, including a cover you set there yourself. Click once to use
+  only that album, again to leave it out.
+- **Plan builder form** in AI settings: keep every question on one page, or
+  switch to **one step at a time** with progress and Back/Continue. Defaults to
+  the existing all-at-once form.
+
+**Equipment tags**
+
+- Added **Barbell**, **Step**, **Bench** and **No Equipment**.
+
+### Changed
+
+- **Build with AI** no longer asks the model for weeks with rest days in them.
+  It asks for a flat list of training sessions and says plainly that the app
+  inserts rest itself and discards empty entries — so the model stops padding
+  each week with breaks that were only going to be thrown away.
+- **Build with AI** asks for a number of **workout days**, not weeks. Empty day
+  slots are discarded on save, so a plan asked for in weeks could come out a
+  fraction of its apparent length; the number you pick is now the number of
+  sessions you get, and the draft is trimmed to it.
+- If the library can't stretch to every workout day requested, the builder says
+  how many it managed instead of leaving you to count.
+- The AI form's questions are **required**, except equipment and albums, where
+  "nothing selected" genuinely means "anything goes".
+- **Body-part icons** are now one drawn set: the same figure each time with the
+  relevant part filled in, instead of the same generic person icon for all ten.
+- The player's **description and tags** are two separate panels side by side —
+  description wider, tags narrower — each with its own heading, instead of
+  sharing one card.
+- The log's month stat counts **active days** rather than workouts logged, and
+  follows the **month shown in the calendar** as you page through it. The
+  all-time stats stay put.
+- Active plan cards always show the equipment row, saying **"No equipment
+  tagged"** when there is none, rather than hiding it — a plan with untagged
+  videos looked identical to one that was never checked.
+- The plan builder says **"Workout Day N"** rather than "Day N", and its
+  wording points at the plan's own rhythm rather than the global setting.
+- Uploading a CSV/TSV plan claims the **main slot only**. It used to deactivate
+  everything, which would now silently drop your extra plan as well.
+
+### Fixed
+
+- The dashboard hero's background image tiled instead of filling the card after
+  paging to the other active plan. React re-applied the `background` shorthand,
+  which resets `background-size` — and since `cover` itself hadn't changed, it
+  was never re-applied. Now set as longhands.
+- A long workout title ran underneath the hero's floating thumbnail at any width
+  between 600px and a wide desktop. The text now stops short of the image, and
+  the image hides below 900px instead of 600px.
+
+### Internal
+
+- `GET /api/schedule` returns a `schedules[]` array, one entry per active plan,
+  each with its own pattern and start date. The previous single-plan fields
+  (`schedule`, `planName`, `startDate`, `pattern`) remain, mirroring the main
+  plan.
+- `GET /api/plan/:id` additionally returns `days[]` (each day's videos resolved)
+  and a de-duplicated `videos[]`, so plan views don't fetch and filter the whole
+  library.
+- New endpoints: `POST /api/plan/deactivate/:id`, `POST /api/plan/:id/duplicate`,
+  `GET /api/profile/plan-progress`, `DELETE /api/profile/plan-completions/:id`.
+- `is_active` on `workout_plans` now carries the slot: 0 inactive, 1 main,
+  2 extra. Every existing `WHERE is_active = 1` still means "the main plan".
+
 ## [1.4.1] - 2026-08-10
 
 ### Added

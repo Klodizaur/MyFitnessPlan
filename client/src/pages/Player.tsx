@@ -98,8 +98,9 @@ export default function Player() {
     fetch('/api/schedule')
       .then(res => res.json())
       .then(data => {
-        const schedule = data.schedule || [];
-        const day = schedule.find((d: any) => d.workout?.id === workoutId);
+        // Either active plan (main or extra) can own this workout.
+        const days = (data.schedules || []).flatMap((plan: any) => plan.schedule || []);
+        const day = days.find((d: any) => d.workout?.id === workoutId);
         const videos = day?.workout?.videos || [];
         const currentVideo = videos.find((v: any) => v.id === videoId);
         if (currentVideo) {
@@ -220,7 +221,8 @@ export default function Player() {
   }
 
   const videoUrl = isExternal ? '' : videoStreamUrl(videoPath);
-  const hasMeta = Boolean(description.trim()) || equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity);
+  const hasTags = equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity);
+  const hasMeta = Boolean(description.trim()) || hasTags;
 
   const goToNext = () => {
     if (nextVideoId) navigate(`/player/${nextVideoId}/${workoutId}`);
@@ -338,18 +340,24 @@ export default function Player() {
       </div>
 
       {hasMeta && (
-        <div className="glass-card player-details player-details-grid">
-          {/* Left column: description (~70%) */}
-          <div className="player-details-text">
-            {description.trim() ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
-            ) : (
-              <span style={{ color: 'var(--text-secondary)' }}>{labels.noDescription}</span>
-            )}
+        /* Two panels rather than two columns of one: the description and the
+           tags are different kinds of thing, and a shared card ran them
+           together. The description takes the larger share. */
+        <div className={`player-details-grid${hasTags ? '' : ' single'}`}>
+          <div className="glass-card player-details">
+            <h3 className="player-details-heading">{t('player.description_heading')}</h3>
+            <div className="player-details-text">
+              {description.trim() ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
+              ) : (
+                <span style={{ color: 'var(--text-secondary)' }}>{labels.noDescription}</span>
+              )}
+            </div>
           </div>
 
-          {/* Right column: tags (~30%) */}
-          {(equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity)) && (
+          {hasTags && (
+            <div className="glass-card player-details">
+            <h3 className="player-details-heading">{t('player.tags_heading')}</h3>
             <div className="player-details-tags" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Equipment */}
               {equipment.length > 0 && (
@@ -408,6 +416,7 @@ export default function Player() {
                   </div>
                 </div>
               )}
+            </div>
             </div>
           )}
         </div>

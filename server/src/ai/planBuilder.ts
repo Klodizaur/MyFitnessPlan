@@ -29,17 +29,33 @@ export interface DraftPlan {
   /** How many library videos were eligible, and whether the list was capped. */
   candidateCount: number;
   truncated: boolean;
+  /**
+   * Workout days actually filled. Normally equals the number requested, but a
+   * thin catalogue can leave the model short — the client says so rather than
+   * letting the user find out by counting.
+   */
+  workoutDayCount: number;
 }
 
 export interface GenerateRequest extends CandidateFilter {
   description: string;
-  weeks: number;
+  /**
+   * How many workout days the finished plan should have.
+   *
+   * This is the number the user actually gets: empty day slots are dropped when
+   * the plan is saved, and the calendar spreads the remaining sessions over the
+   * rest pattern from Settings. Asking for a number of *weeks* instead used to
+   * make the plan look far longer than it turned out to be, because the rest
+   * slots that padded it out never survived the save.
+   */
+  workoutDays: number;
   daysPerWeek: number;
 }
 
 /** The builder models a week as seven day slots; rest days are simply empty. */
 const DAYS_PER_WEEK = 7;
 const MAX_WEEKS = 12;
+const MAX_WORKOUT_DAYS = MAX_WEEKS * DAYS_PER_WEEK;
 
 /**
  * The coaching brief.
@@ -61,7 +77,7 @@ const MAX_WEEKS = 12;
  * name/summary follow the user's preferred language rather than drifting to
  * whatever language dominates the video catalogue.
  */
-function buildSystemPrompt(): string {
+function buildSystemPrompt(daysPerWeek: number): string {
   return `You are an experienced personal trainer building a home workout plan for one person, using only a fixed catalogue of workout videos they already own.
 
 You arrange the training they have. You do not assess anyone's health, diagnose anything, or work around an injury beyond respecting what the person tells you about it.
@@ -77,18 +93,20 @@ BUILDING A DAY
 - If the catalogue has nothing tagged as a warm-up or cool-down, use the shortest and gentlest videos available for those slots, or leave them out — never substitute hard work into them.
 - A long video (roughly 30 minutes or more) is a complete session on its own — it almost always contains its own warm-up and cool-down. Never put two long videos on the same day, and do not bolt extra work onto one. After a hard long session you may add a short stretch or cool-down, nothing more.
 
-BUILDING A WEEK
-- Respect the requested number of training days. Put those sessions in consecutive day slots from the start of the week, and leave every later slot empty.
-- Empty slots are rest in the training sequence. The person's calendar pattern decides which weekdays are rest days, so do not try to place rests on specific calendar days — just leave unused slots empty.
-- Hard work needs recovery. Do not schedule high-intensity sessions (HIIT, hard cardio, heavy strength) on consecutive training days, and use at most two or three in a week.
-- Do not train the same body part hard on back-to-back training days. Alternate the emphasis.
-- Use the breadth of the catalogue. Do not repeat a video within the same week unless the catalogue is too small to avoid it, and never on consecutive training days.
-- In any week with four or more training days, make at least one of them deliberately easy — mobility, stretching, or low intensity.
+BUILDING THE SEQUENCE
+- Return one flat list of training days, in the order the person will do them. The first entry is their first workout, the second is the next time they train, and so on.
+- NEVER return a rest day, an empty day, a "recovery" entry with no videos, or any placeholder. Every entry must contain at least one video.
+- This matters more than it looks: the app adds rest itself, from the person's own schedule, and it DISCARDS any entry you send with no videos. An empty entry does not become a rest day — it disappears, and the plan ends up shorter than the person asked for. Do not think in weeks with rest days in them; think only in training sessions.
+- Because rest is inserted afterwards, consecutive entries are NOT consecutive calendar days. Read each entry as "the next time this person trains".
+- Hard work still needs recovery. Do not put two high-intensity sessions (HIIT, hard cardio, heavy strength) back to back in the list, and keep them to two or three in any run of ${daysPerWeek} entries.
+- Do not train the same body part hard on back-to-back entries. Alternate the emphasis.
+- Use the breadth of the catalogue. Avoid repeating a video within any run of ${daysPerWeek} entries unless the catalogue is too small to avoid it, and never on back-to-back entries.
+- In any run of ${daysPerWeek} entries, make at least one deliberately easy — mobility, stretching, or low intensity.
 
-ACROSS WEEKS
-- Build gradually. Do not open week one with the hardest sessions available.
-- Increase volume or intensity a little at a time, and not both in the same week.
-- In a plan of four weeks or more, make roughly every fourth week lighter to allow recovery.
+PROGRESSION
+- Build gradually. Do not open with the hardest sessions available.
+- Increase volume or intensity a little at a time, and not both at once.
+- Over a long plan, make roughly every fourth run of ${daysPerWeek} entries lighter to allow recovery.
 
 CONSTRAINTS
 - Equipment, album and length limits are already applied — everything in the catalogue is allowed.
@@ -102,7 +120,9 @@ NAMING
 - Give the plan a short, specific title (roughly 2–6 words) that reflects the goal or focus — not a generic label like "Workout Plan" or "AI Plan".
 
 Reply with JSON only, no prose and no code fences, in exactly this shape:
-{"name":"short plan title","summary":"one or two sentences on the structure you chose","weeks":[{"days":[{"videoIds":["id1","id2"]},{"videoIds":[]}]}]}`;
+{"name":"short plan title","summary":"one or two sentences on the structure you chose","days":[{"videoIds":["id1","id2"]},{"videoIds":["id3"]}]}
+
+Every entry in "days" must have at least one id. Do not emit an entry with an empty "videoIds".`;
 }
 
 /** Which language the model must use for name and summary. */
@@ -123,7 +143,7 @@ function planLanguageRule(): string {
 }
 
 export async function generatePlan(request: GenerateRequest): Promise<DraftPlan> {
-  const weeks = clamp(Math.round(request.weeks) || 1, 1, MAX_WEEKS);
+  const workoutDays = clamp(Math.round(request.workoutDays) || 1, 1, MAX_WORKOUT_DAYS);
   const daysPerWeek = clamp(Math.round(request.daysPerWeek) || 3, 1, DAYS_PER_WEEK);
 
   const candidateSet = selectCandidates(request);
@@ -135,15 +155,17 @@ export async function generatePlan(request: GenerateRequest): Promise<DraftPlan>
   }
 
   const raw = await callModel({
-    system: buildSystemPrompt(),
-    user: buildUserPrompt(request, weeks, daysPerWeek, candidateSet),
+    system: buildSystemPrompt(daysPerWeek),
+    user: buildUserPrompt(request, workoutDays, daysPerWeek, candidateSet),
   });
 
   const parsed = parseJsonReply(raw);
   const known = new Set(candidateSet.candidates.map(c => c.id));
-  const { draftWeeks, droppedIds } = validateWeeks(parsed?.weeks, weeks, known);
+  const { days, droppedIds } = validateDays(parsed, workoutDays, known);
+  const draftWeeks = packIntoWeeks(days);
+  const workoutDayCount = days.length;
 
-  if (draftWeeks.every(week => week.days.every(day => day.videoIds.length === 0))) {
+  if (workoutDayCount === 0) {
     throw new AiError(
       'The model did not pick any videos from your library. Try again, or check that the model name is right.',
       'empty_plan'
@@ -157,21 +179,56 @@ export async function generatePlan(request: GenerateRequest): Promise<DraftPlan>
     droppedIds,
     candidateCount: candidateSet.candidates.length,
     truncated: candidateSet.truncated,
+    workoutDayCount,
   };
+}
+
+/**
+ * Pack the training days into the week grid the builder renders on.
+ *
+ * Purely presentational: the builder lays a plan out in rows of seven, and the
+ * save path renumbers whatever is non-empty, so packing consecutively preserves
+ * the order the model chose. A row of seven here is "the next seven sessions",
+ * not a calendar week — the calendar's rest days are applied later, from the
+ * user's own schedule pattern.
+ */
+function packIntoWeeks(days: DraftDay[]): DraftWeek[] {
+  const emptyWeek = (): DraftWeek => ({
+    days: Array.from({ length: DAYS_PER_WEEK }, () => ({ videoIds: [] as string[] })),
+  });
+  if (days.length === 0) return [emptyWeek()];
+
+  const weeks: DraftWeek[] = [];
+  for (let start = 0; start < days.length; start += DAYS_PER_WEEK) {
+    const week = emptyWeek();
+    days.slice(start, start + DAYS_PER_WEEK).forEach((day, index) => {
+      week.days[index] = day;
+    });
+    weeks.push(week);
+  }
+  return weeks;
 }
 
 function buildUserPrompt(
   request: GenerateRequest,
-  weeks: number,
+  workoutDays: number,
   daysPerWeek: number,
   candidateSet: CandidateSet
 ): string {
   const lines: string[] = [];
 
   lines.push(
-    `Plan length: ${weeks} week(s), ${daysPerWeek} training day(s) per week ` +
-    `(from the user's workout schedule pattern). ` +
-    `Fill that many consecutive day slots in each week; leave the rest empty.`
+    `Plan length: exactly ${workoutDays} training day(s). Return exactly ` +
+    `${workoutDays} entries in "days", every single one holding at least one ` +
+    `video. Do not add rest days, empty entries or spacers of any kind — the ` +
+    `app inserts rest itself and throws away anything empty, which would leave ` +
+    `this person with fewer sessions than they asked for.`
+  );
+  lines.push(
+    `For pacing only: this person trains about ${daysPerWeek} time(s) a week ` +
+    `(from their workout schedule pattern), so assume roughly that rhythm when ` +
+    `you space hard sessions out and build the plan up. Do not turn it into ` +
+    `weeks in the output — the output is one flat list.`
   );
   if (request.maxMinutes > 0) {
     // Worth stating: the catalogue was already filtered to fit, so the model
@@ -202,7 +259,8 @@ function buildUserPrompt(
 
   lines.push(
     '',
-    `Build the plan now. Return exactly ${weeks} week(s), each with exactly ${DAYS_PER_WEEK} day slots.`
+    `Build the plan now. Return exactly ${workoutDays} entries in "days", in the ` +
+    `order they will be done, each with at least one video id and no empty entries.`
   );
   return lines.join('\n');
 }
@@ -238,50 +296,64 @@ function parseJsonReply(raw: string): any {
 }
 
 /**
- * Coerce whatever came back into exactly `weeks` weeks of seven days, keeping
- * only ids that exist in the catalogue.
+ * Coerce whatever came back into a list of training days, keeping only ids that
+ * exist in the catalogue.
  *
- * Anything unrecognised is dropped and reported rather than passed through: a
- * phantom id would render as a nameless row in the builder and then vanish on
- * save, so the plan the user reviewed would not be the plan they saved.
+ * Two things are dropped on the way through, and both matter:
+ *
+ * Unrecognised ids are dropped and reported rather than passed on — a phantom
+ * id renders as a nameless row in the builder and then vanishes on save, so the
+ * plan the user reviewed would not be the plan they saved.
+ *
+ * Empty days are dropped outright. The model is told not to emit them, but if
+ * one slips through it must not survive: the save path discards empty days, so
+ * keeping one here would quietly shorten the plan below the number the user
+ * asked for — the exact failure this flat-list shape exists to prevent.
  */
-function validateWeeks(
-  rawWeeks: unknown,
-  weeks: number,
+function validateDays(
+  parsed: any,
+  workoutDays: number,
   known: Set<string>
-): { draftWeeks: DraftWeek[]; droppedIds: string[] } {
-  const source = Array.isArray(rawWeeks) ? rawWeeks : [];
+): { days: DraftDay[]; droppedIds: string[] } {
+  // The flat list is the shape we ask for. A model that falls back to the older
+  // nested "weeks" shape is flattened rather than failed — its rest slots are
+  // empty days, which the empty-day rule below removes anyway.
+  const rawDays: unknown[] = Array.isArray(parsed?.days)
+    ? parsed.days
+    : Array.isArray(parsed?.weeks)
+      ? parsed.weeks.flatMap((week: any) => (Array.isArray(week?.days) ? week.days : []))
+      : [];
+
   const dropped = new Set<string>();
-  const draftWeeks: DraftWeek[] = [];
+  const days: DraftDay[] = [];
 
-  for (let w = 0; w < weeks; w++) {
-    const rawDays = Array.isArray((source[w] as any)?.days) ? (source[w] as any).days : [];
-    const days: DraftDay[] = [];
+  for (const raw of rawDays) {
+    // Overshooting is capped here: the count the user picked is the count they get.
+    if (days.length >= workoutDays) break;
 
-    for (let d = 0; d < DAYS_PER_WEEK; d++) {
-      const rawIds = (rawDays[d] as any)?.videoIds;
-      const seen = new Set<string>();
-      const videoIds: string[] = [];
+    const rawIds = (raw as any)?.videoIds;
+    const seen = new Set<string>();
+    const videoIds: string[] = [];
 
-      if (Array.isArray(rawIds)) {
-        for (const value of rawIds) {
-          if (typeof value !== 'string') continue;
-          const id = value.trim();
-          if (!id || seen.has(id)) continue;
-          if (!known.has(id)) {
-            dropped.add(id);
-            continue;
-          }
-          seen.add(id);
-          videoIds.push(id);
+    if (Array.isArray(rawIds)) {
+      for (const value of rawIds) {
+        if (typeof value !== 'string') continue;
+        const id = value.trim();
+        if (!id || seen.has(id)) continue;
+        if (!known.has(id)) {
+          dropped.add(id);
+          continue;
         }
+        seen.add(id);
+        videoIds.push(id);
       }
-      days.push({ videoIds });
     }
-    draftWeeks.push({ days });
+
+    if (videoIds.length === 0) continue;
+    days.push({ videoIds });
   }
 
-  return { draftWeeks, droppedIds: Array.from(dropped) };
+  return { days, droppedIds: Array.from(dropped) };
 }
 
 /** Keep a model-suggested title short and safe to drop into the builder field. */

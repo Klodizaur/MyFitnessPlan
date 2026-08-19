@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { topLevelAlbumKey, toAlbumRouteParam } from '../lib/paths';
@@ -29,45 +29,64 @@ interface PlanInfo {
   lastDate: string;
 }
 
+/** One active plan's schedule. Two can run at once: a main plan and an extra. */
+interface PlanSchedule {
+  slot: 'main' | 'extra';
+  planId: string;
+  planName: string;
+  startDate: string;
+  schedule: ScheduleDay[];
+}
+
 export default function Dashboard() {
   const { t, i18n } = useTranslation();
-  const [todaySchedule, setTodaySchedule] = useState<ScheduleDay | null>(null);
-  const [upcomingWorkouts, setUpcomingWorkouts] = useState<ScheduleDay[]>([]);
-  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
+  const [planSchedules, setPlanSchedules] = useState<PlanSchedule[]>([]);
+  // Which active plan the hero is showing. Both plans run at once, so the
+  // dashboard shows one at a time and lets you step between them rather than
+  // stacking two heroes or silently hiding the second.
+  const [planIndex, setPlanIndex] = useState(0);
   const [libraryPreview, setLibraryPreview] = useState<{ key: string; title: string; cover?: string | null; count: number }[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetch('/api/schedule')
       .then(res => res.json())
-      .then(data => {
-        if (data.schedule && data.schedule.length > 0) {
-          const today = new Date().toISOString().split('T')[0];
-
-          const workoutDays = data.schedule.filter((d: any) => d.isWorkoutDay);
-          setPlanInfo({
-            name: data.planName || '',
-            totalWorkouts: workoutDays.length,
-            completedWorkouts: workoutDays.filter((d: any) => d.workout?.isCompleted).length,
-            firstDate: data.schedule[0].date,
-            lastDate: data.schedule[data.schedule.length - 1].date,
-          });
-
-          const todayIndex = data.schedule.findIndex((d: any) => d.date === today);
-
-          if (todayIndex !== -1) {
-            setTodaySchedule(data.schedule[todayIndex]);
-
-            // Find next 2 workouts (skip rest days)
-            const nextWorkouts = data.schedule
-              .slice(todayIndex + 1)
-              .filter((d: any) => d.isWorkoutDay)
-              .slice(0, 2);
-            setUpcomingWorkouts(nextWorkouts);
-          }
-        }
-      });
+      .then(data => setPlanSchedules(data.schedules || []));
   }, []);
+
+  const selectedPlan = planSchedules[planIndex] || null;
+
+  // Everything the page renders is derived from whichever plan is selected, so
+  // stepping to the extra plan moves the hero, the banner and the progress
+  // panels together.
+  const { todaySchedule, upcomingWorkouts, planInfo } = useMemo(() => {
+    const schedule = selectedPlan?.schedule || [];
+    if (schedule.length === 0) {
+      return { todaySchedule: null as ScheduleDay | null, upcomingWorkouts: [] as ScheduleDay[], planInfo: null as PlanInfo | null };
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const workoutDays = schedule.filter(d => d.isWorkoutDay);
+    const info: PlanInfo = {
+      name: selectedPlan?.planName || '',
+      totalWorkouts: workoutDays.length,
+      completedWorkouts: workoutDays.filter(d => d.workout?.isCompleted).length,
+      firstDate: schedule[0].date,
+      lastDate: schedule[schedule.length - 1].date,
+    };
+
+    const todayIndex = schedule.findIndex(d => d.date === today);
+    if (todayIndex === -1) {
+      return { todaySchedule: null as ScheduleDay | null, upcomingWorkouts: [] as ScheduleDay[], planInfo: info };
+    }
+
+    return {
+      todaySchedule: schedule[todayIndex],
+      // Next two workouts, skipping rest days.
+      upcomingWorkouts: schedule.slice(todayIndex + 1).filter(d => d.isWorkoutDay).slice(0, 2),
+      planInfo: info,
+    };
+  }, [selectedPlan]);
 
   useEffect(() => {
     fetch('/api/library/videos')
@@ -128,7 +147,9 @@ export default function Dashboard() {
         <div className="glass-card" style={{ padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '-1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', minWidth: 0 }}>
             <span style={{ background: 'var(--accent-color)', color: 'white', padding: '3px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', flexShrink: 0 }}>
-              {t('dashboard.active_plan')}
+              {planSchedules.length > 1 && selectedPlan
+                ? t(selectedPlan.slot === 'extra' ? 'plans.slot_extra' : 'plans.slot_main')
+                : t('dashboard.active_plan')}
             </span>
             <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{planInfo.name}</span>
           </div>
@@ -143,7 +164,9 @@ export default function Dashboard() {
 
       {/* Hero Section */}
       <div 
-        className="glass-card" 
+        className={`glass-card${planSchedules.length > 1 ? ' dashboard-hero-paged' : ''}${
+          todaySchedule?.isWorkoutDay && firstPendingVideo?.thumbnail ? ' dashboard-hero-has-thumb' : ''
+        }`}
         style={{ 
           position: 'relative',
           minHeight: '400px',
@@ -153,16 +176,59 @@ export default function Dashboard() {
           border: todaySchedule?.workout?.isCompleted ? '2px solid #10b981' : '1px solid var(--glass-border)',
         }}
       >
+        {/* With a second plan active, the hero becomes a pager over both rather
+            than a second card: same container, one plan at a time. */}
+        {planSchedules.length > 1 && (
+          <>
+            <button
+              type="button"
+              className="slider-nav-btn dashboard-plan-nav"
+              style={{ left: '14px' }}
+              aria-label={t('plans.scroll_prev')}
+              onClick={() => setPlanIndex(i => (i - 1 + planSchedules.length) % planSchedules.length)}
+            >
+              <span>‹</span>
+            </button>
+            <button
+              type="button"
+              className="slider-nav-btn dashboard-plan-nav"
+              style={{ right: '14px' }}
+              aria-label={t('plans.scroll_next')}
+              onClick={() => setPlanIndex(i => (i + 1) % planSchedules.length)}
+            >
+              <span>›</span>
+            </button>
+            <div className="dashboard-plan-dots">
+              {planSchedules.map((plan, index) => (
+                <button
+                  key={plan.planId}
+                  type="button"
+                  className={`dashboard-plan-dot${index === planIndex ? ' selected' : ''}`}
+                  aria-label={plan.planName}
+                  onClick={() => setPlanIndex(index)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
         {todaySchedule ? (
           <>
             <div style={{ 
               position: 'absolute', 
               top: 0, left: 0, right: 0, bottom: 0, 
               zIndex: 0,
-              background: todaySchedule.isWorkoutDay && firstPendingVideo?.thumbnail 
-                ? `url(/thumbnails/${firstPendingVideo.thumbnail})` 
-                : 'var(--surface-color)',
+              // Longhands, not the `background` shorthand. Paging to the other
+              // plan changes only the image; React would then re-set the
+              // shorthand, which resets background-size back to `auto` — and
+              // because `cover` itself hasn't changed, React doesn't re-apply
+              // it, leaving the thumbnail tiled at its natural size.
+              backgroundColor: 'var(--surface-color)',
+              backgroundImage: todaySchedule.isWorkoutDay && firstPendingVideo?.thumbnail
+                ? `url(/thumbnails/${firstPendingVideo.thumbnail})`
+                : 'none',
               backgroundSize: 'cover',
+              backgroundRepeat: 'no-repeat',
               backgroundPosition: 'center',
               filter: 'brightness(0.3) blur(2px)',
               transform: 'scale(1.1)'

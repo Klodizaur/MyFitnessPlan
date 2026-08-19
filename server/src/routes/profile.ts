@@ -227,16 +227,103 @@ export default async function (fastify: FastifyInstance) {
     return reply.send({ success: true, workoutIds });
   });
 
-  // Remove a manually-added workout (all its rows). Guarded to is_manual = 1 so
-  // app-completion history can never be deleted through this endpoint.
+  /**
+   * How far through each plan you are, and which ones you've finished.
+   *
+   * Read from `history` — the same rows that put the ✓ on the calendar — so a
+   * plan counts as finished exactly when its calendar says every workout day is
+   * done. That ties this to plans that still exist: editing a plan clears its
+   * completion history by design, and deleting one takes its history with it,
+   * so this is "plans in the app you've finished", not an all-time tally.
+   */
+  fastify.get('/plan-progress', async (_request, reply) => {
+    const plans = db.prepare(
+      'SELECT id, name, is_active, category FROM workout_plans ORDER BY uploaded_at DESC'
+    ).all() as any[];
+    const workouts = db.prepare('SELECT id, plan_id, video_ids FROM workouts').all() as any[];
+    const history = db.prepare('SELECT workout_id, video_id FROM history').all() as any[];
+
+    const doneWorkouts = new Set(history.filter(h => !h.video_id).map(h => h.workout_id));
+    const doneVideos = new Set(history.filter(h => h.video_id).map(h => `${h.workout_id}:${h.video_id}`));
+
+    // Mirrors the schedule route: a day is done when it has a day-level mark, or
+    // when every video on it has been marked.
+    const isWorkoutDone = (w: any): boolean => {
+      if (doneWorkouts.has(w.id)) return true;
+      const ids = parseJsonArray(w.video_ids);
+      return ids.length > 0 && ids.every(vid => doneVideos.has(`${w.id}:${vid}`));
+    };
+
+    const progress = plans.map(plan => {
+      const own = workouts.filter(w => w.plan_id === plan.id);
+      const completed = own.filter(isWorkoutDone).length;
+      return {
+        id: plan.id,
+        name: plan.name,
+        category: plan.category ?? null,
+        slot: plan.is_active === 2 ? 'extra' : plan.is_active === 1 ? 'main' : null,
+        totalWorkouts: own.length,
+        completedWorkouts: completed,
+        isFinished: own.length > 0 && completed === own.length,
+      };
+    });
+
+    // Plans you've carried to the end, kept whatever happens to the plan
+    // afterwards. This is the durable half: `progress` above describes plans
+    // that still exist, this describes things you did.
+    const finished = db.prepare(`
+      SELECT id, plan_id, plan_name, workout_count, started_on, finished_on, days_taken
+      FROM plan_completions
+      ORDER BY finished_on DESC, finished_at DESC
+    `).all() as any[];
+
+    return reply.send({
+      plans: progress,
+      finished: finished.map(row => ({
+        id: row.id,
+        planId: row.plan_id,
+        planName: row.plan_name,
+        workoutCount: row.workout_count,
+        startedOn: row.started_on,
+        finishedOn: row.finished_on,
+        daysTaken: row.days_taken,
+      })),
+      finishedCount: finished.length,
+      inProgress: progress.filter(p => !p.isFinished && p.completedWorkouts > 0).length,
+    });
+  });
+
+  // Remove a finished-plan record. The only way to erase one, since nothing
+  // else does: deleting or editing the plan itself deliberately leaves it.
+  fastify.delete('/plan-completions/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!id) return reply.code(400).send({ error: 'id is required' });
+    const result = db.prepare('DELETE FROM plan_completions WHERE id = ?').run(id);
+    return reply.send({ success: true, deleted: result.changes });
+  });
+
+  // Remove a logged workout (all its rows), whether it was added by hand or
+  // marked done in the player.
+  //
+  // A workout completed inside a plan is recorded twice: here in `workout_log`,
+  // which is the durable record this page shows, and in `history`, which is what
+  // puts the ✓ on the calendar. Deleting only the log row would leave the plan
+  // still claiming the workout was done, so both go — the same pairing the
+  // player's un-mark already does. Manual entries have a `manual-` workout id
+  // that never appears in `history`, so that delete is a no-op for them.
   fastify.delete('/history/:workoutId', async (request, reply) => {
     const { workoutId } = request.params as { workoutId: string };
     if (!workoutId) {
       return reply.code(400).send({ error: 'workoutId is required' });
     }
-    const result = db
-      .prepare('DELETE FROM workout_log WHERE workout_id = ? AND is_manual = 1')
-      .run(workoutId);
-    return reply.send({ success: true, deleted: result.changes });
+
+    let deleted = 0;
+    let unmarked = 0;
+    db.transaction(() => {
+      deleted = db.prepare('DELETE FROM workout_log WHERE workout_id = ?').run(workoutId).changes;
+      unmarked = db.prepare('DELETE FROM history WHERE workout_id = ?').run(workoutId).changes;
+    })();
+
+    return reply.send({ success: true, deleted, unmarked });
   });
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import EquipmentPicker from '../components/EquipmentPicker';
@@ -11,14 +11,33 @@ import { BuilderDay, BuilderWeek, createWeek, createInitialBuilderWeeks } from '
 import { useAiAvailable } from '../lib/useAiAvailable';
 import YouTubeImportModal from '../components/YouTubeImportModal';
 import AiPlanModal, { AiPlanResult } from '../components/ai/AiPlanModal';
+import VideoTagChips from '../components/VideoTagChips';
+import WorkoutPatternPicker, { DEFAULT_PATTERN } from '../components/WorkoutPatternPicker';
 import { Video } from '../types/video';
+
+/**
+ * Two plans can run at once, each in its own slot: the main plan and an
+ * optional extra alongside it. The slot is stored in `is_active`
+ * (0 = inactive, 1 = main, 2 = extra).
+ */
+type Slot = 'main' | 'extra';
+const ACTIVE_MAIN = 1;
+const ACTIVE_EXTRA = 2;
+
+const slotOf = (plan: Plan): Slot | null =>
+  plan.is_active === ACTIVE_MAIN ? 'main' : plan.is_active === ACTIVE_EXTRA ? 'extra' : null;
 
 interface Plan {
   id: string;
   name: string;
   uploaded_at: string;
+  /** 0 = inactive, 1 = main plan, 2 = extra plan. */
   is_active: number;
   start_date: string;
+  /** The user's own note about the plan. Shown on the card and in details. */
+  description?: string | null;
+  /** This plan's workout/rest cycle. Null means it follows the global one. */
+  workout_pattern?: string | null;
   background_image?: string | null;
   background_blur?: number;
   workout_count?: number;
@@ -26,6 +45,17 @@ interface Plan {
   category?: string | null;
   /** True when the plan contains videos that stream instead of playing offline. */
   has_external?: boolean;
+}
+
+/** A video resolved by `GET /api/plan/:id`. */
+type PlanVideo = Video;
+
+/** One workout day of a plan, with its videos already resolved. */
+interface PlanDay {
+  id: string;
+  name: string;
+  sequence_order: number;
+  videos: PlanVideo[];
 }
 
 const API_BASE = '';
@@ -67,6 +97,108 @@ function categoryStorageKey(key: string): string {
 // Display-only: the extension is noise when browsing for videos to add.
 const stripVideoExt = (filename: string) => filename.replace(/\.[^/.]+$/, '');
 
+/** A plan's stored rhythm, or null when it follows the global one. */
+function parsePlanPattern(raw?: string | null): number[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    const days = parsed.map((value: unknown) => (value ? 1 : 0));
+    return days.some(day => day === 1) ? days : null;
+  } catch {
+    return null;
+  }
+}
+
+// "1:04:20" for long videos, "32:15" otherwise — the usual player convention.
+function formatRuntime(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
+/**
+ * One workout day in the plan details view.
+ *
+ * Deliberately the same shape as a calendar day card: a preview with the
+ * slider arrows when the day holds more than one video, so browsing a plan
+ * works the way browsing the schedule already does. It carries no dates,
+ * completion state or playback — this view is a look at what's in the plan.
+ */
+function PlanDayCard({ day, index }: { day: PlanDay; index: number }) {
+  const { t } = useTranslation();
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const videos = day.videos;
+  const current = videos[Math.min(currentIndex, Math.max(videos.length - 1, 0))];
+
+  const step = (delta: number) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(prev => (prev + delta + videos.length) % videos.length);
+  };
+
+  return (
+    <div className="plan-day-card">
+      <div className="plan-day-thumb">
+        {current?.thumbnail_path ? (
+          <img src={`/thumbnails/${current.thumbnail_path}`} alt={current.filename} />
+        ) : (
+          <span className="plan-day-noimg">{t('calendar.no_preview')}</span>
+        )}
+
+        <span className="plan-day-badge">{t('plans.details_day_n', { n: index + 1 })}</span>
+
+        {current?.duration_seconds ? (
+          <span className="plan-day-runtime">{formatRuntime(current.duration_seconds)}</span>
+        ) : null}
+
+        {videos.length > 1 && (
+          <>
+            <button
+              type="button"
+              className="slider-nav-btn"
+              style={{ left: '8px' }}
+              aria-label={t('plans.scroll_prev')}
+              onClick={step(-1)}
+            >
+              <span>‹</span>
+            </button>
+            <button
+              type="button"
+              className="slider-nav-btn"
+              style={{ right: '8px' }}
+              aria-label={t('plans.scroll_next')}
+              onClick={step(1)}
+            >
+              <span>›</span>
+            </button>
+            <span className="plan-day-counter">
+              {Math.min(currentIndex, videos.length - 1) + 1} / {videos.length}
+            </span>
+          </>
+        )}
+      </div>
+
+      <span className="plan-day-video-name" title={current?.filename}>
+        {current ? stripVideoExt(current.filename) : ''}
+      </span>
+
+      {current && (
+        <VideoTagChips
+          className="plan-day-tags"
+          intensity={current.intensity}
+          trainingType={current.training_type}
+          bodyParts={current.body_parts}
+          equipment={current.equipment}
+          max={3}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function Plans() {
   const { t } = useTranslation();
   const labels = useMetaLabels();
@@ -78,6 +210,15 @@ export default function Plans() {
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [builderStep, setBuilderStep] = useState(1);
   const [planName, setPlanName] = useState('My Custom Plan');
+  const [planDescription, setPlanDescription] = useState('');
+  // The plan's own workout/rest cycle. Seeded from the global pattern in
+  // Settings, which is what a plan follows until it is given one of its own.
+  const [builderPattern, setBuilderPattern] = useState<number[]>(DEFAULT_PATTERN);
+  const [globalPattern, setGlobalPattern] = useState<number[]>(DEFAULT_PATTERN);
+  // False means "follow whatever Settings says", stored as no pattern at all —
+  // so changing the global rhythm later still moves these plans with it. Only
+  // an explicit override is saved onto the plan.
+  const [builderPatternCustom, setBuilderPatternCustom] = useState(false);
   const [builderStartDate, setBuilderStartDate] = useState(new Date().toISOString().split('T')[0]);
   // Either a preset key, '' for none, or 'custom' while the free-text field is open.
   const [builderCategory, setBuilderCategory] = useState('');
@@ -113,6 +254,19 @@ export default function Plans() {
   const aiAvailable = useAiAvailable();
   const [isAiOpen, setIsAiOpen] = useState(false);
 
+  // Horizontal scroller holding the active plans, and whether either arrow has
+  // anywhere left to go. The scrollbar itself is hidden, so the arrows are the
+  // only affordance and have to reflect the real scroll position.
+  const featuredRowRef = useRef<HTMLDivElement | null>(null);
+  const [featuredCanScrollPrev, setFeaturedCanScrollPrev] = useState(false);
+  const [featuredCanScrollNext, setFeaturedCanScrollNext] = useState(false);
+
+  // Plan details modal, opened by clicking a plan card (rather than one of the
+  // buttons on it). Loads the plan's videos lazily, one plan at a time.
+  const [detailsPlanId, setDetailsPlanId] = useState<string | null>(null);
+  const [detailsDays, setDetailsDays] = useState<PlanDay[]>([]);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+
   // Background image picker state (scoped per-plan)
   const [bgPickerPlanId, setBgPickerPlanId] = useState<string | null>(null);
   const [bgPickerTab, setBgPickerTab] = useState<'thumbnail' | 'upload'>('thumbnail');
@@ -128,6 +282,17 @@ export default function Plans() {
 
   useEffect(() => {
     fetchPlans();
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data?.workout_pattern) && data.workout_pattern.some((d: number) => d)) {
+          setGlobalPattern(data.workout_pattern);
+          // Seeds the builder too. This runs once at mount, before any builder
+          // can be open, so it can't overwrite a rhythm the user is editing.
+          setBuilderPattern(data.workout_pattern);
+        }
+      })
+      .catch(() => { /* keep the built-in default */ });
   }, []);
 
   const handleFileUpload = async (selectedFile: File) => {
@@ -148,16 +313,46 @@ export default function Plans() {
     }
   };
 
-  const handleActivate = async (id: string) => {
+  const handleActivate = async (id: string, slot: Slot) => {
     setStatus(t('plans.activating_status'));
     const res = await fetch(`/api/plan/activate/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startDate: activationDate })
+      body: JSON.stringify({ startDate: activationDate, slot })
     });
     const data = await res.json();
     if (data.success) {
-      setStatus(t('plans.activated_status'));
+      setStatus(t(slot === 'extra' ? 'plans.activated_extra_status' : 'plans.activated_status'));
+      fetchPlans();
+    } else {
+      setStatus(t('plans.failed_activate'));
+    }
+  };
+
+  const handleDuplicate = async (id: string) => {
+    const plan = plans.find(p => p.id === id);
+    setStatus(t('plans.duplicating_status'));
+    const res = await fetch(`/api/plan/${id}/duplicate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // Named here rather than server-side so the suffix follows the UI language.
+      body: JSON.stringify({ name: t('plans.copy_of', { name: plan?.name ?? '' }) }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setStatus(t('plans.duplicated_status'));
+      fetchPlans();
+    } else {
+      setStatus(t('plans.failed_duplicate'));
+    }
+  };
+
+  // Frees a slot without touching the plan itself.
+  const handleDeactivate = async (id: string) => {
+    const res = await fetch(`/api/plan/deactivate/${id}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      setStatus(t('plans.deactivated_status'));
       fetchPlans();
     } else {
       setStatus(t('plans.failed_activate'));
@@ -218,6 +413,10 @@ export default function Plans() {
 
       // Populate builder state
       setPlanName(plan.name);
+      setPlanDescription(plan.description || '');
+      const planPattern = parsePlanPattern(plan.workout_pattern);
+      setBuilderPatternCustom(planPattern !== null);
+      setBuilderPattern(planPattern || globalPattern);
       setBuilderStartDate(plan.start_date);
       const existingCategory = plan.category?.trim() || '';
       setBuilderCategory(
@@ -248,6 +447,12 @@ export default function Plans() {
   const handleAiGenerated = (result: AiPlanResult) => {
     setIsAiOpen(false);
     setPlanName(result.name.trim() || t('ai.default_plan_name'));
+    // The draft's summary describes the structure it chose, which is exactly
+    // what the plan's description is for. Pre-filled, and editable like the rest.
+    setPlanDescription(result.summary || '');
+    // The draft was paced for this rhythm, so the plan should be saved with it.
+    setBuilderPatternCustom(result.workoutPattern !== null);
+    setBuilderPattern(result.workoutPattern || globalPattern);
     setBuilderStartDate(new Date().toISOString().split('T')[0]);
     setBuilderCategory('');
     setBuilderCustomCategory('');
@@ -261,6 +466,12 @@ export default function Plans() {
     // The user reviews and edits before saving, so anything the draft couldn't
     // honour is said out loud here rather than discovered later.
     const notes = [result.summary];
+    if (result.workoutDayCount > 0 && result.workoutDayCount < result.requestedWorkoutDays) {
+      notes.push(t('ai.short_notice', {
+        count: result.workoutDayCount,
+        requested: result.requestedWorkoutDays,
+      }));
+    }
     if (result.droppedIds.length > 0) {
       notes.push(t('ai.dropped_notice', { count: result.droppedIds.length }));
     }
@@ -374,6 +585,8 @@ export default function Plans() {
         name: planName,
         startDate: builderStartDate,
         category: resolvedBuilderCategory(),
+        description: planDescription,
+        workoutPattern: builderPatternCustom ? builderPattern : null,
         days: selectedDays
       })
     });
@@ -387,6 +600,9 @@ export default function Plans() {
       setIsBuilderOpen(false);
       setEditingPlanId(null);
       setBuilderStep(1);
+      setPlanDescription('');
+      setBuilderPattern(globalPattern);
+      setBuilderPatternCustom(false);
       setBuilderCategory('');
       setBuilderCustomCategory('');
       setBuilderWeeks(createInitialBuilderWeeks());
@@ -488,6 +704,9 @@ export default function Plans() {
     setIsBuilderOpen(false);
     setEditingPlanId(null);
     setBuilderStep(1);
+    setPlanDescription('');
+    setBuilderPattern(globalPattern);
+    setBuilderPatternCustom(false);
     setBuilderCategory('');
     setBuilderCustomCategory('');
     setBuilderWeeks(createInitialBuilderWeeks());
@@ -519,7 +738,35 @@ export default function Plans() {
   const currentWeek = builderWeeks[builderCurrentWeek];
   const currentDay = currentWeek?.days[builderCurrentDay] || currentWeek?.days[0];
 
-  // Opens the background picker for a specific plan, loading only the
+  // The plan's contents, already resolved by the server: `days` for the
+  // day-by-day details view, `videos` (de-duplicated) for the background picker.
+  const fetchPlanContents = async (planId: string): Promise<{ days: PlanDay[]; videos: PlanVideo[] }> => {
+    const res = await fetch(`/api/plan/${planId}`);
+    const planData = await res.json();
+    return { days: planData.days || [], videos: planData.videos || [] };
+  };
+
+  // Opens the read-only details view for a plan.
+  const openPlanDetails = async (planId: string) => {
+    setDetailsPlanId(planId);
+    setDetailsDays([]);
+    setDetailsLoading(true);
+    try {
+      const { days } = await fetchPlanContents(planId);
+      setDetailsDays(days);
+    } catch (error) {
+      console.error('Error loading plan details:', error);
+      setDetailsDays([]);
+    }
+    setDetailsLoading(false);
+  };
+
+  const closePlanDetails = () => {
+    setDetailsPlanId(null);
+    setDetailsDays([]);
+  };
+
+  // Opens the background picker for a specific plan, offering only the
   // videos that actually appear somewhere within that plan's workouts.
   const openBackgroundPicker = async (planId: string) => {
     setBgPickerPlanId(planId);
@@ -527,23 +774,8 @@ export default function Plans() {
     setBgPickerLoading(true);
     setBgPickerVideos([]);
     try {
-      const res = await fetch(`/api/plan/${planId}`);
-      const planData = await res.json();
-
-      const idSet = new Set<string>();
-      (planData.workouts || []).forEach((workout: any) => {
-        try {
-          const ids = JSON.parse(workout.video_ids || '[]');
-          ids.forEach((id: string) => idSet.add(id));
-        } catch (e) {
-          // ignore malformed video_ids
-        }
-      });
-
-      const vRes = await fetch('/api/library/videos');
-      const videoList: Video[] = await vRes.json();
-
-      setBgPickerVideos((videoList || []).filter(v => idSet.has(v.id) && v.thumbnail_path));
+      const { videos } = await fetchPlanContents(planId);
+      setBgPickerVideos(videos.filter(v => v.thumbnail_path));
     } catch (error) {
       console.error('Error loading plan videos for background picker:', error);
       setBgPickerVideos([]);
@@ -610,9 +842,41 @@ export default function Plans() {
   const bgPickerPlan = plans.find(p => p.id === bgPickerPlanId);
   const bgPickerCurrentUrl = resolveBackgroundUrl(bgPickerPlan?.background_image);
 
-  // The active plan gets its own featured card above the grid of the remaining plans.
-  const activePlan = plans.find(p => p.is_active === 1) || null;
-  const otherPlans = plans.filter(p => p.is_active !== 1);
+  const detailsPlan = plans.find(p => p.id === detailsPlanId) || null;
+
+  // Active plans get their own featured cards above the grid of the remaining
+  // plans — the main plan first, then the extra one when a second is active.
+  const activePlans = plans.filter(p => slotOf(p) !== null);
+  const otherPlans = plans.filter(p => slotOf(p) === null);
+
+  const syncFeaturedArrows = () => {
+    const row = featuredRowRef.current;
+    if (!row) return;
+    // A pixel of slack: fractional widths can leave a sub-pixel gap at the end.
+    setFeaturedCanScrollPrev(row.scrollLeft > 1);
+    setFeaturedCanScrollNext(row.scrollLeft + row.clientWidth < row.scrollWidth - 1);
+  };
+
+  // Re-checked when the number of active plans changes (a plan was activated or
+  // deactivated) and on resize, since either can change what fits.
+  useEffect(() => {
+    syncFeaturedArrows();
+    window.addEventListener('resize', syncFeaturedArrows);
+    return () => window.removeEventListener('resize', syncFeaturedArrows);
+  }, [activePlans.length]);
+
+  // Steps by one card, which is what the row is sized in. The arrows are also
+  // re-synced once the smooth scroll has settled: `onScroll` normally covers
+  // this, but resolving it here too means the arrows can't be left stale if the
+  // scroll finishes without one.
+  const scrollFeatured = (direction: -1 | 1) => {
+    const row = featuredRowRef.current;
+    if (!row) return;
+    const card = row.firstElementChild as HTMLElement | null;
+    const step = card ? card.getBoundingClientRect().width + 20 : row.clientWidth;
+    row.scrollBy({ left: direction * step, behavior: 'smooth' });
+    window.setTimeout(syncFeaturedArrows, 450);
+  };
 
   // Remaining plans are grouped under category headings: known presets first (in
   // their canonical order), then custom labels A→Z, then uncategorized plans last.
@@ -658,6 +922,57 @@ export default function Plans() {
   // The value actually saved: a preset key, the typed custom label, or '' for none.
   const resolvedBuilderCategory = () =>
     builderCategory === 'custom' ? builderCustomCategory.trim() : builderCategory;
+
+  // Plan note, offered wherever the category is — the two are the same kind of
+  // "what is this plan" metadata and are easiest to fill in together.
+  const renderDescriptionField = () => (
+    <div className="wb-field">
+      <label className="wb-label">{t('plans.builder_description')}</label>
+      <textarea
+        className="wb-input wb-textarea"
+        value={planDescription}
+        onChange={e => setPlanDescription(e.target.value)}
+        placeholder={t('plans.builder_description_placeholder')}
+        rows={3}
+        maxLength={1000}
+      />
+      <p className="wb-hint">{t('plans.builder_description_hint')}</p>
+    </div>
+  );
+
+  // The plan's own rhythm, shown wherever its name and start date are — the
+  // three together are what turn an ordered list of workouts into dated days.
+  const renderPatternField = () => (
+    <div className="wb-field">
+      <label className="wb-label">{t('plans.builder_pattern')}</label>
+      <div className="wb-chip-row">
+        <button
+          type="button"
+          className={`wb-chip${builderPatternCustom ? '' : ' selected'}`}
+          onClick={() => { setBuilderPatternCustom(false); setBuilderPattern(globalPattern); }}
+        >
+          {t('plans.pattern_default')}
+        </button>
+        <button
+          type="button"
+          className={`wb-chip${builderPatternCustom ? ' selected' : ''}`}
+          onClick={() => setBuilderPatternCustom(true)}
+        >
+          {t('plans.pattern_custom')}
+        </button>
+      </div>
+      {/* Shown either way: when following the default you should still be able
+          to see the rhythm you're accepting. */}
+      <WorkoutPatternPicker
+        pattern={builderPattern}
+        onChange={setBuilderPattern}
+        disabled={!builderPatternCustom}
+      />
+      <p className="wb-hint">
+        {builderPatternCustom ? t('plans.pattern_own_note') : t('plans.pattern_following_note')}
+      </p>
+    </div>
+  );
 
   // Category chooser used in both the create flow (step 1) and the edit form.
   const renderCategoryField = () => (
@@ -770,14 +1085,59 @@ export default function Plans() {
         </div>
       )}
 
-      {activePlan && (
-        <div className="plan-featured">
+      {/* One active plan fills the row as before; two become a horizontal
+          scroller where the main plan leads and the extra one peeks in. The
+          scrollbar is hidden, so the arrows below are the visible affordance. */}
+      <div className={`plans-featured-wrap${activePlans.length > 1 ? ' multi' : ''}`}>
+      {activePlans.length > 1 && (
+        <>
+          <button
+            type="button"
+            className="plans-featured-nav prev"
+            aria-label={t('plans.scroll_prev')}
+            disabled={!featuredCanScrollPrev}
+            onClick={() => scrollFeatured(-1)}
+          >
+            <span>‹</span>
+          </button>
+          <button
+            type="button"
+            className="plans-featured-nav next"
+            aria-label={t('plans.scroll_next')}
+            disabled={!featuredCanScrollNext}
+            onClick={() => scrollFeatured(1)}
+          >
+            <span>›</span>
+          </button>
+        </>
+      )}
+      <div
+        className={`plans-featured-row${activePlans.length > 1 ? ' multi' : ''}`}
+        ref={featuredRowRef}
+        onScroll={syncFeaturedArrows}
+      >
+      {activePlans.map(plan => {
+        const slot = slotOf(plan) as Slot;
+        return (
+        <div
+          key={plan.id}
+          className="plan-featured"
+          role="button"
+          tabIndex={0}
+          onClick={() => openPlanDetails(plan.id)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              openPlanDetails(plan.id);
+            }
+          }}
+        >
           {/* Full-bleed image with a dark scrim, so every label on top is white —
               readable in all themes regardless of the theme's accent lightness. */}
           {(() => {
-            const bgUrl = resolveBackgroundUrl(activePlan.background_image);
+            const bgUrl = resolveBackgroundUrl(plan.background_image);
             return bgUrl ? (
-              <div className={`plan-card-bg${activePlan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
+              <div className={`plan-card-bg${plan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
             ) : (
               <>
                 <div className="plan-card-bg no-image" />
@@ -791,7 +1151,7 @@ export default function Plans() {
             type="button"
             className="plan-card-bg-btn"
             title={t('plans.set_background') || 'Set background image'}
-            onClick={() => openBackgroundPicker(activePlan.id)}
+            onClick={e => { e.stopPropagation(); openBackgroundPicker(plan.id); }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           </button>
@@ -799,47 +1159,61 @@ export default function Plans() {
           <div className="plan-featured-content">
             <div className="plan-featured-main">
               <div className="plan-featured-eyebrow">
-                <span className="plan-featured-active">{t('plans.active')}</span>
-                {activePlan.category && (
-                  <span className="plan-featured-category">{categoryLabel(activePlan.category)}</span>
+                <span className="plan-featured-active">
+                  {t(slot === 'extra' ? 'plans.slot_extra' : 'plans.slot_main')}
+                </span>
+                {plan.category && (
+                  <span className="plan-featured-category">{categoryLabel(plan.category)}</span>
                 )}
-                {renderOfflineWarning(activePlan)}
+                {renderOfflineWarning(plan)}
               </div>
-              <h2 className="plan-featured-title">{activePlan.name}</h2>
+              <h2 className="plan-featured-title">{plan.name}</h2>
+              {plan.description && (
+                <p className="plan-featured-description" title={plan.description}>{plan.description}</p>
+              )}
               <p className="plan-featured-date">
                 <span>{t('plans.start_date')}</span>
-                <strong>{activePlan.start_date}</strong>
+                <strong>{plan.start_date}</strong>
               </p>
             </div>
 
             <div className="plan-featured-panel">
               <span className="plan-featured-count">
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M6.5 2v4.5M17.5 2v4.5M6.5 17.5V22M17.5 17.5V22M2 6.5h4.5M2 17.5h4.5M17.5 6.5H22M17.5 17.5H22"/></svg>
-                {t('plans.workout_count', { count: activePlan.workout_count ?? 0 })}
+                {t('plans.workout_count', { count: plan.workout_count ?? 0 })}
               </span>
 
-              {(activePlan.equipment || []).length > 0 && (
-                <div className="plan-featured-equipment">
-                  <span className="plan-featured-panel-label">{t('plans.builder_filter_equipment')}</span>
+              {/* Always shown, even when empty: hiding the row made a plan whose
+                  videos carry no equipment tags look identical to one that was
+                  never checked. */}
+              <div className="plan-featured-equipment">
+                <span className="plan-featured-panel-label">{t('plans.builder_filter_equipment')}</span>
+                {(plan.equipment || []).length > 0 ? (
                   <div className="plan-featured-tags">
-                    {(activePlan.equipment || []).map(eq => (
+                    {(plan.equipment || []).map(eq => (
                       <span key={eq} className="plan-featured-tag" title={labels.equipment(eq)}>
                         <EquipmentIcon id={eq} size={13} />
                         {labels.equipment(eq)}
                       </span>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <span className="plan-featured-equipment-none">{t('plans.equipment_none')}</span>
+                )}
+              </div>
 
-              <div className="plan-card-actions">
-                <button className="btn btn-ghost" onClick={() => handleEditPlan(activePlan.id)}>{t('plans.edit')}</button>
-                <button className="btn btn-danger-ghost" onClick={() => handleDelete(activePlan.id)}>{t('plans.delete')}</button>
+              <div className="plan-card-actions" onClick={e => e.stopPropagation()}>
+                <button className="btn btn-ghost" onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
+                <button className="btn btn-ghost" onClick={() => handleDeactivate(plan.id)}>{t('plans.deactivate')}</button>
+                <button className="btn btn-danger-ghost" onClick={() => handleDelete(plan.id)}>{t('plans.delete')}</button>
               </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })}
+      </div>
+      </div>
 
       {planGroups.map(group => {
         const storageKey = categoryStorageKey(group.key);
@@ -864,7 +1238,19 @@ export default function Plans() {
             {group.plans.map(plan => {
           const bgUrl = resolveBackgroundUrl(plan.background_image);
           return (
-            <div key={plan.id} className="glass-card plan-card">
+            <div
+              key={plan.id}
+              className="glass-card plan-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => openPlanDetails(plan.id)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openPlanDetails(plan.id);
+                }
+              }}
+            >
               {bgUrl ? (
                 <div className={`plan-card-bg${plan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
               ) : (
@@ -879,7 +1265,7 @@ export default function Plans() {
                 type="button"
                 className="plan-card-bg-btn"
                 title={t('plans.set_background') || 'Set background image'}
-                onClick={() => openBackgroundPicker(plan.id)}
+                onClick={e => { e.stopPropagation(); openBackgroundPicker(plan.id); }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
               </button>
@@ -889,7 +1275,7 @@ export default function Plans() {
 
                 {renderPlanInfo(plan)}
 
-                <div className="plan-card-datefield">
+                <div className="plan-card-datefield" onClick={e => e.stopPropagation()}>
                   <label>{t('plans.set_start_date')}</label>
                   <input
                     type="date"
@@ -898,9 +1284,15 @@ export default function Plans() {
                   />
                 </div>
 
-                <div className="plan-card-actions">
+                {/* Two slots to activate into, so a plan can run alongside the main one. */}
+                <div className="plan-card-activate" onClick={e => e.stopPropagation()}>
+                  <span className="plan-card-activate-label">{t('plans.activate_as')}</span>
+                  <button className="btn btn-ghost" onClick={() => handleActivate(plan.id, 'main')}>{t('plans.slot_main')}</button>
+                  <button className="btn btn-ghost" onClick={() => handleActivate(plan.id, 'extra')}>{t('plans.slot_extra')}</button>
+                </div>
+
+                <div className="plan-card-actions" onClick={e => e.stopPropagation()}>
                   <button className="btn btn-ghost" onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
-                  <button className="btn btn-ghost" onClick={() => handleActivate(plan.id)}>{t('plans.activate')}</button>
                   <button className="btn btn-danger-ghost" onClick={() => handleDelete(plan.id)}>{t('plans.delete')}</button>
                 </div>
               </div>
@@ -917,6 +1309,134 @@ export default function Plans() {
         <div style={{ textAlign: 'center', padding: '4rem', color: '#888' }}>
           {t('plans.no_plans')}
         </div>
+      )}
+
+      {detailsPlan && createPortal(
+        <div className="plan-details-overlay" onClick={closePlanDetails}>
+          <div className="plan-details-panel" onClick={e => e.stopPropagation()}>
+            {(() => {
+              const bgUrl = resolveBackgroundUrl(detailsPlan.background_image);
+              const slot = slotOf(detailsPlan);
+              return (
+                <div className="plan-details-header">
+                  {bgUrl ? (
+                    <div className={`plan-card-bg${detailsPlan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
+                  ) : (
+                    <>
+                      <div className="plan-card-bg no-image" />
+                      <div className="plan-card-logo" />
+                    </>
+                  )}
+                  <div className="plan-featured-scrim" />
+                  <button type="button" className="plan-details-close" onClick={closePlanDetails} aria-label={t('plans.builder_cancel')}>✕</button>
+                  <div className="plan-details-header-content">
+                    <div className="plan-featured-eyebrow">
+                      {slot && (
+                        <span className="plan-featured-active">
+                          {t(slot === 'extra' ? 'plans.slot_extra' : 'plans.slot_main')}
+                        </span>
+                      )}
+                      {detailsPlan.category && (
+                        <span className="plan-featured-category">{categoryLabel(detailsPlan.category)}</span>
+                      )}
+                      {/* The offline warning lives in the info row below, next to
+                          the workout count, so it isn't repeated here. */}
+                    </div>
+                    <h2 className="plan-featured-title">{detailsPlan.name}</h2>
+                    <p className="plan-featured-date">
+                      <span>{t('plans.start_date')}</span>
+                      <strong>{detailsPlan.start_date}</strong>
+                    </p>
+                    {renderPlanInfo(detailsPlan)}
+                    {detailsPlan.description && (
+                      <p className="plan-details-description">{detailsPlan.description}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="plan-details-body">
+              <h3 className="plan-details-section-title">
+                {t('plans.details_days')}
+                {detailsDays.length > 0 && (
+                  <span className="plan-details-video-count">{detailsDays.length}</span>
+                )}
+              </h3>
+
+              {detailsLoading ? (
+                <p style={{ color: 'var(--text-secondary)' }}>{t('plans.details_loading')}</p>
+              ) : detailsDays.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)' }}>{t('plans.details_no_videos')}</p>
+              ) : (
+                <div className="plan-day-grid">
+                  {detailsDays.map((day, index) => (
+                    <PlanDayCard key={day.id} day={day} index={index} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Everything you can do to a plan, in the view you opened to look at
+                it — so inspecting and acting aren't two different trips. */}
+            <div className="plan-details-actions">
+              <label className="plan-details-date">
+                <span>{t('plans.set_start_date')}</span>
+                <input
+                  type="date"
+                  value={activationDate}
+                  onChange={e => setActivationDate(e.target.value)}
+                />
+              </label>
+
+              <div className="plan-details-action-buttons">
+                {slotOf(detailsPlan) !== 'main' && (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => { handleActivate(detailsPlan.id, 'main'); closePlanDetails(); }}
+                  >
+                    {t('plans.activate_as')}: {t('plans.slot_main')}
+                  </button>
+                )}
+                {slotOf(detailsPlan) !== 'extra' && (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => { handleActivate(detailsPlan.id, 'extra'); closePlanDetails(); }}
+                  >
+                    {t('plans.activate_as')}: {t('plans.slot_extra')}
+                  </button>
+                )}
+                {slotOf(detailsPlan) !== null && (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => { handleDeactivate(detailsPlan.id); closePlanDetails(); }}
+                  >
+                    {t('plans.deactivate')}
+                  </button>
+                )}
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => { closePlanDetails(); handleEditPlan(detailsPlan.id); }}
+                >
+                  {t('plans.edit')}
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => { handleDuplicate(detailsPlan.id); closePlanDetails(); }}
+                >
+                  {t('plans.duplicate')}
+                </button>
+                <button
+                  className="btn btn-danger-ghost"
+                  onClick={async () => { await handleDelete(detailsPlan.id); closePlanDetails(); }}
+                >
+                  {t('plans.delete')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {bgPickerPlanId && createPortal(
@@ -1017,7 +1537,9 @@ export default function Plans() {
                   <label className="wb-label">{t('plans.builder_start_date')}</label>
                   <input className="wb-input" type="date" value={builderStartDate} onChange={e => setBuilderStartDate(e.target.value)} />
                 </div>
+                {renderPatternField()}
                 {renderCategoryField()}
+                {renderDescriptionField()}
                 <div className="wb-actions">
                   <button className="wb-btn wb-btn-ghost" onClick={closeBuilder}>{t('plans.builder_cancel')}</button>
                   <button className="wb-btn wb-btn-primary" onClick={() => setBuilderStep(2)}>{t('plans.builder_next')}</button>
@@ -1036,7 +1558,9 @@ export default function Plans() {
                         placeholder={t('plans.builder_plan_name')}
                       />
                     </div>
+                    {renderPatternField()}
                     {renderCategoryField()}
+                    {renderDescriptionField()}
                   </>
                 )}
                 <div className="wb-sticky-head">

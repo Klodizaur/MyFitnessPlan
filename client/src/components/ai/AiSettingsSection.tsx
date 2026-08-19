@@ -17,11 +17,15 @@ type Provider = 'anthropic' | 'openai';
 /** '' keeps whatever language each description was already written in. */
 type DescriptionLanguage = '' | 'en' | 'pl';
 
+/** Whether the plan builder asks everything at once, or one thing at a time. */
+type PlanFlow = 'all' | 'guided';
+
 interface AiConfig {
   provider: Provider;
   baseUrl: string;
   model: string;
   descriptionLanguage: DescriptionLanguage;
+  planFlow: PlanFlow;
   hasKey: boolean;
   isLocal: boolean;
   available: boolean;
@@ -57,6 +61,7 @@ export default function AiSettingsSection() {
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [language, setLanguage] = useState<DescriptionLanguage>('');
+  const [planFlow, setPlanFlow] = useState<PlanFlow>('all');
   const [status, setStatus] = useState('');
   const [statusOk, setStatusOk] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -79,6 +84,7 @@ export default function AiSettingsSection() {
         setBaseUrl(data.baseUrl);
         setModel(data.model);
         setLanguage(data.descriptionLanguage || '');
+        setPlanFlow(data.planFlow === 'guided' ? 'guided' : 'all');
         if (data.hasKey || data.isLocal) loadModels();
       })
       .catch(() => setConfig(null));
@@ -151,6 +157,7 @@ export default function AiSettingsSection() {
         baseUrl,
         model,
         descriptionLanguage: language,
+        planFlow,
         // Omitted rather than sent empty, so saving a model change doesn't
         // wipe a key the user never retyped.
         ...(apiKey ? { apiKey } : {}),
@@ -388,6 +395,29 @@ export default function AiSettingsSection() {
           </select>
           <p className="ai-hint" style={{ marginTop: 6 }}>
             {language ? t('ai.language_translate_warning') : t('ai.language_hint')}
+          </p>
+        </div>
+
+        <div>
+          <label className="wb-label">{t('ai.flow_label')}</label>
+          <div className="wb-chip-row">
+            <button
+              type="button"
+              className={`wb-chip${planFlow === 'all' ? ' selected' : ''}`}
+              onClick={() => setPlanFlow('all')}
+            >
+              {t('ai.flow_all')}
+            </button>
+            <button
+              type="button"
+              className={`wb-chip${planFlow === 'guided' ? ' selected' : ''}`}
+              onClick={() => setPlanFlow('guided')}
+            >
+              {t('ai.flow_guided')}
+            </button>
+          </div>
+          <p className="ai-hint" style={{ marginTop: 6 }}>
+            {planFlow === 'guided' ? t('ai.flow_guided_hint') : t('ai.flow_all_hint')}
           </p>
         </div>
       </div>

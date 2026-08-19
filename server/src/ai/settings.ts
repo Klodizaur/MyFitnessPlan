@@ -38,12 +38,22 @@ export const DESCRIPTION_LANGUAGE_NAMES: Record<Exclude<DescriptionLanguage, ''>
   pl: 'Polish',
 };
 
+/**
+ * How the "Build with AI" form is presented.
+ *
+ * 'all' shows every field at once — fast for someone who knows what they want.
+ * 'guided' asks one thing at a time, which is far less to take in but slower.
+ * Neither is right for everyone, so it's a preference rather than a redesign.
+ */
+export type AiPlanFlow = 'all' | 'guided';
+
 export interface AiSettings {
   provider: AiProvider;
   apiKey: string;
   baseUrl: string;
   model: string;
   descriptionLanguage: DescriptionLanguage;
+  planFlow: AiPlanFlow;
 }
 
 const DEFAULT_BASE_URL: Record<AiProvider, string> = {
@@ -86,6 +96,9 @@ export function getAiSettings(): AiSettings {
     baseUrl: read('base_url') || DEFAULT_BASE_URL[provider],
     model: read('model') || DEFAULT_MODEL[provider],
     descriptionLanguage: language === 'en' || language === 'pl' ? language : '',
+    // Defaults to the all-at-once form the feature shipped with, so nobody's
+    // builder changes shape underneath them.
+    planFlow: read('plan_flow') === 'guided' ? 'guided' : 'all',
   };
 }
 
@@ -96,6 +109,7 @@ export function saveAiSettings(patch: {
   baseUrl?: string;
   model?: string;
   descriptionLanguage?: DescriptionLanguage;
+  planFlow?: AiPlanFlow;
 }): void {
   if (patch.provider !== undefined) {
     write('provider', patch.provider === 'openai' ? 'openai' : 'anthropic');
@@ -112,6 +126,9 @@ export function saveAiSettings(patch: {
   if (patch.descriptionLanguage !== undefined) {
     const value = patch.descriptionLanguage;
     write('description_language', value === 'en' || value === 'pl' ? value : '');
+  }
+  if (patch.planFlow !== undefined) {
+    write('plan_flow', patch.planFlow === 'guided' ? 'guided' : 'all');
   }
 }
 
