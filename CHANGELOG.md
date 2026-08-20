@@ -5,6 +5,20 @@ All notable changes to MyFitnessPlan are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-08-21
+
+### Fixed
+
+- **"Today" was a day behind for the first hours after midnight.** The calendar,
+  dashboard and the date fields in the plan builder derived today's date via
+  `toISOString()`, which converts to UTC first — so anywhere east of Greenwich
+  they showed yesterday until the local clock passed the UTC offset. They now
+  use the local date, as the server already did.
+- **"Today" no longer goes stale in a window left open.** It was computed once
+  when the page rendered, so the highlight stayed on the old day after midnight
+  until a reload. It now re-checks at midnight and whenever the window regains
+  focus, which also covers a machine that was asleep when the day changed.
+
 ## [1.5.0] - 2026-08-19
 
 ### ⚠️ Upgrade notes

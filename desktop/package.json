@@ -2,7 +2,7 @@
   "name": "workout-planner-desktop",
   "productName": "MyFitnessPlan",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Desktop wrapper for MyFitnessPlan. Isolated from the app; runs the compiled server on Electron's Node and packages installers.",
   "author": "Klaudia Krzos",
   "homepage": "https://github.com/Klodizaur/MyFitnessPlan",
