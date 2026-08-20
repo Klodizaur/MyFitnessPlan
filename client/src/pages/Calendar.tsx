@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import VideoTagChips from '../components/VideoTagChips';
+import { useToday } from '../lib/dates';
 
 interface ScheduleVideo {
   id: string;
@@ -37,13 +38,15 @@ interface PlanSchedule {
   schedule: ScheduleDay[];
 }
 
-function CalendarCard({ day, calendarView, navigate }: { day: ScheduleDay, calendarView: string, navigate: (path: string) => void }) {
+function CalendarCard({ day, calendarView, navigate, today }: { day: ScheduleDay, calendarView: string, navigate: (path: string) => void, today: string }) {
   const { t, i18n } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   
   const dateObj = new Date(day.date);
   const isPast = dateObj < new Date(new Date().setHours(0,0,0,0));
-  const isToday = day.date === new Date().toISOString().split('T')[0];
+  // `today` comes from the page so every card agrees, and so it moves on when
+  // the day turns over with the app left open.
+  const isToday = day.date === today;
   const videos = day.workout?.videos || [];
   const currentVideo = videos[currentIndex];
   const hasThumbnail = currentVideo?.thumbnail;
@@ -336,6 +339,7 @@ export default function Calendar() {
   // Which active plan's calendar is on screen. The two plans run on their own
   // dates, so they're shown one at a time rather than interleaved by day.
   const [selectedSlot, setSelectedSlot] = useState<'main' | 'extra'>('main');
+  const today = useToday();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -397,7 +401,7 @@ export default function Calendar() {
         gap: '2rem'
       }}>
         {selected.schedule.map((day, index) => (
-          <CalendarCard key={`${selected.planId}:${index}`} day={day} calendarView={calendarView} navigate={navigate} />
+          <CalendarCard key={`${selected.planId}:${index}`} day={day} calendarView={calendarView} navigate={navigate} today={today} />
         ))}
       </div>
     </div>

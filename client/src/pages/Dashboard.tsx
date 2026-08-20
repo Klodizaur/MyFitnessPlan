@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { topLevelAlbumKey, toAlbumRouteParam } from '../lib/paths';
+import { useToday } from '../lib/dates';
 
 interface ScheduleDay {
   date: string;
@@ -45,6 +46,7 @@ export default function Dashboard() {
   // dashboard shows one at a time and lets you step between them rather than
   // stacking two heroes or silently hiding the second.
   const [planIndex, setPlanIndex] = useState(0);
+  const today = useToday();
   const [libraryPreview, setLibraryPreview] = useState<{ key: string; title: string; cover?: string | null; count: number }[]>([]);
   const navigate = useNavigate();
 
@@ -65,7 +67,6 @@ export default function Dashboard() {
       return { todaySchedule: null as ScheduleDay | null, upcomingWorkouts: [] as ScheduleDay[], planInfo: null as PlanInfo | null };
     }
 
-    const today = new Date().toISOString().split('T')[0];
     const workoutDays = schedule.filter(d => d.isWorkoutDay);
     const info: PlanInfo = {
       name: selectedPlan?.planName || '',
@@ -86,7 +87,7 @@ export default function Dashboard() {
       upcomingWorkouts: schedule.slice(todayIndex + 1).filter(d => d.isWorkoutDay).slice(0, 2),
       planInfo: info,
     };
-  }, [selectedPlan]);
+  }, [selectedPlan, today]);
 
   useEffect(() => {
     fetch('/api/library/videos')
@@ -109,7 +110,7 @@ export default function Dashboard() {
   const firstPendingVideo = todaySchedule?.workout?.videos.find(v => !v.isCompleted) || todaySchedule?.workout?.videos[0];
 
   // Where "today" falls relative to the active plan's schedule window.
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = today;
   const planStatus: 'none' | 'upcoming' | 'active' | 'ended' = !planInfo
     ? 'none'
     : todayStr < planInfo.firstDate

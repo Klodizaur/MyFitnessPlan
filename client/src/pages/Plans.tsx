@@ -13,6 +13,7 @@ import YouTubeImportModal from '../components/YouTubeImportModal';
 import AiPlanModal, { AiPlanResult } from '../components/ai/AiPlanModal';
 import VideoTagChips from '../components/VideoTagChips';
 import WorkoutPatternPicker, { DEFAULT_PATTERN } from '../components/WorkoutPatternPicker';
+import { localDateString } from '../lib/dates';
 import { Video } from '../types/video';
 
 /**
@@ -204,7 +205,7 @@ export default function Plans() {
   const labels = useMetaLabels();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [status, setStatus] = useState('');
-  const [activationDate, setActivationDate] = useState(new Date().toISOString().split('T')[0]);
+  const [activationDate, setActivationDate] = useState(localDateString());
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(readCollapsedCategories);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -219,7 +220,7 @@ export default function Plans() {
   // so changing the global rhythm later still moves these plans with it. Only
   // an explicit override is saved onto the plan.
   const [builderPatternCustom, setBuilderPatternCustom] = useState(false);
-  const [builderStartDate, setBuilderStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [builderStartDate, setBuilderStartDate] = useState(localDateString());
   // Either a preset key, '' for none, or 'custom' while the free-text field is open.
   const [builderCategory, setBuilderCategory] = useState('');
   const [builderCustomCategory, setBuilderCustomCategory] = useState('');
@@ -453,7 +454,7 @@ export default function Plans() {
     // The draft was paced for this rhythm, so the plan should be saved with it.
     setBuilderPatternCustom(result.workoutPattern !== null);
     setBuilderPattern(result.workoutPattern || globalPattern);
-    setBuilderStartDate(new Date().toISOString().split('T')[0]);
+    setBuilderStartDate(localDateString());
     setBuilderCategory('');
     setBuilderCustomCategory('');
     setBuilderWeeks(result.weeks);
