@@ -355,14 +355,32 @@
     "plans_took_days_one": "took 1 day",
     "plans_took_days_other": "took {{count}} days",
     "plans_forget": "Remove from finished plans",
-    "plans_forget_confirm": "Remove this plan from your finished plans?\n\nThis only erases the record that you completed it."
+    "plans_forget_confirm": "Remove this plan from your finished plans?\n\nThis only erases the record that you completed it.",
+    "loop_badge_aria": "Played {{count}} times in a loop"
   },
   "player": {
     "youtube_error_embed_blocked": "The person who uploaded this video doesn't allow it to play outside YouTube.",
     "youtube_error_unavailable": "This video is no longer available on YouTube.",
     "youtube_error_offline": "Couldn't reach YouTube. Check your internet connection.",
     "description_heading": "Description",
-    "tags_heading": "Tags"
+    "tags_heading": "Tags",
+    "loop_set_aria": "Set up looping and rest",
+    "loop_edit_aria": "Looping {{total}} times — change",
+    "loop_heading": "Loop this video",
+    "loop_times_label": "Play (times)",
+    "loop_rest_label": "Rest (seconds)",
+    "loop_hint": "Counts the play already running, so 10 means 10 plays in total. Set rest to 0 to skip it.",
+    "loop_start": "Start loop",
+    "loop_update": "Update",
+    "loop_turn_off": "Turn off",
+    "loop_status_playing": "Play {{current}} of {{total}}",
+    "loop_status_resting": "Resting — play {{current}} of {{total}} next",
+    "rest_heading": "Rest",
+    "rest_next_loop": "Next: play {{current}} of {{total}}",
+    "rest_next_video": "Next video after this",
+    "rest_skip": "Skip rest",
+    "rest_announce_loop": "Rest started. Next: play {{current}} of {{total}}.",
+    "rest_announce_video": "Rest started. The next video follows."
   },
   "import": {
     "btn": "Add from YouTube",

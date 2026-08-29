@@ -418,14 +418,32 @@
     "plans_took_days_many": "zajęło {{count}} dni",
     "plans_took_days_other": "zajęło {{count}} dni",
     "plans_forget": "Usuń z ukończonych planów",
-    "plans_forget_confirm": "Usunąć ten plan z ukończonych planów?\n\nSkasuje to tylko zapis o jego ukończeniu."
+    "plans_forget_confirm": "Usunąć ten plan z ukończonych planów?\n\nSkasuje to tylko zapis o jego ukończeniu.",
+    "loop_badge_aria": "Odtworzone {{count}} razy w pętli"
   },
   "player": {
     "youtube_error_embed_blocked": "Autor tego filmu nie zezwala na odtwarzanie go poza YouTube.",
     "youtube_error_unavailable": "Ten film nie jest już dostępny na YouTube.",
     "youtube_error_offline": "Brak połączenia z YouTube. Sprawdź internet.",
     "description_heading": "Opis",
-    "tags_heading": "Tagi"
+    "tags_heading": "Tagi",
+    "loop_set_aria": "Ustaw zapętlenie i przerwę",
+    "loop_edit_aria": "Zapętlone {{total}} razy — zmień",
+    "loop_heading": "Zapętl to wideo",
+    "loop_times_label": "Odtwórz (razy)",
+    "loop_rest_label": "Przerwa (sekundy)",
+    "loop_hint": "Liczy trwające odtwarzanie, więc 10 oznacza 10 odtworzeń łącznie. Ustaw 0, aby pominąć przerwę.",
+    "loop_start": "Uruchom pętlę",
+    "loop_update": "Zaktualizuj",
+    "loop_turn_off": "Wyłącz",
+    "loop_status_playing": "Odtworzenie {{current}} z {{total}}",
+    "loop_status_resting": "Przerwa — następnie odtworzenie {{current}} z {{total}}",
+    "rest_heading": "Przerwa",
+    "rest_next_loop": "Dalej: odtworzenie {{current}} z {{total}}",
+    "rest_next_video": "Potem następne wideo",
+    "rest_skip": "Pomiń przerwę",
+    "rest_announce_loop": "Przerwa rozpoczęta. Dalej: odtworzenie {{current}} z {{total}}.",
+    "rest_announce_video": "Przerwa rozpoczęta. Potem następne wideo."
   },
   "import": {
     "btn": "Dodaj z YouTube",

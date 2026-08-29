@@ -283,6 +283,13 @@ if (!workoutLogInfo.some((c: any) => c.name === 'notes')) {
   db.exec('ALTER TABLE workout_log ADD COLUMN notes TEXT');
 }
 
+// How many times the video was played through when it was marked done, for
+// entries the user looped in the player. Null/0/1 all mean "played once" and
+// render no badge; only a real set (2+) is worth marking in the log.
+if (!workoutLogInfo.some((c: any) => c.name === 'loop_count')) {
+  db.exec('ALTER TABLE workout_log ADD COLUMN loop_count INTEGER');
+}
+
 db.exec('CREATE INDEX IF NOT EXISTS idx_workout_log_date ON workout_log(completed_date)');
 
 // One-time seeding of plan_completions from plans that are already finished.

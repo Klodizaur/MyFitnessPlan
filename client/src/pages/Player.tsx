@@ -8,6 +8,7 @@ import { TrainingTypeIcon, BodyPartIcon, IntensityIcon } from '../lib/metadata';
 import { useMetaLabels } from '../lib/labels';
 import { videoStreamUrl } from '../lib/paths';
 import YouTubeEmbed from '../components/YouTubeEmbed';
+import LoopControl, { formatRest } from '../components/LoopControl';
 
 export default function Player() {
   const { videoId, workoutId } = useParams();
@@ -41,6 +42,21 @@ export default function Player() {
   const [nextVideoId, setNextVideoId] = useState<string | null>(null);
   const [prevVideoId, setPrevVideoId] = useState<string | null>(null);
   const labels = useMetaLabels();
+
+  // --- Loop + rest ---------------------------------------------------------
+  // `loops` is the total number of passes the user asked for, counting the one
+  // already playing when they set it up: "10 times" means 10 plays, not 10
+  // repeats on top of the first. `passesDone` counts finished passes, so the
+  // pass on screen is always passesDone + 1.
+  const [loops, setLoops] = useState(0);
+  const [restSeconds, setRestSeconds] = useState(60);
+  const [passesDone, setPassesDone] = useState(0);
+  const [restLeft, setRestLeft] = useState<number | null>(null);
+  // The end-of-video handler runs from player callbacks that can hold a stale
+  // closure, so the count it reads lives in a ref alongside the state.
+  const passesDoneRef = useRef(0);
+  // What to do when the rest countdown reaches zero: replay, or move on.
+  const restActionRef = useRef<(() => void) | null>(null);
 
   // Declared before the effects below, which depend on it.
   const isExternal = source !== 'local';
@@ -120,6 +136,81 @@ export default function Player() {
       .catch(() => loadStandaloneState());
   }, [videoId, workoutId]);
 
+  const goToNext = () => {
+    if (nextVideoId) navigate(`/player/${nextVideoId}/${workoutId}`);
+  };
+
+  // Looping is per-video: switching videos drops the count and any pending rest
+  // rather than carrying a half-finished set onto the next exercise.
+  useEffect(() => {
+    setLoops(0);
+    setPassesDone(0);
+    passesDoneRef.current = 0;
+    setRestLeft(null);
+    restActionRef.current = null;
+  }, [videoId]);
+
+  const restartVideo = () => {
+    if (isExternal) {
+      ytPlayerRef.current?.seekTo?.(0, true);
+      ytPlayerRef.current?.playVideo?.();
+    } else if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      // Autoplay can be refused; the user still has the native controls.
+      videoRef.current.play().catch(() => {});
+    }
+  };
+
+  /** Begin the rest period, or run `after` straight away when rest is off. */
+  const startRest = (after: () => void) => {
+    if (restSeconds <= 0) {
+      after();
+      return;
+    }
+    restActionRef.current = after;
+    setRestLeft(restSeconds);
+  };
+
+  const endRest = () => {
+    const run = restActionRef.current;
+    restActionRef.current = null;
+    setRestLeft(null);
+    run?.();
+  };
+
+  // One timeout per remaining second. Re-running `endRest` from the effect body
+  // is safe — it only navigates or restarts playback.
+  useEffect(() => {
+    if (restLeft === null) return;
+    if (restLeft <= 0) {
+      endRest();
+      return;
+    }
+    const id = setTimeout(() => setRestLeft(s => (s === null ? null : s - 1)), 1000);
+    return () => clearTimeout(id);
+  }, [restLeft]);
+
+  const handleEnded = () => {
+    // No loop, or the set is already finished and the user replayed by hand:
+    // fall back to plain auto-advance rather than counting past the set.
+    if (loops <= 0 || passesDoneRef.current >= loops) {
+      goToNext();
+      return;
+    }
+    const done = passesDoneRef.current + 1;
+    passesDoneRef.current = done;
+    setPassesDone(done);
+
+    // More passes to go: rest, then play it again.
+    if (done < loops) {
+      startRest(restartVideo);
+      return;
+    }
+    // Set finished. Rest before the next video too, but don't leave the user
+    // staring at a countdown when there is nothing to count down to.
+    if (nextVideoId) startRest(goToNext);
+  };
+
   const toggleFullscreen = () => {
     if (document.fullscreenElement) {
       document.exitFullscreen();
@@ -133,6 +224,11 @@ export default function Player() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't steal Space/arrows from the page's own controls — typing a loop
+      // count would otherwise pause and seek the video.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"], [data-player-ui]')) return;
+
       // Same shortcuts either way; the two players just expose different APIs.
       const player = isExternal ? ytPlayerRef.current : videoRef.current;
       if (!player) return;
@@ -164,6 +260,11 @@ export default function Player() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isExternal]);
 
+  // How many times through the video the user actually got, counting the pass
+  // in progress (but not one that hasn't started — during rest the pass that
+  // just finished is the last one to count). Logged so a set reads as "10×".
+  const loggedLoops = loops > 0 ? Math.min(passesDone + (restLeft === null ? 1 : 0), loops) : 0;
+
   const handleToggleDone = async () => {
     if (!videoId || isMarking) return;
     setIsMarking(true);
@@ -173,7 +274,7 @@ export default function Player() {
         const res = await fetch('/api/schedule/toggle-done', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workoutId, videoId })
+          body: JSON.stringify({ workoutId, videoId, loopCount: loggedLoops })
         });
         const data = await res.json();
         if (res.ok) setIsDone(data.completed);
@@ -191,7 +292,7 @@ export default function Player() {
         const res = await fetch('/api/profile/history', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ completedDate: today, videoIds: [videoId] })
+          body: JSON.stringify({ completedDate: today, videoIds: [videoId], loopCount: loggedLoops })
         });
         const data = await res.json();
         if (res.ok) {
@@ -224,10 +325,6 @@ export default function Player() {
   const hasTags = equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity);
   const hasMeta = Boolean(description.trim()) || hasTags;
 
-  const goToNext = () => {
-    if (nextVideoId) navigate(`/player/${nextVideoId}/${workoutId}`);
-  };
-
   return (
     <div className="player-wrap">
       <div className="player-theater" ref={theaterRef} onDoubleClick={toggleFullscreen}>
@@ -235,38 +332,42 @@ export default function Player() {
         <div className="player-theater-header">
           <h2>{filename}</h2>
           <div className="player-theater-actions">
+            <LoopControl
+              loops={loops}
+              restSeconds={restSeconds}
+              currentPass={Math.min(passesDone + 1, loops || 1)}
+              restLeft={restLeft}
+              onApply={(nextLoops, nextRest) => {
+                // Starting a fresh set counts the pass already on screen as #1;
+                // only adjusting an existing one keeps the tally.
+                if (loops === 0) {
+                  setPassesDone(0);
+                  passesDoneRef.current = 0;
+                }
+                setLoops(nextLoops);
+                setRestSeconds(nextRest);
+              }}
+              onClear={() => {
+                setLoops(0);
+                setPassesDone(0);
+                passesDoneRef.current = 0;
+                restActionRef.current = null;
+                setRestLeft(null);
+              }}
+            />
             {showMarkDone && (
               <button
                 onClick={handleToggleDone}
                 disabled={isMarking}
-                style={{
-                  background: isDone ? '#10b981' : 'rgba(255,255,255,0.15)',
-                  color: 'white',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  backdropFilter: 'blur(8px)',
-                  fontWeight: 600,
-                }}
+                className="player-theater-btn"
+                style={isDone ? { background: '#10b981', borderColor: 'transparent' } : undefined}
               >
                 {standalone
                   ? (isDone ? '✓ Logged as Done' : 'Mark as Done')
                   : (isDone ? '✓ This Part Done' : 'Mark Part Done')}
               </button>
             )}
-            <button
-              onClick={() => navigate(-1)}
-              style={{
-                background: 'rgba(255,255,255,0.15)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.2)',
-                padding: '10px 20px',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
+            <button onClick={() => navigate(-1)} className="player-theater-btn">
               Close
             </button>
           </div>
@@ -276,7 +377,7 @@ export default function Player() {
           externalId ? (
             <YouTubeEmbed
               externalId={externalId}
-              onEnded={goToNext}
+              onEnded={handleEnded}
               onReady={player => { ytPlayerRef.current = player; }}
               onError={reason => setError(t(`player.youtube_error_${reason}`))}
             />
@@ -289,9 +390,33 @@ export default function Player() {
             src={videoUrl}
             controls
             autoPlay
-            onEnded={goToNext}
+            onEnded={handleEnded}
             onError={() => setError('Could not play this video. The file may be missing or use an unsupported format.')}
           />
+        )}
+
+        {/* Rest between passes. Sits under the header (z-index 20) so the loop
+            and close buttons stay reachable while the clock runs. */}
+        {restLeft !== null && (
+          <div className="player-rest" data-player-ui>
+            {/* Announced once when the rest starts. The visible clock is hidden
+                from assistive tech so it isn't read out every second. */}
+            <span className="sr-only" role="status">
+              {passesDone < loops
+                ? t('player.rest_announce_loop', { current: passesDone + 1, total: loops })
+                : t('player.rest_announce_video')}
+            </span>
+            <span aria-hidden="true" className="player-rest-label">{t('player.rest_heading')}</span>
+            <span aria-hidden="true" className="player-rest-time">{formatRest(restLeft)}</span>
+            <span aria-hidden="true" className="player-rest-next">
+              {passesDone < loops
+                ? t('player.rest_next_loop', { current: passesDone + 1, total: loops })
+                : t('player.rest_next_video')}
+            </span>
+            <button type="button" className="player-rest-skip" onClick={endRest}>
+              {t('player.rest_skip')}
+            </button>
+          </div>
         )}
 
         {/* Floating prev/next */}

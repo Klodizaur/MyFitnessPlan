@@ -368,6 +368,262 @@ body {
   pointer-events: auto;
 }
 
+/* Shared look for the theater's header buttons. Kept in CSS rather than inline
+   styles so the mobile sizing below can actually win — three controls plus the
+   title otherwise stack one per row and bury the video. */
+.player-theater-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+/* Loop control — lives in the theater header, over the video, so it is styled
+   against black rather than with the page's surface tokens. */
+.player-loop {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-loop-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.player-loop-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.player-loop-btn:focus-visible,
+.player-loop-preset:focus-visible,
+.player-loop-pop-btn:focus-visible,
+.player-rest-skip:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.player-loop-btn.is-active {
+  background: var(--accent-color);
+  border-color: transparent;
+}
+
+.player-loop-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.player-loop-status.is-resting {
+  border-color: var(--accent-color);
+}
+
+.player-loop-sep {
+  opacity: 0.5;
+  margin: 0 1px;
+}
+
+.player-loop-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  opacity: 0.9;
+}
+
+/* Setup popover, anchored under the button. */
+.player-loop-pop {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 40;
+  width: 244px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(18, 18, 22, 0.92);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  text-align: left;
+}
+
+.player-loop-pop-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.player-loop-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.player-loop-field input {
+  width: 78px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-loop-presets {
+  display: flex;
+  gap: 6px;
+}
+
+.player-loop-preset {
+  flex: 1;
+  padding: 5px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.player-loop-preset.is-on {
+  background: var(--accent-color);
+  border-color: transparent;
+  color: #fff;
+}
+
+.player-loop-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.player-loop-pop-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.player-loop-pop-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.player-loop-pop-btn.is-primary {
+  background: var(--accent-color);
+  border-color: transparent;
+}
+
+/* Rest countdown over the video. */
+.player-rest {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(3px);
+  color: #fff;
+  text-align: center;
+  padding: 1rem;
+}
+
+.player-rest-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.player-rest-time {
+  font-size: clamp(2.75rem, 9vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-rest-next {
+  font-size: 0.88rem;
+  opacity: 0.75;
+}
+
+.player-rest-skip {
+  margin-top: 12px;
+  padding: 9px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.player-rest-skip:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/* Screen-reader-only text (the loop status is shown as a compact chip, so the
+   full sentence is announced rather than drawn). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .player-theater-nav {
   position: absolute;
   bottom: 10%;
@@ -1541,6 +1797,20 @@ nav .nav-links a:hover, nav .nav-links a.active {
   opacity: 0.75;
 }
 
+/* "10×" marker on a log entry the user looped. Deliberately tiny — it annotates
+   the video name rather than competing with it. */
+.log-loop-badge {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  border: 1px solid var(--glass-border);
+}
+
 /* Workout count + equipment tag chips shown on every plan card */
 .plan-card-info {
   display: flex;
@@ -2467,6 +2737,18 @@ nav .nav-links a:hover, nav .nav-links a.active {
   /* Tighten the player theater chrome. */
   .player-theater-header { padding: 1rem; }
   .player-theater-nav { gap: 1.25rem; }
+
+  /* Three controls plus the title don't fit a phone-width row at desktop sizing,
+     so everything shrinks enough to stay on one line and the loop popover is
+     pinned to the right edge to stay on screen. */
+  .player-theater-header { align-items: flex-start; gap: 8px; }
+  .player-theater-header h2 { max-width: 32%; font-size: 0.95rem; }
+  .player-theater-actions { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .player-theater-btn { padding: 7px 10px; font-size: 0.75rem; border-radius: 8px; }
+  .player-loop-btn { width: 32px; height: 32px; border-radius: 8px; }
+  .player-loop-btn svg { width: 15px; height: 15px; }
+  .player-loop-status { padding: 5px 8px; font-size: 0.72rem; gap: 5px; }
+  .player-loop-pop { left: auto; right: 0; width: min(244px, calc(100vw - 2.5rem)); }
 }
 
 /* Page wrapper with generous desktop gutters that tighten on smaller screens. */

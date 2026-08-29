@@ -257,7 +257,11 @@ export default async function (fastify: FastifyInstance) {
   });
 
   fastify.post('/toggle-done', async (request, reply) => {
-    const { workoutId, videoId } = request.body as { workoutId: string, videoId?: string };
+    const { workoutId, videoId, loopCount } = request.body as { workoutId: string, videoId?: string, loopCount?: number };
+    // Times through the video, when the player was looping it. Only a real set
+    // (2+) is recorded; a single play needs no marker in the log.
+    const rawLoops = Number(loopCount);
+    const loops = Number.isFinite(rawLoops) && rawLoops > 1 ? Math.min(Math.floor(rawLoops), 999) : null;
     
     let existing;
     if (videoId) {
@@ -314,9 +318,9 @@ export default async function (fastify: FastifyInstance) {
       }
       db.prepare(`
         INSERT INTO workout_log
-          (id, workout_id, video_id, plan_name, workout_name, video_filename, thumbnail_path, completed_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(nanoid(), workoutId, videoId ?? null, planName, workout?.name ?? null, videoFilename, thumbnailPath, completedDate);
+          (id, workout_id, video_id, plan_name, workout_name, video_filename, thumbnail_path, completed_date, loop_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(nanoid(), workoutId, videoId ?? null, planName, workout?.name ?? null, videoFilename, thumbnailPath, completedDate, loops);
 
       // Did that leave the plan with nothing outstanding?
       if (workout?.plan_id) await syncPlanCompletion(workout.plan_id, completedDate);
