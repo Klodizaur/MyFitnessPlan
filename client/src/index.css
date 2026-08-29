@@ -8,6 +8,10 @@
   --accent-color: #3b82f6; /* Electric Blue */
   --accent-hover: #60a5fa;
   --accent-soft: rgba(59, 130, 246, 0.15); /* subtle accent tint for selected states */
+  /* Readable text/icon color for content painted directly on --accent-color.
+     White everywhere except the light pastel themes, whose accent is too pale
+     for white to clear contrast — mirrors --wb-accent-text below. */
+  --accent-contrast: #ffffff;
   --rest-color: #ef4444; /* Red for Rest */
   --progress-bg: rgba(255, 255, 255, 0.1);
   
@@ -27,6 +31,7 @@
   --accent-color: #f97316;
   --accent-hover: #fb923c;
   --accent-soft: rgba(249, 115, 22, 0.20);
+  --accent-contrast: #ffffff;
   --progress-bg: rgba(255, 255, 255, 0.1);
   --glass-bg: rgba(61, 43, 70, 0.7);
   --glass-border: rgba(249, 115, 22, 0.2);
@@ -42,6 +47,7 @@
   --accent-color: #10b981;
   --accent-hover: #34d399;
   --accent-soft: rgba(16, 185, 129, 0.20);
+  --accent-contrast: #ffffff;
   --progress-bg: rgba(255, 255, 255, 0.1);
   --glass-bg: rgba(6, 95, 70, 0.7);
   --glass-border: rgba(16, 185, 129, 0.2);
@@ -57,6 +63,7 @@
   --accent-color: #fdba74;
   --accent-hover: #fb923c;
   --accent-soft: rgba(253, 186, 116, 0.38);
+  --accent-contrast: #7c2d12;
   --progress-bg: rgba(0, 0, 0, 0.05);
   --glass-bg: rgba(255, 255, 255, 0.9);
   --glass-border: rgba(253, 186, 116, 0.2);
@@ -72,6 +79,7 @@
   --accent-color: #f9a8d4;
   --accent-hover: #f472b6;
   --accent-soft: rgba(249, 168, 212, 0.40);
+  --accent-contrast: #831843;
   --progress-bg: rgba(0, 0, 0, 0.05);
   --glass-bg: rgba(255, 255, 255, 0.9);
   --glass-border: rgba(249, 168, 212, 0.2);
@@ -87,6 +95,7 @@
   --accent-color: #7dd3fc;
   --accent-hover: #38bdf8;
   --accent-soft: rgba(125, 211, 252, 0.40);
+  --accent-contrast: #0c4a6e;
   --progress-bg: rgba(0, 0, 0, 0.05);
   --glass-bg: rgba(255, 255, 255, 0.9);
   --glass-border: rgba(125, 211, 252, 0.2);
@@ -110,6 +119,7 @@
   --accent-color: #d81b45;
   --accent-hover: #be123c;
   --accent-soft: rgba(216, 27, 69, 0.14);
+  --accent-contrast: #ffffff;
   --rest-color: #166534;
   --progress-bg: rgba(20, 67, 42, 0.08);
   --glass-bg: rgba(255, 255, 255, 0.92);
@@ -422,6 +432,8 @@ body {
 .player-loop-btn.is-active {
   background: var(--accent-color);
   border-color: transparent;
+  /* Pastel themes' accent is too light for a white icon to clear contrast. */
+  color: var(--accent-contrast, #fff);
 }
 
 .player-loop-status {
@@ -525,7 +537,7 @@ body {
 .player-loop-preset.is-on {
   background: var(--accent-color);
   border-color: transparent;
-  color: #fff;
+  color: var(--accent-contrast, #fff);
 }
 
 .player-loop-hint {
@@ -555,6 +567,7 @@ body {
 .player-loop-pop-btn.is-primary {
   background: var(--accent-color);
   border-color: transparent;
+  color: var(--accent-contrast, #fff);
 }
 
 /* Rest countdown over the video. */
