@@ -13,6 +13,8 @@ import YouTubeImportModal from '../components/YouTubeImportModal';
 import AiPlanModal, { AiPlanResult } from '../components/ai/AiPlanModal';
 import VideoTagChips from '../components/VideoTagChips';
 import WorkoutPatternPicker, { DEFAULT_PATTERN } from '../components/WorkoutPatternPicker';
+import FreezePlanModal from '../components/FreezePlanModal';
+import { FREEZE_REASON_EMOJI, FreezeReason } from '../lib/freeze';
 import { localDateString } from '../lib/dates';
 import { Video } from '../types/video';
 
@@ -275,14 +277,27 @@ export default function Plans() {
   const [bgPickerVideos, setBgPickerVideos] = useState<Video[]>([]);
   const [bgPickerLoading, setBgPickerLoading] = useState(false);
 
+  // Today's freeze reason per active plan (planId -> reason), so the card can
+  // show Freeze vs. Unfreeze without computing each plan's full schedule.
+  const [freezeStatus, setFreezeStatus] = useState<Record<string, FreezeReason>>({});
+  const [freezeModalPlanId, setFreezeModalPlanId] = useState<string | null>(null);
+  const [freezeSaving, setFreezeSaving] = useState(false);
+  const [unfreezingPlanId, setUnfreezingPlanId] = useState<string | null>(null);
+
   const fetchPlans = async () => {
     const res = await fetch('/api/plan');
     const data = await res.json();
     setPlans(data);
   };
 
+  const fetchFreezeStatus = async () => {
+    const res = await fetch('/api/schedule/freeze-status');
+    if (res.ok) setFreezeStatus(await res.json());
+  };
+
   useEffect(() => {
     fetchPlans();
+    fetchFreezeStatus();
     fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
@@ -295,6 +310,35 @@ export default function Plans() {
       })
       .catch(() => { /* keep the built-in default */ });
   }, []);
+
+  const handleFreeze = async (planId: string, reason: FreezeReason, days: number) => {
+    setFreezeSaving(true);
+    try {
+      const res = await fetch('/api/schedule/freeze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId, reason, days }),
+      });
+      if (res.ok) {
+        setFreezeModalPlanId(null);
+        fetchFreezeStatus();
+      }
+    } finally {
+      setFreezeSaving(false);
+    }
+  };
+
+  // Freezing here can cover several days at once, so undoing it clears the
+  // whole run (today onward) rather than leaving the rest of it stranded.
+  const handleUnfreeze = async (planId: string) => {
+    setUnfreezingPlanId(planId);
+    try {
+      const res = await fetch(`/api/schedule/freeze/${encodeURIComponent(planId)}`, { method: 'DELETE' });
+      if (res.ok) fetchFreezeStatus();
+    } finally {
+      setUnfreezingPlanId(null);
+    }
+  };
 
   const handleFileUpload = async (selectedFile: File) => {
     setStatus(t('plans.uploading_status'));
@@ -1167,6 +1211,11 @@ export default function Plans() {
                   <span className="plan-featured-category">{categoryLabel(plan.category)}</span>
                 )}
                 {renderOfflineWarning(plan)}
+                {freezeStatus[plan.id] && (
+                  <span className="plan-featured-frozen">
+                    {FREEZE_REASON_EMOJI[freezeStatus[plan.id]]} {t(`calendar.freeze_reason_${freezeStatus[plan.id]}`)}
+                  </span>
+                )}
               </div>
               <h2 className="plan-featured-title">{plan.name}</h2>
               {plan.description && (
@@ -1205,8 +1254,20 @@ export default function Plans() {
 
               <div className="plan-card-actions" onClick={e => e.stopPropagation()}>
                 <button className="btn btn-ghost" onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
+                {freezeStatus[plan.id] ? (
+                  <button
+                    className="btn btn-ghost"
+                    disabled={unfreezingPlanId === plan.id}
+                    onClick={() => handleUnfreeze(plan.id)}
+                  >
+                    {t('plans.unfreeze')}
+                  </button>
+                ) : (
+                  <button className="btn btn-ghost" onClick={() => setFreezeModalPlanId(plan.id)}>
+                    {t('plans.freeze')}
+                  </button>
+                )}
                 <button className="btn btn-ghost" onClick={() => handleDeactivate(plan.id)}>{t('plans.deactivate')}</button>
-                <button className="btn btn-danger-ghost" onClick={() => handleDelete(plan.id)}>{t('plans.delete')}</button>
               </div>
             </div>
           </div>
@@ -1391,21 +1452,25 @@ export default function Plans() {
               </label>
 
               <div className="plan-details-action-buttons">
-                {slotOf(detailsPlan) !== 'main' && (
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => { handleActivate(detailsPlan.id, 'main'); closePlanDetails(); }}
-                  >
-                    {t('plans.activate_as')}: {t('plans.slot_main')}
-                  </button>
-                )}
-                {slotOf(detailsPlan) !== 'extra' && (
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => { handleActivate(detailsPlan.id, 'extra'); closePlanDetails(); }}
-                  >
-                    {t('plans.activate_as')}: {t('plans.slot_extra')}
-                  </button>
+                {/* Switching slots only makes sense for a plan that isn't running yet —
+                    re-slotting an already-active plan would just evict whatever
+                    currently occupies the other slot. An active plan only offers
+                    Deactivate below. */}
+                {slotOf(detailsPlan) === null && (
+                  <>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => { handleActivate(detailsPlan.id, 'main'); closePlanDetails(); }}
+                    >
+                      {t('plans.activate_as')}: {t('plans.slot_main')}
+                    </button>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => { handleActivate(detailsPlan.id, 'extra'); closePlanDetails(); }}
+                    >
+                      {t('plans.activate_as')}: {t('plans.slot_extra')}
+                    </button>
+                  </>
                 )}
                 {slotOf(detailsPlan) !== null && (
                   <button
@@ -1514,6 +1579,15 @@ export default function Plans() {
 
       {isImportOpen && (
         <YouTubeImportModal onClose={() => setIsImportOpen(false)} onImported={handleImported} />
+      )}
+
+      {freezeModalPlanId && (
+        <FreezePlanModal
+          planName={plans.find(p => p.id === freezeModalPlanId)?.name ?? ''}
+          saving={freezeSaving}
+          onConfirm={(reason, days) => handleFreeze(freezeModalPlanId, reason, days)}
+          onClose={() => setFreezeModalPlanId(null)}
+        />
       )}
 
       {isBuilderOpen && createPortal(

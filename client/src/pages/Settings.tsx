@@ -258,12 +258,19 @@ export default function Settings() {
           >
             {t('settings.classic_list')}
           </button>
-          <button 
+          <button
             className={`btn ${calendarView === 'slider' ? '' : 'btn-secondary'}`}
             style={{ flex: 1 }}
             onClick={() => setCalendarView('slider')}
           >
             {t('settings.modern_slider')}
+          </button>
+          <button
+            className={`btn ${calendarView === 'tape' ? '' : 'btn-secondary'}`}
+            style={{ flex: 1 }}
+            onClick={() => setCalendarView('tape')}
+          >
+            {t('settings.day_tape')}
           </button>
         </div>
       </div>

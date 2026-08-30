@@ -283,6 +283,13 @@ if (!workoutLogInfo.some((c: any) => c.name === 'notes')) {
   db.exec('ALTER TABLE workout_log ADD COLUMN notes TEXT');
 }
 
+// How many times the video was played through when it was marked done, for
+// entries the user looped in the player. Null/0/1 all mean "played once" and
+// render no badge; only a real set (2+) is worth marking in the log.
+if (!workoutLogInfo.some((c: any) => c.name === 'loop_count')) {
+  db.exec('ALTER TABLE workout_log ADD COLUMN loop_count INTEGER');
+}
+
 db.exec('CREATE INDEX IF NOT EXISTS idx_workout_log_date ON workout_log(completed_date)');
 
 // One-time seeding of plan_completions from plans that are already finished.
@@ -338,5 +345,22 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_plan_completions_date ON plan_completion
 // The 'snow' theme was removed. Anyone still on it would fall back to the bare
 // :root variables, so move them onto the default theme explicitly.
 db.prepare("UPDATE settings SET value = 'midnight' WHERE key = 'theme' AND value = 'snow'").run();
+
+// One frozen calendar day for a plan: that day's card shows the reason
+// instead of its scheduled workout, and the workout itself is deferred to the
+// next open workout day — freezing a run of days pushes the rest of the plan
+// back by the same span rather than losing what was scheduled on them (see
+// buildSchedule in schedule.ts). UNIQUE so freezing an already-frozen day
+// updates the reason instead of stacking rows.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS plan_freezes (
+    id TEXT PRIMARY KEY,
+    plan_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(plan_id, date)
+  );
+`);
 
 export default db;

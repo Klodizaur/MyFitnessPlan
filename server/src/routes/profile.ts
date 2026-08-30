@@ -30,6 +30,7 @@ export default async function (fastify: FastifyInstance) {
         l.completed_at,
         l.is_manual,
         l.notes,
+        l.loop_count,
         v.duration_seconds,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.training_type ELSE v.training_type END AS training_type,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.body_parts    ELSE v.body_parts    END AS body_parts,
@@ -52,6 +53,9 @@ export default async function (fastify: FastifyInstance) {
       completedAt: r.completed_at,
       isManual: !!r.is_manual,
       notes: r.notes || '',
+      // Times through the video when it was logged. Anything below 2 was a
+      // single play, which the log shows without a badge.
+      loopCount: typeof r.loop_count === 'number' && r.loop_count > 1 ? r.loop_count : null,
       // Runtime of the linked video, when the library has probed it. Manually
       // logged entries have no video and therefore no duration.
       durationSeconds: typeof r.duration_seconds === 'number' ? r.duration_seconds : null,
@@ -139,6 +143,7 @@ export default async function (fastify: FastifyInstance) {
       bodyParts?: unknown;
       intensity?: unknown;
       videoIds?: unknown;
+      loopCount?: unknown;
     };
 
     const { completedDate } = body;
@@ -194,11 +199,17 @@ export default async function (fastify: FastifyInstance) {
     // Drop the file extension so a video "Full Body HIIT.mp4" logs as "Full Body HIIT".
     const stripExt = (f: string) => f.replace(/\.[^/.]+$/, '');
 
+    // Set by the player when the video was looped; ignored for a hand-typed
+    // entry, which has no playback to count. Stored only for a real set (2+).
+    const rawLoops = Number(body.loopCount);
+    const loopCount =
+      Number.isFinite(rawLoops) && rawLoops > 1 ? Math.min(Math.floor(rawLoops), 999) : null;
+
     const insert = db.prepare(`
       INSERT INTO workout_log
         (id, workout_id, video_id, plan_name, workout_name, video_filename, thumbnail_path,
-         completed_date, is_manual, training_type, body_parts, intensity, equipment)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+         completed_date, is_manual, training_type, body_parts, intensity, equipment, loop_count)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
     `);
 
     const workoutIds: string[] = [];
@@ -212,14 +223,14 @@ export default async function (fastify: FastifyInstance) {
         insert.run(nanoid(), wid, v.id, null,
           v.filename ? stripExt(v.filename) : (name || null),
           v.filename, v.thumbnail_path, completedDate,
-          null, null, null, null);
+          null, null, null, null, loopCount);
       }
       // A typed name adds one more separate custom entry carrying the chosen tags.
       if (name) {
         const wid = `manual-${nanoid()}`;
         workoutIds.push(wid);
         insert.run(nanoid(), wid, null, null, name, null, null, completedDate,
-          JSON.stringify(trainingType), JSON.stringify(bodyParts), intensity, JSON.stringify(equipment));
+          JSON.stringify(trainingType), JSON.stringify(bodyParts), intensity, JSON.stringify(equipment), null);
       }
     });
     create();

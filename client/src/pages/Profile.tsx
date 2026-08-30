@@ -18,6 +18,8 @@ type LogEntry = {
   completedAt: string;
   isManual: boolean;
   notes: string;
+  /** Times through the video, when it was looped in the player; null otherwise. */
+  loopCount: number | null;
   durationSeconds: number | null;
   trainingType: string[];
   bodyParts: string[];
@@ -737,6 +739,11 @@ export default function Profile() {
                           <span style={{ fontSize: '0.85rem', fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {e.videoFilename ? stripExt(e.videoFilename) : t('profile.untitled_workout')}
                           </span>
+                          {e.loopCount && e.loopCount > 1 && (
+                            <span className="log-loop-badge" title={t('profile.loop_badge_aria', { count: e.loopCount })}>
+                              {e.loopCount}×
+                            </span>
+                          )}
                           {editableVideo && (
                             <button
                               type="button"
