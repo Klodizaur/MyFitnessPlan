@@ -5,6 +5,38 @@ All notable changes to MyFitnessPlan are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-08-30
+
+### Added
+
+**Loop a video, with rest**
+
+- The player can loop a video for a set number of passes, with a rest between
+  each one — for repeating a single move or circuit without reaching for the
+  seek bar every time.
+- A separate rest can be set for right before the next video in the plan
+  starts, since that pause is usually wanted longer than the one between
+  passes.
+
+**Freeze a plan without losing any workouts**
+
+- Freezing a run of days (sick, your period, or just a break) shows the reason
+  on each of those days instead of a workout — but nothing is skipped. The
+  workouts that would've fallen on frozen days wait and move to the next open
+  day, pushing the rest of the plan back by the same span.
+- Freeze for just today from the calendar header, or a longer stretch from a
+  plan's card on the Plans page. Each frozen day can also be unfrozen on its
+  own before it arrives.
+
+**New "Day Tape" calendar view**
+
+- A new way to browse the calendar alongside the existing List and Slider
+  views: a horizontal strip of day numbers grouped by week, with a dot marking
+  workout days. Tapping a day opens a full detail view below — thumbnail,
+  duration, categorized tags (intensity, training type, body parts,
+  equipment) and description — instead of a grid of cards.
+- Switch views from Settings.
+
 ## [1.5.1] - 2026-08-21
 
 ### Fixed

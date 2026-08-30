@@ -157,7 +157,9 @@
     "pattern_default": "Use my default",
     "pattern_custom": "Set for this plan",
     "pattern_following_note": "This plan follows the workout pattern in Settings. Change it there and this plan changes with it.",
-    "pattern_own_note": "This plan keeps its own rhythm, whatever Settings says. It repeats from the plan's start date."
+    "pattern_own_note": "This plan keeps its own rhythm, whatever Settings says. It repeats from the plan's start date.",
+    "freeze": "Freeze",
+    "unfreeze": "Unfreeze"
   },
   "calendar": {
     "today": "Today",
@@ -181,7 +183,24 @@
     "review_workout": "✓ Review Workout",
     "play_part": "Play Part {{index}}",
     "start_workout": "Start Workout",
-    "part": "Part {{index}}"
+    "part": "Part {{index}}",
+    "freeze_button": "Freeze today",
+    "freeze_modal_heading": "Freeze this plan",
+    "freeze_modal_subtitle": "Pause {{plan}} for today. Pick what's going on:",
+    "freeze_modal_hint": "Nothing gets skipped — frozen workouts wait and shift to the next open day, so the rest of the plan moves back to make room. You can unfreeze any of these days again before it passes.",
+    "freeze_reason_unwell": "Unwell",
+    "freeze_reason_period": "Period",
+    "freeze_reason_freeze": "Just Freeze",
+    "frozen_caption": "This day is frozen — nothing else to do here.",
+    "unfreeze_button": "Unfreeze",
+    "freeze_days_label": "For how many days",
+    "freeze_days_decrease": "Fewer days",
+    "freeze_days_increase": "More days",
+    "freeze_confirm_one": "Freeze {{count}} day",
+    "freeze_confirm_other": "Freeze {{count}} days",
+    "freeze_modal_subtitle_day": "Freeze {{plan}} for just today. Pick what's going on:",
+    "week_label": "Week {{number}}",
+    "duration_min": "min"
   },
   "settings": {
     "appearance": "Appearance",
@@ -231,7 +250,8 @@
     "tab_workouts": "Workouts",
     "tab_appearance": "Appearance",
     "tab_ai": "AI",
-    "tab_about": "About"
+    "tab_about": "About",
+    "day_tape": "Day Tape"
   },
   "about": {
     "version": "Version",
@@ -368,8 +388,8 @@
     "loop_edit_aria": "Looping {{total}} times — change",
     "loop_heading": "Loop this video",
     "loop_times_label": "Play (times)",
-    "loop_rest_label": "Rest (seconds)",
-    "loop_hint": "Counts the play already running, so 10 means 10 plays in total. Set rest to 0 to skip it.",
+    "loop_rest_label": "Rest between plays (seconds)",
+    "loop_hint": "Counts the play already running, so 10 means 10 plays in total. Set either rest to 0 to skip it.",
     "loop_start": "Start loop",
     "loop_update": "Update",
     "loop_turn_off": "Turn off",
@@ -380,7 +400,8 @@
     "rest_next_video": "Next video after this",
     "rest_skip": "Skip rest",
     "rest_announce_loop": "Rest started. Next: play {{current}} of {{total}}.",
-    "rest_announce_video": "Rest started. The next video follows."
+    "rest_announce_video": "Rest started. The next video follows.",
+    "loop_next_rest_label": "Rest before next video (seconds)"
   },
   "import": {
     "btn": "Add from YouTube",

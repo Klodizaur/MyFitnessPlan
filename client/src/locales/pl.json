@@ -216,7 +216,9 @@
     "pattern_default": "Użyj domyślnego",
     "pattern_custom": "Ustaw dla tego planu",
     "pattern_following_note": "Ten plan korzysta ze schematu treningowego z Ustawień. Zmień go tam, a zmieni się i ten plan.",
-    "pattern_own_note": "Ten plan ma własny rytm, niezależnie od Ustawień. Powtarza się od daty startu planu."
+    "pattern_own_note": "Ten plan ma własny rytm, niezależnie od Ustawień. Powtarza się od daty startu planu.",
+    "freeze": "Zamroź",
+    "unfreeze": "Odmroź"
   },
   "calendar": {
     "today": "Dzisiaj",
@@ -240,7 +242,24 @@
     "review_workout": "✓ Przejrzyj trening",
     "play_part": "Odtwórz część {{index}}",
     "start_workout": "Rozpocznij trening",
-    "part": "Część {{index}}"
+    "part": "Część {{index}}",
+    "freeze_button": "Zamroź dzisiaj",
+    "freeze_modal_heading": "Zamroź ten plan",
+    "freeze_modal_subtitle": "Zatrzymaj {{plan}} na dziś. Wybierz powód:",
+    "freeze_modal_hint": "Nic nie zostaje pominięte — zamrożone treningi czekają i przesuwają się na najbliższy wolny dzień, więc reszta planu przesuwa się razem z nimi. Każdy z zamrożonych dni możesz odmrozić, zanim nadejdzie.",
+    "freeze_reason_unwell": "Niedyspozycja",
+    "freeze_reason_period": "Okres",
+    "freeze_reason_freeze": "Po prostu przerwa",
+    "frozen_caption": "Ten dzień jest zamrożony — nic tu więcej do zrobienia.",
+    "unfreeze_button": "Odmroź",
+    "freeze_days_label": "Na ile dni",
+    "freeze_days_decrease": "Mniej dni",
+    "freeze_days_increase": "Więcej dni",
+    "freeze_confirm_one": "Zamróź {{count}} dzień",
+    "freeze_confirm_other": "Zamróź {{count}} dni",
+    "freeze_modal_subtitle_day": "Zamróź {{plan}} tylko na dziś. Wybierz powód:",
+    "week_label": "Tydzień {{number}}",
+    "duration_min": "min"
   },
   "settings": {
     "appearance": "Wygląd",
@@ -290,7 +309,8 @@
     "tab_workouts": "Treningi",
     "tab_appearance": "Wygląd",
     "tab_ai": "AI",
-    "tab_about": "O aplikacji"
+    "tab_about": "O aplikacji",
+    "day_tape": "Taśma dni"
   },
   "about": {
     "version": "Wersja",
@@ -431,8 +451,8 @@
     "loop_edit_aria": "Zapętlone {{total}} razy — zmień",
     "loop_heading": "Zapętl to wideo",
     "loop_times_label": "Odtwórz (razy)",
-    "loop_rest_label": "Przerwa (sekundy)",
-    "loop_hint": "Liczy trwające odtwarzanie, więc 10 oznacza 10 odtworzeń łącznie. Ustaw 0, aby pominąć przerwę.",
+    "loop_rest_label": "Przerwa między odtworzeniami (sekundy)",
+    "loop_hint": "Liczy trwające odtwarzanie, więc 10 oznacza 10 odtworzeń łącznie. Ustaw 0 przy dowolnej przerwie, aby ją pominąć.",
     "loop_start": "Uruchom pętlę",
     "loop_update": "Zaktualizuj",
     "loop_turn_off": "Wyłącz",
@@ -443,7 +463,8 @@
     "rest_next_video": "Potem następne wideo",
     "rest_skip": "Pomiń przerwę",
     "rest_announce_loop": "Przerwa rozpoczęta. Dalej: odtworzenie {{current}} z {{total}}.",
-    "rest_announce_video": "Przerwa rozpoczęta. Potem następne wideo."
+    "rest_announce_video": "Przerwa rozpoczęta. Potem następne wideo.",
+    "loop_next_rest_label": "Przerwa przed następnym wideo (sekundy)"
   },
   "import": {
     "btn": "Dodaj z YouTube",

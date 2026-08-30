@@ -50,6 +50,10 @@ export default function Player() {
   // pass on screen is always passesDone + 1.
   const [loops, setLoops] = useState(0);
   const [restSeconds, setRestSeconds] = useState(60);
+  // Separate from restSeconds: the pause after the LAST pass, before a
+  // different video from the plan starts — often wanted longer than the
+  // between-pass breather.
+  const [nextRestSeconds, setNextRestSeconds] = useState(60);
   const [passesDone, setPassesDone] = useState(0);
   const [restLeft, setRestLeft] = useState<number | null>(null);
   // The end-of-video handler runs from player callbacks that can hold a stale
@@ -162,13 +166,13 @@ export default function Player() {
   };
 
   /** Begin the rest period, or run `after` straight away when rest is off. */
-  const startRest = (after: () => void) => {
-    if (restSeconds <= 0) {
+  const startRest = (seconds: number, after: () => void) => {
+    if (seconds <= 0) {
       after();
       return;
     }
     restActionRef.current = after;
-    setRestLeft(restSeconds);
+    setRestLeft(seconds);
   };
 
   const endRest = () => {
@@ -203,12 +207,13 @@ export default function Player() {
 
     // More passes to go: rest, then play it again.
     if (done < loops) {
-      startRest(restartVideo);
+      startRest(restSeconds, restartVideo);
       return;
     }
-    // Set finished. Rest before the next video too, but don't leave the user
-    // staring at a countdown when there is nothing to count down to.
-    if (nextVideoId) startRest(goToNext);
+    // Set finished. Rest before the next video too (its own, often longer,
+    // duration), but don't leave the user staring at a countdown when there
+    // is nothing to count down to.
+    if (nextVideoId) startRest(nextRestSeconds, goToNext);
   };
 
   const toggleFullscreen = () => {
@@ -335,9 +340,10 @@ export default function Player() {
             <LoopControl
               loops={loops}
               restSeconds={restSeconds}
+              nextRestSeconds={nextRestSeconds}
               currentPass={Math.min(passesDone + 1, loops || 1)}
               restLeft={restLeft}
-              onApply={(nextLoops, nextRest) => {
+              onApply={(nextLoops, nextRest, nextVideoRest) => {
                 // Starting a fresh set counts the pass already on screen as #1;
                 // only adjusting an existing one keeps the tally.
                 if (loops === 0) {
@@ -346,6 +352,7 @@ export default function Player() {
                 }
                 setLoops(nextLoops);
                 setRestSeconds(nextRest);
+                setNextRestSeconds(nextVideoRest);
               }}
               onClear={() => {
                 setLoops(0);
@@ -407,7 +414,7 @@ export default function Player() {
                 : t('player.rest_announce_video')}
             </span>
             <span aria-hidden="true" className="player-rest-label">{t('player.rest_heading')}</span>
-            <span aria-hidden="true" className="player-rest-time">{formatRest(restLeft)}</span>
+            <span aria-hidden="true" className={`player-rest-time${restLeft <= 10 ? ' is-ending' : ''}`}>{formatRest(restLeft)}</span>
             <span aria-hidden="true" className="player-rest-next">
               {passesDone < loops
                 ? t('player.rest_next_loop', { current: passesDone + 1, total: loops })

@@ -97,6 +97,12 @@ function todayLocal(): string {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 }
 
+const FREEZE_REASONS = ['unwell', 'period', 'freeze'] as const;
+type FreezeReason = typeof FREEZE_REASONS[number];
+function isFreezeReason(v: unknown): v is FreezeReason {
+  return typeof v === 'string' && (FREEZE_REASONS as readonly string[]).includes(v);
+}
+
 export default async function (fastify: FastifyInstance) {
   fastify.get('/', async (request, reply) => {
     // Get pattern and start date
@@ -129,13 +135,13 @@ export default async function (fastify: FastifyInstance) {
 
     // Active plans, main slot first.
     const activePlans = db.prepare(
-      'SELECT id, name, start_date, is_active, workout_pattern FROM workout_plans WHERE is_active IN (1, 2) ORDER BY is_active ASC'
+      'SELECT id, name, start_date, is_active, workout_pattern, background_image, category FROM workout_plans WHERE is_active IN (1, 2) ORDER BY is_active ASC'
     ).all() as any[];
     if (!activePlans.length) {
       return reply.send({ schedule: [], schedules: [], pattern: globalPattern });
     }
 
-    const allVideos = db.prepare('SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, source, external_id FROM videos').all() as any[];
+    const allVideos = db.prepare('SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, source, external_id, duration_seconds FROM videos').all() as any[];
     const videoMap = new Map(allVideos.map(v => [v.id, {
       filename: v.filename,
       path: v.relative_path,
@@ -148,6 +154,9 @@ export default async function (fastify: FastifyInstance) {
       trainingType: parseTags(v.training_type),
       bodyParts: parseTags(v.body_parts),
       intensity: v.intensity || '',
+      // Probed at scan time, so present for nearly every local video even
+      // when nobody has ever gotten around to tagging or describing it.
+      duration: typeof v.duration_seconds === 'number' ? v.duration_seconds : null,
     }]));
     
     // Get history (both workout-level and video-level)
@@ -161,6 +170,14 @@ export default async function (fastify: FastifyInstance) {
       WHERE w.plan_id IN (${activePlans.map(() => '?').join(', ')})
       ORDER BY w.sequence_order ASC
     `).all(...activePlans.map(p => p.id)) as any[];
+
+    // Frozen days, keyed `${plan_id}|${date}` so buildSchedule can look one up
+    // per day without a query per row.
+    const freezeRows = db.prepare(`
+      SELECT plan_id, date, reason FROM plan_freezes
+      WHERE plan_id IN (${activePlans.map(() => '?').join(', ')})
+    `).all(...activePlans.map(p => p.id)) as any[];
+    const freezeByPlanDate = new Map(freezeRows.map(f => [`${f.plan_id}|${f.date}`, f.reason as string]));
 
     const buildSchedule = (plan: any) => {
       const startDateStr = plan.start_date || globalStartDate || new Date().toISOString().split('T')[0];
@@ -189,6 +206,7 @@ export default async function (fastify: FastifyInstance) {
             intensity: videoInfo.intensity,
             source: videoInfo.source,
             externalId: videoInfo.externalId,
+            duration: videoInfo.duration,
             isCompleted: completedVideos.has(`${w.id}:${vid}`)
           } : null;
         }).filter((v: any) => v !== null);
@@ -216,12 +234,19 @@ export default async function (fastify: FastifyInstance) {
       const currentDate = new Date(startDate);
 
       while (workoutIndex < workouts.length) {
-        const isWorkoutDay = pattern[patternIndex] === 1;
-        
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const frozenReason = freezeByPlanDate.get(`${plan.id}|${dateStr}`) || null;
+        // A frozen workout day doesn't consume its slot in the sequence — the
+        // workout that would've landed here waits for the next open workout
+        // day instead, so freezing pushes the rest of the plan back rather
+        // than burying that day's workout behind the freeze banner for good.
+        const isWorkoutDay = pattern[patternIndex] === 1 && !frozenReason;
+
         schedule.push({
-          date: currentDate.toISOString().split('T')[0],
+          date: dateStr,
           isWorkoutDay,
-          workout: isWorkoutDay ? workouts[workoutIndex] : null
+          workout: isWorkoutDay ? workouts[workoutIndex] : null,
+          frozen: frozenReason,
         });
 
         if (isWorkoutDay) {
@@ -237,6 +262,10 @@ export default async function (fastify: FastifyInstance) {
         planId: plan.id,
         planName: plan.name,
         startDate: startDateStr,
+        // For the plan-switcher tabs when two plans are active, so they can
+        // look like the plan rather than a bare text label.
+        backgroundImage: plan.background_image || null,
+        category: plan.category || null,
         pattern,
         schedule,
       };
@@ -327,5 +356,104 @@ export default async function (fastify: FastifyInstance) {
 
       return reply.send({ success: true, completed: true });
     }
+  });
+
+  // Today's freeze state per active plan, for the Plans page card — cheap and
+  // direct rather than computing each plan's full schedule just to read one day.
+  fastify.get('/freeze-status', async (_request, reply) => {
+    const rows = db.prepare(`
+      SELECT plan_id, reason FROM plan_freezes
+      WHERE date = ? AND plan_id IN (SELECT id FROM workout_plans WHERE is_active IN (1, 2))
+    `).all(todayLocal()) as { plan_id: string; reason: string }[];
+    const byPlan: Record<string, string> = {};
+    for (const r of rows) byPlan[r.plan_id] = r.reason;
+    return reply.send(byPlan);
+  });
+
+  const MAX_FREEZE_DAYS = 60;
+
+  // Freeze a run of consecutive days starting from `startDate` (today, unless
+  // the caller is looking at a specific future day and means to freeze
+  // forward from there), for an active plan: each day's calendar card shows
+  // the reason instead of the scheduled day, and any workout that would've
+  // landed on a frozen day is deferred to the next open one, pushing the rest
+  // of the plan's dates back by the same span (see buildSchedule). Never
+  // starts before today — there's no path to freezing a day already in the
+  // past from outside the UI — but can reach forward, so a
+  // Friday flare-up can be blocked out through the weekend in one go, or a
+  // trip planned for next month can be frozen ahead of time. Each covered day
+  // gets its own row, so any of them (including ones still in the future) can
+  // be unfrozen independently before it arrives.
+  fastify.post('/freeze', async (request, reply) => {
+    const { planId, reason, days, startDate } = request.body as {
+      planId?: string; reason?: string; days?: number; startDate?: string;
+    };
+    if (typeof planId !== 'string' || !planId) {
+      return reply.code(400).send({ error: 'planId is required' });
+    }
+    if (!isFreezeReason(reason)) {
+      return reply.code(400).send({ error: `reason must be one of: ${FREEZE_REASONS.join(', ')}` });
+    }
+    const today = todayLocal();
+    // A given date must be today or later — a bare format check plus a string
+    // comparison is enough since both sides are YYYY-MM-DD.
+    const effectiveStart =
+      typeof startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && startDate >= today
+        ? startDate
+        : today;
+    const dayCount = Number.isInteger(days) && (days as number) >= 1 ? Math.min(days as number, MAX_FREEZE_DAYS) : 1;
+    const plan = db.prepare('SELECT id FROM workout_plans WHERE id = ? AND is_active IN (1, 2)').get(planId);
+    if (!plan) {
+      return reply.code(404).send({ error: 'No active plan with that id' });
+    }
+
+    const { nanoid } = await import('nanoid');
+    const upsert = db.prepare(`
+      INSERT INTO plan_freezes (id, plan_id, date, reason) VALUES (?, ?, ?, ?)
+      ON CONFLICT(plan_id, date) DO UPDATE SET reason = excluded.reason
+    `);
+    const dates: string[] = [];
+    // UTC-anchored, not `new Date(effectiveStart + 'T00:00:00')`: that string
+    // has no offset, so JS parses it as LOCAL midnight, and toISOString() below
+    // would then convert it back to UTC — pushing the date back a day in any
+    // positive-offset timezone (BST, CET, ...). Anchoring in UTC from the
+    // start means the calendar date never has to survive a local-time round trip.
+    const [ty, tm, td] = effectiveStart.split('-').map(Number);
+    const cursor = new Date(Date.UTC(ty, tm - 1, td));
+    const applyFreeze = db.transaction(() => {
+      for (let i = 0; i < dayCount; i++) {
+        const dateStr = cursor.toISOString().split('T')[0];
+        dates.push(dateStr);
+        upsert.run(nanoid(), planId, dateStr, reason);
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    });
+    applyFreeze();
+
+    return reply.send({ success: true, dates, reason });
+  });
+
+  // Unfreeze a specific day. Not restricted to today: undoing a past freeze is
+  // harmless (it just reveals the workout/rest that was already sitting there).
+  // This is the individual day card's own toggle, so it only ever touches the
+  // one date it's on.
+  fastify.delete('/freeze/:planId/:date', async (request, reply) => {
+    const { planId, date } = request.params as { planId: string; date: string };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return reply.code(400).send({ error: 'date must be a YYYY-MM-DD string' });
+    }
+    const { changes } = db.prepare('DELETE FROM plan_freezes WHERE plan_id = ? AND date = ?').run(planId, date);
+    return reply.send({ success: true, deleted: changes });
+  });
+
+  // Unfreeze everything from today onward: pairs with the header's "freeze the
+  // next N days" tool, so undoing that is one click rather than N. Past frozen
+  // days are left alone — they're history at this point, not something to undo.
+  fastify.delete('/freeze/:planId', async (request, reply) => {
+    const { planId } = request.params as { planId: string };
+    const { changes } = db.prepare('DELETE FROM plan_freezes WHERE plan_id = ? AND date >= ?').run(
+      planId, todayLocal()
+    );
+    return reply.send({ success: true, deleted: changes });
   });
 }

@@ -27,7 +27,10 @@ type Props = {
   /** Configured total passes; 0 means looping is off. */
   loops: number;
   restSeconds: number;
-  onApply: (loops: number, restSeconds: number) => void;
+  /** Rest after the LAST pass, before a different video from the plan starts —
+   *  kept separate from restSeconds since it's often wanted longer. */
+  nextRestSeconds: number;
+  onApply: (loops: number, restSeconds: number, nextRestSeconds: number) => void;
   onClear: () => void;
   /** 1-based pass currently playing, for the counter chip. */
   currentPass: number;
@@ -35,11 +38,12 @@ type Props = {
   restLeft: number | null;
 };
 
-export default function LoopControl({ loops, restSeconds, onApply, onClear, currentPass, restLeft }: Props) {
+export default function LoopControl({ loops, restSeconds, nextRestSeconds, onApply, onClear, currentPass, restLeft }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [loopDraft, setLoopDraft] = useState(String(loops || 3));
   const [restDraft, setRestDraft] = useState(String(restSeconds));
+  const [nextRestDraft, setNextRestDraft] = useState(String(nextRestSeconds));
   const wrapRef = useRef<HTMLDivElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
@@ -50,9 +54,10 @@ export default function LoopControl({ loops, restSeconds, onApply, onClear, curr
     if (!open) return;
     setLoopDraft(String(loops || 3));
     setRestDraft(String(restSeconds));
+    setNextRestDraft(String(nextRestSeconds));
     firstFieldRef.current?.focus();
     firstFieldRef.current?.select();
-  }, [open, loops, restSeconds]);
+  }, [open, loops, restSeconds, nextRestSeconds]);
 
   // Dismiss on Escape or a click outside, the way the rest of the app's
   // transient panels behave.
@@ -83,7 +88,11 @@ export default function LoopControl({ loops, restSeconds, onApply, onClear, curr
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    onApply(clampInt(loopDraft, 1, MAX_LOOPS, 1), clampInt(restDraft, 0, MAX_REST_SECONDS, 0));
+    onApply(
+      clampInt(loopDraft, 1, MAX_LOOPS, 1),
+      clampInt(restDraft, 0, MAX_REST_SECONDS, 0),
+      clampInt(nextRestDraft, 0, MAX_REST_SECONDS, 0)
+    );
     setOpen(false);
   };
 
@@ -124,15 +133,9 @@ export default function LoopControl({ loops, restSeconds, onApply, onClear, curr
           <span aria-hidden="true" className="player-loop-count">
             {currentPass}<span className="player-loop-sep">/</span>{loops}
           </span>
-          {restLeft !== null && (
-            <span aria-hidden="true" className="player-loop-timer">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3 2" />
-              </svg>
-              {formatRest(restLeft)}
-            </span>
-          )}
+          {/* No clock here during rest: the big countdown overlay on the video
+              already shows the time, so this chip would just be a tinier,
+              redundant copy of the same number. */}
           <span className="sr-only" role="status">{statusLabel}</span>
         </div>
       )}
@@ -179,6 +182,32 @@ export default function LoopControl({ loops, restSeconds, onApply, onClear, curr
                 type="button"
                 className={`player-loop-preset${Number(restDraft) === sec ? ' is-on' : ''}`}
                 onClick={() => setRestDraft(String(sec))}
+              >
+                {formatRest(sec)}
+              </button>
+            ))}
+          </div>
+
+          <label className="player-loop-field">
+            <span>{t('player.loop_next_rest_label')}</span>
+            <input
+              type="number"
+              min={0}
+              max={MAX_REST_SECONDS}
+              step={1}
+              inputMode="numeric"
+              value={nextRestDraft}
+              onChange={e => setNextRestDraft(e.target.value)}
+            />
+          </label>
+
+          <div className="player-loop-presets">
+            {REST_PRESETS.map(sec => (
+              <button
+                key={sec}
+                type="button"
+                className={`player-loop-preset${Number(nextRestDraft) === sec ? ' is-on' : ''}`}
+                onClick={() => setNextRestDraft(String(sec))}
               >
                 {formatRest(sec)}
               </button>
