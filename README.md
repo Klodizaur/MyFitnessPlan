@@ -5,55 +5,72 @@
 </p>
 <h1 align="center">MyFitnessPlan - Open Source Self-Hosted Home Video Workout Planner</h1>
 
-![](./screenshots/7.%20dashboard.jpg)
+![MyFitnessPlan dashboard](./screenshots/dashboard_orange.jpg)
 An open source, self-hosted local application for managing custom workout plans with flexible scheduling patterns based on your own video collection.
 
 MyFitnessPlan is a personal workout planning tool designed to help you organize and track workout routines using your own video resources. Unlike rigid, predefined weekly schedules, MyFitnessPlan lets you define custom workout patterns that fit your lifestyle—whether that's 3 days on, 1 day off, or any other pattern you prefer.
 
+- **Website**: [myfitnessplan.bigdeckit.com](https://myfitnessplan.bigdeckit.com) — I try to keep it up to date, and it's the easiest way to see what it does
+- **Download**: grab the latest macOS `.dmg` or Windows `.exe` from the [Releases page](https://github.com/Klodizaur/MyFitnessPlan/releases). No Node.js, npm, or terminal required.
+
 ## Features
 
-### Upload TSV/CSV Workouts
-![Upload TSV/CSV interface](./screenshots/1.%20intro.jpg)
+### Import Workouts from Spreadsheets
+![Importing a workout plan from a Google Sheet into MyFitnessPlan](./screenshots/1.%20import%20from%20spreadsheets.jpg)
 
-Easily import your entire workout library using simple spreadsheet files. Support for both TSV and CSV formats makes it compatible with Excel, Google Sheets, and any spreadsheet software.
+Easily import your entire workout library using simple TSV or CSV spreadsheet files—compatible with Excel, Google Sheets, and any spreadsheet software. The dashboard picks up right where the sheet left off, showing today's workout and how much of it you've completed.
 
-### Add Paths to Your Local Media
-![Video library management](./screenshots/5.%20video%20library.jpg)
+### Manage & Build Multiple Plans
+![Managing and building workout plans, with a video picker for each day](./screenshots/2.%20manage%20and%20build%20workout%20plans.jpg)
 
-Link to your local workout video files directly on your computer. Keep full control over your video library without uploading anything to the cloud.
-
-### Create Multiple Plans
-![Multi-plan management](./screenshots/2.%20plans.jpg)
-
-Build and manage multiple workout plans simultaneously. Switch between different routines whenever you want—perfect for varying your training intensity or style.
+Upload a plan, or build one from scratch day by day, week by week, straight from your video library. Keep several plans around and switch between them, or run two at once—a **main plan** alongside an **extra plan** (a short mobility or core block, for example) without one replacing the other.
 
 ### Flexible Custom Patterns
-![Custom workout patterns](./screenshots/3.%20workout%20pattern.jpg)
+![Workout schedule pattern editor, toggling days between Workout and Rest](./screenshots/7.%20workout%20pattern.jpg)
 
-No hard-coded weekdays (Monday-Sunday). Define your own workout patterns: 3 days on/1 day off, 5 on/2 off, or any custom sequence that fits your lifestyle.
+No hard-coded weekdays. Define your own workout pattern—3 days on/1 day off, 5 on/2 off, or any custom cycle—and the calendar follows it instead of the calendar week.
 
-### Smart Workout Recognition
-![Workout calendar and dashboard](./screenshots/4.%20workout%20calendar.jpg)
+### Calendar Views
+![Weekly calendar cards showing completed workouts and their videos](./screenshots/3.%20workout%20calendar.jpg)
 
-Works seamlessly with TSV/CSV files, automatically recognizing multiple workout entries per row. Mark individual exercises as done while tracking your progress through each workout session—complete flexibility in how you log your training.
+Browse your schedule as a classic card list, a slider, or the newer **Day Tape** view—a horizontal strip of days grouped by week with a dot marking workout days, expanding into a full detail view with thumbnail, duration, and tags. Need a break? Freeze a day, or a whole stretch, without losing any workouts—frozen days show the reason instead of a workout, and everything else shifts forward to make room.
 
-### Personalization & Customization
-![Color themes and customization](./screenshots/6.%20themes.jpg)
+### Built-in Player with Loop & Rest
+![Built-in video player showing workout details, equipment, and intensity](./screenshots/4.%20built%20in%20player.jpg)
 
-Make the app truly yours with customizable color themes and personalization options. Choose your preferred color scheme and adjust the interface to match your style.
+Play your videos without leaving the app, with the workout's focus, equipment, training type, and intensity right alongside it. The player can loop a video for a set number of passes with a rest between each one, plus a separate, usually longer rest before the next video in the plan begins—no more reaching for the seek bar between rounds.
+
+### Local Video Library & Filtering
+![Video library grouped by folder, with equipment, training type, and body part filters](./screenshots/6.%20library%20search%20%26%20filtering.jpg)
+
+Point MyFitnessPlan at your local video folders and it scans and organizes them for you. Search, and filter by equipment, training type, body part, or intensity to find exactly the workout you're after—all without uploading a single file anywhere.
+
+### Track Your Progress
+![Activity log with workout stats and a monthly activity calendar](./screenshots/5.%20workout%20log.jpg)
+
+See workouts done, active days, and a monthly activity calendar at a glance. Mark individual exercises as done and track your progress through each session—complete flexibility in how you log your training.
+
+### Personalization & Themes
+![The same dashboard shown in three different color themes](./screenshots/9.%20themes.jpg)
+
+Make the app truly yours with several built-in color themes—from Midnight and Forest to Pastel Pink and Sky Blue—plus language and calendar-layout preferences, all from Settings.
 
 ### Additional Features
-- **Local & Self-Hosted**: Run entirely on your own machine with no cloud dependency
-- **Multi-language Support**: Available in English and Polish
-- **No Subscription Required**: Complete control over your data and workout library
-- **Privacy First**: All data stays on your computer
+- **Freeze plans without losing progress**: pause a day or a whole stretch (sick day, time off, whatever) and every workout that would have landed there just moves to the next open day
+- **Local & Self-Hosted**: run entirely on your own machine with no cloud dependency
+- **Desktop app**: an installable macOS/Windows app that wraps the server and UI—no Node.js or terminal required (see [desktop/README.md](desktop/README.md))
+- **Multi-language Support**: available in English and Polish
+- **No Subscription Required**: complete control over your data and workout library
+- **Privacy First**: all data stays on your computer
 
-## Getting Started
+## Development & Contributing
+
+Everything below this point is for people who want to run the app from source, build it themselves, or contribute.
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
-- npm or yarn package manager
+- Node.js (v20 or higher)
+- npm
 
 ### Installation & Running Locally
 
@@ -63,33 +80,22 @@ Make the app truly yours with customizable color themes and personalization opti
    cd <downloaded root folder>
    ```
 
-2. **Install server dependencies**
+2. **Install dependencies** (installs the `client` and `server` workspaces)
    ```bash
-   cd server
    npm install
    ```
 
-3. **Install client dependencies**
+3. **Start the app**
    ```bash
-   cd ../client
-   npm install
-   ```
-
-4. **Start the server**
-   ```bash
-   cd ../server
    npm run dev
    ```
-   The server will run on `http://localhost:3000` (or the port specified in your configuration)
+   This runs the server (`http://localhost:3000`) and the Vite client (`http://localhost:5173`) together.
 
-5. **Start the client (in a new terminal)**
-   ```bash
-   cd client
-   npm run dev
-   ```
-   The client will be available at `http://localhost:5173` (Vite default port)
+4. **Open your browser** at `http://localhost:5173`
 
-6. **Open your browser** and navigate to the client URL shown in the terminal
+### Building the Desktop App Yourself
+
+The `desktop/` folder packages MyFitnessPlan into the same standalone macOS `.dmg` or Windows `.exe` published on the Releases page (Linux builds are supported by the tooling too, just not published yet). See [desktop/README.md](desktop/README.md) for build instructions and where your data lives.
 
 ## ⚠️ Important Notice
 
@@ -180,10 +186,18 @@ WorkoutPlanner/
 │   │   ├── db.ts
 │   │   └── index.ts
 │   └── package.json
-└── README.md
+├── desktop/         # Electron desktop wrapper (packages client + server)
+├── example_workout_sheets/  # Example TSV plans
+└── package.json     # Root workspace: `npm install` / `npm run dev`
 ```
 
 ## Available Scripts
+
+### Root
+- `npm install` - Install client + server workspace dependencies
+- `npm run dev` - Start server and client together
+- `npm run build` - Build client and server for production
+- `npm run start` - Run the built server
 
 ### Client
 - `npm run dev` - Start development server
@@ -194,6 +208,10 @@ WorkoutPlanner/
 - `npm run dev` - Start development server with auto-reload
 - `npm run build` - Compile TypeScript
 - `npm run start` - Run compiled server
+
+### Desktop (run from `desktop/`)
+- `npm start` - Run the desktop wrapper in development
+- `npm run dist:mac` / `dist:win` / `dist:linux` - Build an installer for that platform
 
 ## Configuration
 
@@ -209,21 +227,21 @@ Configuration files can be customized in:
 
 ## License
 
-This project is licensed under a **Non-Commercial Use License**.
+This project is licensed under the **MyFitnessPlan Community License**.
 
 ### You are free to:
-- Use the software for personal projects and self-hosted setups
-- Modify and improve it for your own use
-- Share it with others for non-commercial purposes
+- Run the software for your own use
+- Modify the software
+- Create and share your own modified versions
 - Contribute improvements back to the project
 
 ### You **cannot**:
-- Use this for commercial purposes or to earn revenue
-- Redistribute it as a commercial product
-- Sell access to this software or its features
-- Use it as part of a paid service offering
+- Sell this software or modified versions of it
+- Offer this software as a paid service or product
+- Use this software as the basis of a commercial offering without written permission
+- Remove copyright notices or claim the original work as your own
 
-For more details, see the [LICENSE](LICENSE) file.
+For more details, see the [LICENSE](LICENSE) file. For commercial licensing, contact hello@bigdeckit.com.
 
 ---
 
