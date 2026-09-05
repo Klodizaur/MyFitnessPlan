@@ -39,6 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The navigation bar overflowed on tablets.** The menu only collapsed to a
+  hamburger below 900px, but the full bar needs about 1100px in English and
+  1200px in Polish - so every width in between (1024 and 1194 are iPad
+  landscape; 1024 is iPad Pro portrait) pushed the language switcher off the
+  edge and put the whole page into horizontal scroll. Between those widths the
+  bar now drops the wordmark to its icon and tightens the links, which fits
+  both languages without collapsing the menu on a screen that has room for it.
+- **The player had no way to go fullscreen on a phone or tablet.** Fullscreen
+  was reachable only by double-clicking the video, which touch devices do not
+  have, and it used only the unprefixed API - which Safari on iPadOS does not
+  implement and iPhone does not have at all. There is now a fullscreen button
+  in the player header, and it falls back through the prefixed API to the
+  iPhone's system video player. It also fills the screen with the whole
+  theater rather than the bare video, so the loop counter and rest countdown
+  stay visible while it is on.
+- Videos now carry `playsinline`, so an iPhone plays them in the app's own
+  player instead of hijacking playback into the system one the moment it starts.
 - A `/videos/...` request could previously be crafted to read files outside the
   configured library folder. It now cannot, which matters considerably more now
   that the server can be reached from other devices.

@@ -8,6 +8,7 @@ import { TrainingTypeIcon, BodyPartIcon, IntensityIcon } from '../lib/metadata';
 import { useMetaLabels } from '../lib/labels';
 import { videoStreamUrl } from '../lib/paths';
 import { resolvePlayback, type PlaybackPlan } from '../lib/playback';
+import { canFullscreen, enterFullscreen, exitFullscreen, fullscreenElement, onFullscreenChange } from '../lib/fullscreen';
 import YouTubeEmbed from '../components/YouTubeEmbed';
 import LoopControl, { formatRest } from '../components/LoopControl';
 
@@ -241,15 +242,29 @@ export default function Player() {
   };
 
   const toggleFullscreen = () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
+    if (fullscreenElement()) {
+      exitFullscreen();
       return;
     }
-    // A cross-origin iframe can't be fullscreened directly, so external videos
-    // fullscreen the theater wrapper instead.
-    const target = isExternal ? theaterRef.current : videoRef.current;
-    target?.requestFullscreen();
+    // The theater, not the <video>: a cross-origin iframe can't be fullscreened
+    // directly, and going fullscreen on the video element alone would hide the
+    // loop counter and rest countdown that sit over it. The video is passed as
+    // the iPhone fallback, where the system player is the only fullscreen there is.
+    enterFullscreen(theaterRef.current, videoRef.current);
   };
+
+  // Whether we're filling the screen, so the button can say which way it goes.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  // Touch devices have no double-click, so without a real button there is no way
+  // to reach fullscreen on a phone or tablet at all.
+  const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setIsFullscreen(Boolean(fullscreenElement()));
+    sync();
+    setFullscreenAvailable(canFullscreen(theaterRef.current, videoRef.current));
+    return onFullscreenChange(videoRef.current, sync);
+  }, [videoId, isLoaded, playbackReady, isExternal]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -416,6 +431,23 @@ export default function Player() {
                   : (isDone ? '✓ This Part Done' : 'Mark Part Done')}
               </button>
             )}
+            {/* An actual button, not just the double-click on the theater: a
+                phone or tablet has no double-click, so this was the only thing
+                standing between a touch device and fullscreen. */}
+            {fullscreenAvailable && (
+              <button
+                onClick={toggleFullscreen}
+                className="player-theater-btn player-theater-btn--icon"
+                aria-label={t(isFullscreen ? 'player.fullscreen_exit' : 'player.fullscreen_enter')}
+                title={t(isFullscreen ? 'player.fullscreen_exit' : 'player.fullscreen_enter')}
+              >
+                {isFullscreen ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                )}
+              </button>
+            )}
             <button onClick={() => navigate(-1)} className="player-theater-btn">
               Close
             </button>
@@ -439,6 +471,9 @@ export default function Player() {
             src={videoUrl}
             controls
             autoPlay
+            /* Without this an iPhone hijacks playback into the system player the
+               moment it starts, so the theater and its overlays never appear. */
+            playsInline
             onEnded={handleEnded}
             onError={() => setError('Could not play this video. The file may be missing or use an unsupported format.')}
           />

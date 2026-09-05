@@ -320,6 +320,38 @@ body {
   box-shadow: var(--glass-shadow);
 }
 
+/* Filling the screen means dropping the card: the 16/9 box and the 72vh cap are
+   what make it a panel on the page, and both have to go or fullscreen letterboxes
+   inside its own rounded rectangle. Safari still needs the prefixed selector, and
+   the two cannot be combined in one rule — a selector it doesn't understand
+   invalidates the whole list. */
+.player-theater:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-height: none;
+  aspect-ratio: auto;
+  border: none;
+  border-radius: 0;
+}
+
+.player-theater:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  max-height: none;
+  aspect-ratio: auto;
+  border: none;
+  border-radius: 0;
+}
+
+/* Icon-only header button: square, so it doesn't read as a truncated label. */
+.player-theater-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  line-height: 0;
+}
+
 .player-theater video {
   display: block;
   width: 100%;
@@ -2827,6 +2859,25 @@ nav .nav-links a:hover, nav .nav-links a.active {
   grid-template-columns: 360px 1fr;
   gap: 18px;
   align-items: start;
+}
+
+/* Tablets, and any window narrower than the bar's natural width.
+   The six links, the wordmark and the language switcher need ~1100px in English
+   and ~1210px in Polish, but the menu doesn't collapse until 900px - so every
+   width in between (1024 and 1194 are iPad landscape, 1024 is iPad Pro portrait)
+   overflowed the bar and pushed the page into horizontal scroll.
+   Rather than collapsing to a hamburger on screens with room to spare, the bar
+   gives up what it can afford: the wordmark drops to its icon and the links
+   tighten. That fits both languages well inside the existing 900px breakpoint. */
+@media (min-width: 901px) and (max-width: 1200px) {
+  nav {
+    gap: 1rem;
+    padding: 0.5rem 0.75rem;
+  }
+  .logo-text { display: none; }
+  .nav-links { gap: 0.3rem; }
+  nav .nav-links a { padding: 0.45rem 0.6rem; }
+  .language-switcher { padding: 0.4rem 0.6rem; }
 }
 
 @media (max-width: 900px) {

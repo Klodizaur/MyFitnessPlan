@@ -465,14 +465,16 @@
     "rest_announce_loop": "Przerwa rozpoczęta. Dalej: odtworzenie {{current}} z {{total}}.",
     "rest_announce_video": "Przerwa rozpoczęta. Potem następne wideo.",
     "loop_next_rest_label": "Przerwa przed następnym wideo (sekundy)",
-    "playback_direct": "Odtwarzanie bezpośrednie",
+    "playback_direct": "Bezpośrednio",
     "playback_converting": "Konwersja",
     "playback_no_audio": "brak dźwięku",
     "playback_hint_direct": "{{container}} · {{video}} / {{audio}} — odtwarzane prosto z pliku, bez zmian.",
     "playback_hint_container": "{{container}} · {{video}} / {{audio}} — to urządzenie nie otwiera plików {{container}}, więc są one konwertowane podczas odtwarzania.",
     "playback_hint_video_codec": "{{container}} · {{video}} / {{audio}} — to urządzenie nie odtwarza obrazu {{video}}, więc jest on konwertowany podczas odtwarzania.",
     "playback_hint_audio_codec": "{{container}} · {{video}} / {{audio}} — to urządzenie nie odtwarza dźwięku {{audio}}, więc jest on konwertowany podczas odtwarzania.",
-    "playback_hint_unknown_codecs": "{{container}} · {{video}} / {{audio}} — nie udało się rozpoznać pliku, więc jest konwertowany podczas odtwarzania."
+    "playback_hint_unknown_codecs": "{{container}} · {{video}} / {{audio}} — nie udało się rozpoznać pliku, więc jest konwertowany podczas odtwarzania.",
+    "fullscreen_enter": "Pełny ekran",
+    "fullscreen_exit": "Zamknij pełny ekran"
   },
   "import": {
     "btn": "Dodaj z YouTube",

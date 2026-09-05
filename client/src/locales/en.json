@@ -409,7 +409,9 @@
     "playback_hint_container": "{{container}} · {{video}} / {{audio}} — this device can't open a {{container}} file, so it's being converted while it plays.",
     "playback_hint_video_codec": "{{container}} · {{video}} / {{audio}} — this device can't decode {{video}} video, so it's being converted while it plays.",
     "playback_hint_audio_codec": "{{container}} · {{video}} / {{audio}} — this device can't decode {{audio}} audio, so the sound is being converted while it plays.",
-    "playback_hint_unknown_codecs": "{{container}} · {{video}} / {{audio}} — the file couldn't be identified, so it's being converted while it plays."
+    "playback_hint_unknown_codecs": "{{container}} · {{video}} / {{audio}} — the file couldn't be identified, so it's being converted while it plays.",
+    "fullscreen_enter": "Fullscreen",
+    "fullscreen_exit": "Exit fullscreen"
   },
   "import": {
     "btn": "Add from YouTube",
