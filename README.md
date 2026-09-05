@@ -45,6 +45,14 @@ Play your videos without leaving the app, with the workout's focus, equipment, t
 
 Point MyFitnessPlan at your local video folders and it scans and organizes them for you. Search, and filter by equipment, training type, body part, or intensity to find exactly the workout you're after—all without uploading a single file anywhere.
 
+### Watch on Your Phone or Tablet
+
+Turn on **Share on Local Network** from the desktop app's tray icon and MyFitnessPlan becomes reachable from anything on the same Wi-Fi—open the address it gives you in Safari or Chrome on your iPhone or iPad and your plans, library and player are all there. In Safari, *Share → Add to Home Screen* gives it an app icon of its own.
+
+Videos your device can already decode are played **direct**, straight from the file: no conversion, no quality loss, and instant seeking. Anything it genuinely cannot open—an MKV on an iPad, an AC-3 soundtrack—is converted as it plays instead of simply failing, and even then only the stream that needs it is touched. The player shows which of the two is happening.
+
+Sharing is off until you turn it on, is remembered between launches, and has no password: while it is on, anyone on your network who knows the address can browse your library.
+
 ### Track Your Progress
 ![Activity log with workout stats and a monthly activity calendar](./screenshots/5.%20workout%20log.jpg)
 

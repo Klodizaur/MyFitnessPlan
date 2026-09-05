@@ -45,6 +45,14 @@ Odtwarzaj filmy bez wychodzenia z aplikacji — obok nich widzisz cel treningu, 
 
 Wskaż MyFitnessPlan swoje lokalne foldery wideo, a aplikacja sama je zeskanuje i uporządkuje. Szukaj i filtruj według sprzętu, typu treningu, partii ciała lub intensywności, żeby znaleźć dokładnie to, czego potrzebujesz — bez przesyłania jakiegokolwiek pliku gdziekolwiek.
 
+### Oglądanie na telefonie lub tablecie
+
+Włącz **Share on Local Network** z ikony aplikacji desktopowej w pasku menu, a MyFitnessPlan stanie się dostępny dla wszystkiego w tej samej sieci Wi-Fi — otwórz podany adres w Safari lub Chrome na iPhonie albo iPadzie i masz tam swoje plany, bibliotekę i odtwarzacz. W Safari *Udostępnij → Dodaj do ekranu początkowego* doda mu własną ikonę.
+
+Filmy, które urządzenie potrafi odtworzyć samodzielnie, lecą **bezpośrednio** z pliku: bez konwersji, bez straty jakości i z natychmiastowym przewijaniem. To, czego naprawdę nie potrafi otworzyć — MKV na iPadzie, ścieżka AC-3 — jest konwertowane w locie, zamiast po prostu nie działać, i nawet wtedy przetwarzana jest tylko ta ścieżka, która tego wymaga. Odtwarzacz pokazuje, który z tych dwóch trybów jest w użyciu.
+
+Udostępnianie jest wyłączone, dopóki go nie włączysz, jest zapamiętywane między uruchomieniami i nie ma hasła: gdy jest włączone, każdy w Twojej sieci, kto zna adres, może przeglądać Twoją bibliotekę.
+
 ### Śledzenie postępów
 ![Dziennik aktywności ze statystykami treningów i miesięcznym kalendarzem aktywności](./screenshots/5.%20workout%20log.jpg)
 

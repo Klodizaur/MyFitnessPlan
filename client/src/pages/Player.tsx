@@ -7,6 +7,7 @@ import { EquipmentIcon } from '../lib/equipment';
 import { TrainingTypeIcon, BodyPartIcon, IntensityIcon } from '../lib/metadata';
 import { useMetaLabels } from '../lib/labels';
 import { videoStreamUrl } from '../lib/paths';
+import { resolvePlayback, type PlaybackPlan } from '../lib/playback';
 import YouTubeEmbed from '../components/YouTubeEmbed';
 import LoopControl, { formatRest } from '../components/LoopControl';
 
@@ -41,6 +42,11 @@ export default function Player() {
   const [standaloneWorkoutId, setStandaloneWorkoutId] = useState<string | null>(null);
   const [nextVideoId, setNextVideoId] = useState<string | null>(null);
   const [prevVideoId, setPrevVideoId] = useState<string | null>(null);
+  // How this device should play this file: straight from disk, or converted on
+  // the fly because it can't decode it. `playbackReady` is separate from a null
+  // plan, because "asked, and the server had no opinion" still means go ahead.
+  const [playback, setPlayback] = useState<PlaybackPlan | null>(null);
+  const [playbackReady, setPlaybackReady] = useState(false);
   const labels = useMetaLabels();
 
   // --- Loop + rest ---------------------------------------------------------
@@ -139,6 +145,24 @@ export default function Player() {
       })
       .catch(() => loadStandaloneState());
   }, [videoId, workoutId]);
+
+  // Resolve direct play vs. transcode before the <video> gets a src. Local files
+  // only — an external video is played through its provider's embed.
+  useEffect(() => {
+    setPlayback(null);
+    setPlaybackReady(false);
+    if (!videoId || !isLoaded) return;
+    if (isExternal) { setPlaybackReady(true); return; }
+    let cancelled = false;
+    // Waiting for the answer avoids handing <video> the direct URL first and
+    // swapping it a moment later, which would start two loads of the same file.
+    resolvePlayback(videoId).then(plan => {
+      if (cancelled) return;
+      setPlayback(plan);
+      setPlaybackReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [videoId, isExternal, isLoaded]);
 
   const goToNext = () => {
     if (nextVideoId) navigate(`/player/${nextVideoId}/${workoutId}`);
@@ -322,11 +346,13 @@ export default function Player() {
     );
   }
 
-  if (!isLoaded) {
+  if (!isLoaded || !playbackReady) {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
-  const videoUrl = isExternal ? '' : videoStreamUrl(videoPath);
+  // The server's answer wins; the plain file URL is the fallback if it never
+  // arrived, which is exactly the behaviour the app had before.
+  const videoUrl = isExternal ? '' : (playback?.url || videoStreamUrl(videoPath));
   const hasTags = equipment.length > 0 || trainingType.length > 0 || bodyParts.length > 0 || Boolean(intensity);
   const hasMeta = Boolean(description.trim()) || hasTags;
 
@@ -337,6 +363,22 @@ export default function Player() {
         <div className="player-theater-header">
           <h2>{filename}</h2>
           <div className="player-theater-actions">
+            {/* Says out loud which of the two paths this file took. Worth showing:
+                direct play is the fast, seekable one, and knowing when a video
+                falls off it is the difference between "my app is slow" and "that
+                file is an MKV". */}
+            {!isExternal && playback && (
+              <span
+                className={`player-playback-badge${playback.mode === 'direct' ? ' is-direct' : ''}`}
+                title={t(`player.playback_hint_${playback.reason}`, {
+                  container: (playback.container || '?').toUpperCase(),
+                  video: playback.videoCodec || '?',
+                  audio: playback.audioCodec || t('player.playback_no_audio'),
+                })}
+              >
+                {playback.mode === 'direct' ? t('player.playback_direct') : t('player.playback_converting')}
+              </span>
+            )}
             <LoopControl
               loops={loops}
               restSeconds={restSeconds}

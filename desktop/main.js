@@ -16,18 +16,24 @@
  *       no chance of hijacking / being hijacked by whatever is on port 3000.
  *     - cwd is the writable per-user data dir; a bundled ffmpeg is put on PATH.
  *
+ * Either mode can additionally be SHARED on the local network from the tray, so
+ * a phone or tablet on the same Wi-Fi can open the app. Sharing is off until it
+ * is switched on, is remembered between runs, and is the only thing that ever
+ * binds anything but loopback.
+ *
  * The existing app is driven, never duplicated. All app-source changes it relies
  * on are additive and env-guarded (see server/src/index.ts).
  */
 
 const {
-  app, BrowserWindow, Tray, Menu, nativeImage, dialog, shell, utilityProcess, ipcMain,
+  app, BrowserWindow, Tray, Menu, nativeImage, dialog, shell, utilityProcess, ipcMain, clipboard,
 } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
 const https = require('https');
 const net = require('net');
+const os = require('os');
 const fs = require('fs');
 
 // --- Mode / config -----------------------------------------------------------
@@ -36,8 +42,18 @@ const SELFTEST = process.env.POC_SELFTEST === '1';
 // GitHub repo used by the lightweight "Check for Updates" feature.
 const GITHUB_REPO = 'Klodizaur/MyFitnessPlan';
 
+// Local-network sharing. Off by default: the server binds loopback only, exactly
+// as it always has, until the user turns this on from the tray.
+//
+// A fixed port matters here in a way it does not for loopback. The address is
+// something you type into a phone by hand, and a random port would hand you a
+// different one after every restart. If it is taken we fall back to a free port
+// rather than refusing to start, and the tray always shows the real address.
+const LAN_PORT = 7777;
+
 // Dev-only
 const REPO_ROOT = path.resolve(__dirname, '..');
+const CLIENT_DEV_PORT = 5173;
 const DEV_PORT = 3000; // `npm run dev` server port
 const CLIENT_DEV_URL = 'http://localhost:5173';
 const DEV_SERVER_PROBE = `http://127.0.0.1:${DEV_PORT}/api/settings`;
@@ -60,6 +76,24 @@ let serverState = 'stopped'; // 'stopped' | 'starting' | 'running'
 let reusedExternal = false;  // DEV: attached to an already-running instance
 let currentPort = null;      // PACKAGED: the port the window loads from
 let logStream = null;
+let shareOnNetwork = false;  // serve to other devices on the LAN (tray toggle)
+
+// --- Desktop preferences (tray settings that outlive a run) ------------------
+// Kept in its own small file rather than in the app database: this decides how
+// the server is *started*, so it has to be readable before the server exists.
+function configPath() { return path.join(app.getPath('userData'), 'desktop-config.json'); }
+
+function loadConfig() {
+  try { return JSON.parse(fs.readFileSync(configPath(), 'utf8')) || {}; }
+  catch (e) { return {}; }
+}
+
+function saveConfig(patch) {
+  try {
+    fs.mkdirSync(path.dirname(configPath()), { recursive: true });
+    fs.writeFileSync(configPath(), JSON.stringify({ ...loadConfig(), ...patch }, null, 2));
+  } catch (e) { log('Could not save desktop config:', e.message); }
+}
 
 // --- Helpers -----------------------------------------------------------------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -79,16 +113,74 @@ function probe(url, timeoutMs = 1500) {
   });
 }
 
-/** Ask the OS for a free TCP port on the loopback interface. */
-function findFreePort() {
-  return new Promise((resolve, reject) => {
+/**
+ * A port nothing else is on.
+ *
+ * `preferred` is tried first and quietly given up on if it is taken, which is
+ * what LAN sharing wants: a stable address you can type into a phone, without
+ * ever failing to start just because something else grabbed the number.
+ * `host` matters too — a port free on loopback is not necessarily free on the
+ * network interface we are about to bind.
+ */
+function findFreePort(preferred, host = '127.0.0.1') {
+  const tryPort = (port) => new Promise((resolve) => {
     const srv = net.createServer();
-    srv.on('error', reject);
-    srv.listen(0, '127.0.0.1', () => {
-      const { port } = srv.address();
-      srv.close(() => resolve(port));
+    srv.on('error', () => resolve(null));
+    srv.listen(port, host, () => {
+      const actual = srv.address().port;
+      srv.close(() => resolve(actual));
     });
   });
+
+  return (async () => {
+    if (preferred) {
+      const got = await tryPort(preferred);
+      if (got) return got;
+      log(`Port ${preferred} is in use; falling back to a free one.`);
+    }
+    const any = await tryPort(0);
+    if (!any) throw new Error('No free port available');
+    return any;
+  })();
+}
+
+// --- Local network -----------------------------------------------------------
+/**
+ * This machine's address on the local network, or null when it has none.
+ *
+ * Interfaces are ranked rather than just filtered: a laptop routinely has a
+ * handful of IPv4 addresses (Wi-Fi, Ethernet, a VPN, Docker, a VM bridge) and
+ * only one of them is the one a phone on the same Wi-Fi can reach. Ordinary
+ * private ranges on a real Wi-Fi/Ethernet interface come first; 169.254.x
+ * link-local addresses mean "no network" and are dropped entirely.
+ */
+function lanAddress() {
+  const scored = [];
+  const interfaces = os.networkInterfaces() || {};
+  for (const [name, addrs] of Object.entries(interfaces)) {
+    for (const addr of addrs || []) {
+      // Node <18 reported `family` as a number; accept both spellings.
+      const isV4 = addr.family === 'IPv4' || addr.family === 4;
+      if (!isV4 || addr.internal) continue;
+      if (addr.address.startsWith('169.254.')) continue; // self-assigned: unreachable
+      const isPrivate = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(addr.address);
+      const isPhysical = /^(en|eth|wl|wlan)\d/.test(name);
+      // Docker/VM bridges are private too, so being on a real adapter is what
+      // separates "the address your phone can use" from the rest.
+      scored.push({ address: addr.address, score: (isPrivate ? 2 : 0) + (isPhysical ? 1 : 0) });
+    }
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.length ? scored[0].address : null;
+}
+
+/** The address to open on another device, or null when there is nothing to share. */
+function shareUrl() {
+  const ip = lanAddress();
+  if (!ip) return null;
+  // Packaged: the server serves the UI itself. Dev: the UI is Vite's, on its own port.
+  const port = isPackaged ? currentPort : CLIENT_DEV_PORT;
+  return port ? `http://${ip}:${port}/` : null;
 }
 
 /** Server environment: ensure the bundled ffmpeg and yt-dlp are found first, plus extras. */
@@ -172,7 +264,9 @@ async function startDevServer() {
   log('Starting the existing app via `npm run dev` in', REPO_ROOT);
   devProc = spawn('npm', ['run', 'dev'], {
     cwd: REPO_ROOT,
-    env: serverEnv(),
+    // Vite binds localhost unless told otherwise; this is what lets the dev UI be
+    // reached from a phone without changing the default `npm run dev` behaviour.
+    env: serverEnv(shareOnNetwork ? { MYFITNESSPLAN_LAN: '1' } : {}),
     shell: true,
     detached: process.platform !== 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -204,18 +298,25 @@ async function startPackagedServer() {
     return false;
   }
 
+  // Sharing changes both halves of the bind: the interface (so other devices can
+  // reach it at all) and the port (so the address stays the same between runs).
+  const host = shareOnNetwork ? '0.0.0.0' : '127.0.0.1';
+  const preferredPort = shareOnNetwork ? LAN_PORT : 0;
+
   for (let attempt = 1; attempt <= 4; attempt++) {
     let port;
-    try { port = await findFreePort(); }
+    try { port = await findFreePort(preferredPort, host); }
     catch (e) { log('findFreePort failed:', e.message); await sleep(300); continue; }
     currentPort = port;
-    log(`Starting compiled server on 127.0.0.1:${port} (attempt ${attempt}, cwd=${userData})`);
+    log(`Starting compiled server on ${host}:${port} (attempt ${attempt}, cwd=${userData})`);
 
     const child = utilityProcess.fork(entry, [], {
       cwd: userData,
       env: serverEnv({
         PORT: String(port),
-        HOST: '127.0.0.1',                       // loopback only: no LAN exposure, no firewall prompt
+        // Loopback unless the user asked to share: binding every interface is
+        // what raises the firewall prompt and what puts the app on the network.
+        HOST: host,
         MYFITNESSPLAN_CLIENT_DIR: clientDir(),   // serve the built UI same-origin
         NODE_ENV: 'production',
       }),
@@ -543,6 +644,81 @@ function openApp() {
   mainWindow.on('closed', () => { mainWindow = null; }); // keep running in tray
 }
 
+// --- Sharing on the local network --------------------------------------------
+/**
+ * Turn LAN sharing on or off. The bind address is fixed when the server starts,
+ * so the change only takes effect on a restart — which this does, rather than
+ * leaving the tray claiming something the running server is not doing.
+ */
+async function setShareOnNetwork(enabled) {
+  if (enabled === shareOnNetwork) return;
+  shareOnNetwork = enabled;
+  saveConfig({ shareOnNetwork: enabled });
+  log(enabled ? 'Enabling local network sharing.' : 'Disabling local network sharing.');
+  updateTray();
+
+  // Dev mode reusing a server somebody else started can't be rebound from here.
+  if (reusedExternal) {
+    await dialog.showMessageBox({
+      type: 'info',
+      title: 'Restart the server to apply',
+      message: enabled ? 'Sharing is on, but this server was started outside the app.' : 'Sharing is off for the next server start.',
+      detail: 'This window is attached to a MyFitnessPlan server that was already running, so the app can\u2019t change how it is listening. Quit that server and let the app start its own.',
+    });
+    return;
+  }
+
+  if (serverState === 'running' || serverState === 'starting') await restartServer();
+  updateTray();
+  if (enabled && serverState === 'running') await showShareAddress();
+}
+
+/**
+ * Show the address to type on a phone or tablet, with the caveats that actually
+ * matter: same network, and everyone on it can reach the app.
+ */
+async function showShareAddress() {
+  if (!shareOnNetwork) {
+    await dialog.showMessageBox({
+      type: 'info',
+      title: 'Sharing is off',
+      message: 'Turn on "Share on Local Network" first.',
+      detail: 'Until then MyFitnessPlan listens only on this computer.',
+    });
+    return;
+  }
+
+  const url = shareUrl();
+  if (!url) {
+    await dialog.showMessageBox({
+      type: 'warning',
+      title: 'No network address',
+      message: 'This computer doesn\u2019t have a local network address right now.',
+      detail: 'Connect it to your Wi-Fi or Ethernet network and open this again.',
+    });
+    return;
+  }
+
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    buttons: ['Copy Address', 'Done'],
+    defaultId: 0,
+    cancelId: 1,
+    title: 'Open MyFitnessPlan on another device',
+    message: url,
+    detail:
+      'Type that into Safari or Chrome on your iPhone or iPad. The device has to be on the same Wi-Fi as this computer.\n\n' +
+      'In Safari, Share \u2192 Add to Home Screen gives you an icon that opens it like an app.\n\n' +
+      'While sharing is on, anyone on this network who knows the address can open your library \u2014 there is no password. ' +
+      'Turn it off from the tray when you are done.\n\n' +
+      'macOS may ask whether to allow incoming connections the first time; it has to be allowed for this to work.',
+  });
+  if (response === 0) {
+    clipboard.writeText(url);
+    log('Copied share address to the clipboard:', url);
+  }
+}
+
 // --- Tray --------------------------------------------------------------------
 function trayImage() {
   let img = nativeImage.createFromPath(TRAY_ICON);
@@ -555,12 +731,23 @@ function updateTray() {
   const running = serverState === 'running';
   const starting = serverState === 'starting';
   const status = starting ? 'Server: starting...' : running ? 'Server: running' : 'Server: stopped';
-  tray.setToolTip(`MyFitnessPlan - ${status}`);
+  const sharedAt = shareOnNetwork && running ? shareUrl() : null;
+  tray.setToolTip(`MyFitnessPlan - ${status}` + (sharedAt ? `\nShared at ${sharedAt}` : ''));
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: status, enabled: false },
+    ...(sharedAt ? [{ label: sharedAt, enabled: false }] : []),
     { type: 'separator' },
     { label: 'Open App', click: () => openApp() },
     { label: 'Import Database...', enabled: !starting, click: () => importDatabase() },
+    { type: 'separator' },
+    {
+      label: 'Share on Local Network',
+      type: 'checkbox',
+      checked: shareOnNetwork,
+      enabled: !starting,
+      click: (item) => setShareOnNetwork(item.checked),
+    },
+    { label: 'Local Network Address...', enabled: shareOnNetwork && running, click: () => showShareAddress() },
     { type: 'separator' },
     { label: 'Start Server', enabled: !running && !starting, click: () => startServer() },
     { label: 'Stop Server', enabled: running || starting, click: () => stopServer() },
@@ -598,6 +785,8 @@ if (!gotLock) {
     if (!isPackaged && process.platform === 'darwin' && app.dock) {
       try { app.dock.setIcon(path.join(__dirname, 'build', 'icon.png')); } catch (e) { /* ignore */ }
     }
+    shareOnNetwork = loadConfig().shareOnNetwork === true;
+    if (shareOnNetwork) log('Local network sharing is on (remembered from last run).');
     tray = new Tray(trayImage());
     updateTray();
 

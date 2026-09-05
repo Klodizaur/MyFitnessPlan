@@ -5,6 +5,44 @@ All notable changes to MyFitnessPlan are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-09-06
+
+### Added
+
+**Share the app on your local network**
+
+- A new **Share on Local Network** switch in the desktop app's tray menu makes
+  MyFitnessPlan reachable from anything on the same Wi-Fi, so your plans,
+  library and player open on an iPhone or iPad. The tray shows the address to
+  type, and **Local Network Address...** copies it to the clipboard.
+- Sharing is off until you switch it on and is remembered between launches.
+  While it is off nothing but this computer can reach the app, exactly as
+  before. While it is on there is no password: anyone on the network who knows
+  the address can browse your library.
+- The shared address stays the same between restarts rather than changing every
+  launch, so it is worth bookmarking. In Safari, *Share -> Add to Home Screen*
+  now installs it as a standalone app with its own icon.
+
+**Direct play, with conversion only when it is actually needed**
+
+- Videos are now checked against what the device asking for them can decode.
+  Anything it can already play is served **direct** — the untouched file, with
+  byte ranges and instant seeking, no re-encoding and no quality loss. This is
+  what happens for essentially every ordinary MP4, on the desktop and on a
+  phone alike.
+- Files a device genuinely cannot open — an MKV or an AC-3 soundtrack on an
+  iPad, say — are now converted as they play instead of failing with
+  "unsupported format". Only the stream that needs it is converted: a video
+  whose picture is fine but whose audio is not keeps its original picture.
+- The player shows which of the two is happening, so a file that falls off the
+  fast path is visible rather than just feeling slow.
+
+### Fixed
+
+- A `/videos/...` request could previously be crafted to read files outside the
+  configured library folder. It now cannot, which matters considerably more now
+  that the server can be reached from other devices.
+
 ## [1.6.0] - 2026-08-30
 
 ### Added

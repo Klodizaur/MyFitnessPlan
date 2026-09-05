@@ -398,6 +398,30 @@ body {
   backdrop-filter: blur(8px);
 }
 
+/* Direct play vs. converting. Sits with the header buttons and is styled against
+   black like the rest of them; muted by default so it reads as a status, not an
+   action, and tinted green only when the video is playing untouched. */
+.player-playback-badge {
+  align-self: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: help;
+  backdrop-filter: blur(8px);
+}
+
+.player-playback-badge.is-direct {
+  border-color: rgba(16, 185, 129, 0.5);
+  background: rgba(16, 185, 129, 0.2);
+  color: #d1fae5;
+}
+
 /* Loop control — lives in the theater header, over the video, so it is styled
    against black rather than with the page's surface tokens. */
 .player-loop {
@@ -2888,6 +2912,7 @@ nav .nav-links a:hover, nav .nav-links a.active {
   .player-theater-header h2 { max-width: 32%; font-size: 0.95rem; }
   .player-theater-actions { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .player-theater-btn { padding: 7px 10px; font-size: 0.75rem; border-radius: 8px; }
+  .player-playback-badge { padding: 5px 8px; font-size: 0.68rem; }
   .player-loop-btn { width: 32px; height: 32px; border-radius: 8px; }
   .player-loop-btn svg { width: 15px; height: 15px; }
   .player-loop-status { padding: 5px 8px; font-size: 0.72rem; gap: 5px; }

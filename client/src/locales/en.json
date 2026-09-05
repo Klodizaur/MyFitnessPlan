@@ -401,7 +401,15 @@
     "rest_skip": "Skip rest",
     "rest_announce_loop": "Rest started. Next: play {{current}} of {{total}}.",
     "rest_announce_video": "Rest started. The next video follows.",
-    "loop_next_rest_label": "Rest before next video (seconds)"
+    "loop_next_rest_label": "Rest before next video (seconds)",
+    "playback_direct": "Direct play",
+    "playback_converting": "Converting",
+    "playback_no_audio": "no audio",
+    "playback_hint_direct": "{{container}} · {{video}} / {{audio}} — played straight from the file, untouched.",
+    "playback_hint_container": "{{container}} · {{video}} / {{audio}} — this device can't open a {{container}} file, so it's being converted while it plays.",
+    "playback_hint_video_codec": "{{container}} · {{video}} / {{audio}} — this device can't decode {{video}} video, so it's being converted while it plays.",
+    "playback_hint_audio_codec": "{{container}} · {{video}} / {{audio}} — this device can't decode {{audio}} audio, so the sound is being converted while it plays.",
+    "playback_hint_unknown_codecs": "{{container}} · {{video}} / {{audio}} — the file couldn't be identified, so it's being converted while it plays."
   },
   "import": {
     "btn": "Add from YouTube",
