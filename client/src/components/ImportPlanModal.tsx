@@ -127,12 +127,8 @@ export default function ImportPlanModal({ onClose, onImported }: Props) {
     }
   };
 
-  // Only missing local files make this an "anyway" decision. Videos that will
-  // be created are the plan arriving intact, not a compromise.
-  const totalMissing = reports?.reduce((n, r) => n + r.missing, 0) ?? 0;
-
   return createPortal(
-    <div className="wb-overlay wb-overlay-top" onClick={() => !busy && onClose()}>
+    <div className="wb-overlay wb-overlay-top pt-overlay" onClick={() => !busy && onClose()}>
       <div className="wb-import-modal" onClick={e => e.stopPropagation()}>
         <h3 className="wb-import-title">{t('transfer.import_title')}</h3>
         <p className="wb-import-intro">{t('transfer.import_intro')}</p>
@@ -204,11 +200,10 @@ export default function ImportPlanModal({ onClose, onImported }: Props) {
             {t('transfer.cancel')}
           </button>
           <button className="wb-btn wb-btn-primary" onClick={doImport} disabled={busy || !reports}>
-            {busy
-              ? t('transfer.working')
-              : totalMissing > 0
-                ? t('transfer.import_anyway')
-                : t('transfer.import_btn')}
+            {/* Always just "Import". The note above already says what won't come
+                across; an "anyway" here would make a normal outcome sound like
+                a decision to regret. */}
+            {busy ? t('transfer.working') : t('transfer.import_btn')}
           </button>
         </div>
       </div>

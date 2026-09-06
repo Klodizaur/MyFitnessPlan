@@ -564,7 +564,6 @@
     "playlist_add": "Add playlist",
     "playlist_added": "Added \"{{title}}\" — {{count}} videos.",
     "import_btn": "Import",
-    "import_anyway": "Import anyway",
     "imported": "Imported: {{names}}",
     "error_not_a_plan_file": "That isn't a MyFitnessPlan plan file.",
     "error_newer_version": "That file was made by a newer version of the app.",

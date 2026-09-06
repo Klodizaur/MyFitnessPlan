@@ -1011,6 +1011,25 @@ nav .nav-links a:hover, nav .nav-links a.active {
   color: var(--accent-color);
 }
 
+/* Centred, unlike the shared .wb-overlay, which pins its dialog near the top.
+   These two are short enough that top-pinning just leaves them stranded.
+   Centring is done with auto margins on the child rather than align-items:
+   center, because a centred flex item in a scrolling container gets clipped at
+   the top once it outgrows the viewport — with auto margins it centres when
+   there is room and scrolls properly when there isn't. */
+/* Qualified with .wb-overlay so it beats that rule's own padding regardless of
+   which is declared first — .wb-overlay pads 3rem at the top to push its dialog
+   down, which is exactly what we're undoing. */
+.wb-overlay.pt-overlay {
+  align-items: flex-start;
+  padding: 1.5rem;
+}
+
+.wb-overlay.pt-overlay > * {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
 /* --- Plan transfer dialogs -------------------------------------------------
    Sit inside .wb-import-modal, so they inherit its width, type and spacing and
    only add what the playlist dialog didn't need. */

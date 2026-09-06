@@ -69,7 +69,7 @@ export default function ExportPlanModal({ planId, planName, onClose }: Props) {
   };
 
   return createPortal(
-    <div className="wb-overlay wb-overlay-top" onClick={onClose}>
+    <div className="wb-overlay wb-overlay-top pt-overlay" onClick={onClose}>
       <div className="wb-import-modal" onClick={e => e.stopPropagation()}>
         <h3 className="wb-import-title">
           {planId ? t('transfer.export_title') : t('transfer.export_all_title')}
