@@ -1214,6 +1214,16 @@ export default function Plans() {
 
           <button
             type="button"
+            className="plan-card-export-btn"
+            title={t('transfer.export_btn')}
+            aria-label={t('transfer.export_btn')}
+            onClick={e => { e.stopPropagation(); setExportTarget(plan.id); }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </button>
+
+          <button
+            type="button"
             className="plan-card-bg-btn"
             title={t('plans.set_background') || 'Set background image'}
             onClick={e => { e.stopPropagation(); openBackgroundPicker(plan.id); }}
@@ -1345,6 +1355,16 @@ export default function Plans() {
 
               <button
                 type="button"
+                className="plan-card-export-btn"
+                title={t('transfer.export_btn')}
+                aria-label={t('transfer.export_btn')}
+                onClick={e => { e.stopPropagation(); setExportTarget(plan.id); }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </button>
+
+              <button
+                type="button"
                 className="plan-card-bg-btn"
                 title={t('plans.set_background') || 'Set background image'}
                 onClick={e => { e.stopPropagation(); openBackgroundPicker(plan.id); }}
@@ -1375,7 +1395,6 @@ export default function Plans() {
 
                 <div className="plan-card-actions" onClick={e => e.stopPropagation()}>
                   <button className="btn btn-ghost" onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
-                  <button className="btn btn-ghost" onClick={() => setExportTarget(plan.id)}>{t('transfer.export_btn')}</button>
                   <button className="btn btn-danger-ghost" onClick={() => handleDelete(plan.id)}>{t('plans.delete')}</button>
                 </div>
               </div>
@@ -1512,6 +1531,14 @@ export default function Plans() {
                   onClick={() => { handleDuplicate(detailsPlan.id); closePlanDetails(); }}
                 >
                   {t('plans.duplicate')}
+                </button>
+                {/* Closes this panel first: the export dialog is its own overlay,
+                    and stacking the two would bury one behind the other. */}
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => { const id = detailsPlan.id; closePlanDetails(); setExportTarget(id); }}
+                >
+                  {t('transfer.export_btn')}
                 </button>
                 <button
                   className="btn btn-danger-ghost"

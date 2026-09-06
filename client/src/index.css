@@ -1634,6 +1634,50 @@ nav .nav-links a:hover, nav .nav-links a.active {
   background: rgba(0,0,0,0.7);
 }
 
+/* Export sits beside the background icon and shares its look, but stays out of
+   the way until you go looking for it — the card already carries a title, dates,
+   tags and a row of buttons, and exporting is a rare thing to want. */
+.plan-card-export-btn {
+  position: absolute;
+  top: 14px;
+  right: 60px; /* clears the 38px background button plus its 14px inset */
+  z-index: 3;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, background 0.2s ease;
+}
+
+.plan-card:hover .plan-card-export-btn,
+.plan-featured:hover .plan-card-export-btn,
+/* Keyboard users never trigger :hover, so focus has to reveal it too. */
+.plan-card-export-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.plan-card-export-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Nothing hovers on a touch screen, so there it simply stays visible. */
+@media (hover: none) {
+  .plan-card-export-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 .plan-card-body {
   position: relative;
   z-index: 2;
