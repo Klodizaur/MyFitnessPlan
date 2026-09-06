@@ -1491,61 +1491,78 @@ export default function Plans() {
                 />
               </label>
 
+              {/* Three tiers, because these six things are not equally important.
+                  What you open a plan to do is put it into a slot (or take it
+                  out); editing is the next thing down; duplicating and exporting
+                  are occasional and get icons; deleting is set apart because it
+                  is the one that cannot be undone. Six identically-weighted
+                  pills said none of that. */}
               <div className="plan-details-action-buttons">
-                {/* Switching slots only makes sense for a plan that isn't running yet —
-                    re-slotting an already-active plan would just evict whatever
-                    currently occupies the other slot. An active plan only offers
-                    Deactivate below. */}
-                {slotOf(detailsPlan) === null && (
-                  <>
+                <div className="plan-details-primary">
+                  {/* Switching slots only makes sense for a plan that isn't running yet —
+                      re-slotting an already-active plan would just evict whatever
+                      currently occupies the other slot. An active plan only offers
+                      Deactivate. */}
+                  {slotOf(detailsPlan) === null ? (
+                    <>
+                      <span className="plan-details-primary-label">{t('plans.activate_as')}</span>
+                      <button
+                        className="btn"
+                        onClick={() => { handleActivate(detailsPlan.id, 'main'); closePlanDetails(); }}
+                      >
+                        {t('plans.slot_main')}
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => { handleActivate(detailsPlan.id, 'extra'); closePlanDetails(); }}
+                      >
+                        {t('plans.slot_extra')}
+                      </button>
+                    </>
+                  ) : (
                     <button
-                      className="btn btn-ghost"
-                      onClick={() => { handleActivate(detailsPlan.id, 'main'); closePlanDetails(); }}
+                      className="btn btn-secondary"
+                      onClick={() => { handleDeactivate(detailsPlan.id); closePlanDetails(); }}
                     >
-                      {t('plans.activate_as')}: {t('plans.slot_main')}
+                      {t('plans.deactivate')}
                     </button>
-                    <button
-                      className="btn btn-ghost"
-                      onClick={() => { handleActivate(detailsPlan.id, 'extra'); closePlanDetails(); }}
-                    >
-                      {t('plans.activate_as')}: {t('plans.slot_extra')}
-                    </button>
-                  </>
-                )}
-                {slotOf(detailsPlan) !== null && (
+                  )}
+                </div>
+
+                <div className="plan-details-utilities">
                   <button
                     className="btn btn-ghost"
-                    onClick={() => { handleDeactivate(detailsPlan.id); closePlanDetails(); }}
+                    onClick={() => { closePlanDetails(); handleEditPlan(detailsPlan.id); }}
                   >
-                    {t('plans.deactivate')}
+                    {t('plans.edit')}
                   </button>
-                )}
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => { closePlanDetails(); handleEditPlan(detailsPlan.id); }}
-                >
-                  {t('plans.edit')}
-                </button>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => { handleDuplicate(detailsPlan.id); closePlanDetails(); }}
-                >
-                  {t('plans.duplicate')}
-                </button>
-                {/* Closes this panel first: the export dialog is its own overlay,
-                    and stacking the two would bury one behind the other. */}
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => { const id = detailsPlan.id; closePlanDetails(); setExportTarget(id); }}
-                >
-                  {t('transfer.export_btn')}
-                </button>
-                <button
-                  className="btn btn-danger-ghost"
-                  onClick={async () => { await handleDelete(detailsPlan.id); closePlanDetails(); }}
-                >
-                  {t('plans.delete')}
-                </button>
+                  <button
+                    type="button"
+                    className="plan-details-icon-btn"
+                    title={t('plans.duplicate')}
+                    aria-label={t('plans.duplicate')}
+                    onClick={() => { handleDuplicate(detailsPlan.id); closePlanDetails(); }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                  {/* Closes this panel first: the export dialog is its own overlay,
+                      and stacking the two would bury one behind the other. */}
+                  <button
+                    type="button"
+                    className="plan-details-icon-btn"
+                    title={t('transfer.export_btn')}
+                    aria-label={t('transfer.export_btn')}
+                    onClick={() => { const id = detailsPlan.id; closePlanDetails(); setExportTarget(id); }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  </button>
+                  <button
+                    className="btn btn-danger-ghost plan-details-delete"
+                    onClick={async () => { await handleDelete(detailsPlan.id); closePlanDetails(); }}
+                  >
+                    {t('plans.delete')}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

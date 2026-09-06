@@ -4246,15 +4246,79 @@ nav .nav-links a:hover, nav .nav-links a.active {
   color: var(--text-primary);
 }
 
+/* Two rows, not one wrapping line: the primary choice on top, everything else
+   beneath it. Right-aligned because this column sits opposite the start-date
+   field on the left. */
 .plan-details-action-buttons {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
 }
 
 .plan-details-action-buttons .btn {
   padding: 9px 14px;
   font-size: 0.82rem;
+}
+
+.plan-details-primary,
+.plan-details-utilities {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-details-primary-label {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 2px;
+}
+
+/* Duplicate and export: real actions, but rare ones. Square and unlabelled so
+   they read as tools rather than competing with the buttons either side. */
+.plan-details-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.plan-details-icon-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+  background: var(--surface-hover);
+}
+
+/* Set apart from the rest — it's the one action that can't be taken back. */
+.plan-details-delete {
+  margin-left: 14px;
+}
+
+/* .btn-danger-ghost only carries its own colours inside .plan-card-actions;
+   anywhere else it falls through to the plain .btn fill, which made Delete look
+   like the primary action in this panel. The red lives in the tint and border
+   rather than the label, so it reads the same on the light themes' white
+   surfaces as on the dark ones. */
+.plan-details-actions .btn-danger-ghost {
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: var(--text-primary);
+}
+
+.plan-details-actions .btn-danger-ghost:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.75);
 }
 
 /* The details panel sits on the app surface rather than a photo, so the ghost
@@ -4273,6 +4337,13 @@ nav .nav-links a:hover, nav .nav-links a.active {
   .plan-details-actions {
     padding-left: 1.1rem;
     padding-right: 1.1rem;
+  }
+  .plan-details-action-buttons {
+    align-items: stretch;
+    width: 100%;
+  }
+  .plan-details-delete {
+    margin-left: auto;
   }
 }
 
