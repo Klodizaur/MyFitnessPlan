@@ -5,7 +5,6 @@ import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import db from './db.js';
 import libraryRoutes from './routes/library.js';
 import planRoutes from './routes/plan.js';
@@ -13,6 +12,7 @@ import scheduleRoutes from './routes/schedule.js';
 import profileRoutes from './routes/profile.js';
 import externalRoutes from './routes/external.js';
 import aiRoutes from './routes/ai.js';
+import { appVersion } from './version.js';
 import { clientProfile, copyPlan, decidePlayback, mediaForVideo, probeMedia } from './playback.js';
 import { hlsPlaylist, hlsSegment, progressiveMp4, SEGMENT_SECONDS, segmentCount } from './transcode.js';
 import type { FfmpegProcess } from './transcode.js';
@@ -412,17 +412,7 @@ fastify.register(profileRoutes, { prefix: '/api/profile' });
 fastify.register(externalRoutes, { prefix: '/api/external' });
 fastify.register(aiRoutes, { prefix: '/api/ai' });
 
-// App version. The packaged desktop app injects MYFITNESSPLAN_VERSION; otherwise
-// we fall back to this package's version. Exposed so the UI shows it automatically.
-const appVersion = (() => {
-  if (process.env.MYFITNESSPLAN_VERSION) return process.env.MYFITNESSPLAN_VERSION;
-  try {
-    const pkgPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
-    return JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version || '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-})();
+// Exposed so the UI shows the running version automatically.
 fastify.get('/api/version', async (_request, reply) => reply.send({ version: appVersion }));
 
 // Generic settings route

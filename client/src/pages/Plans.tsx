@@ -13,6 +13,8 @@ import YouTubeImportModal from '../components/YouTubeImportModal';
 import AiPlanModal, { AiPlanResult } from '../components/ai/AiPlanModal';
 import VideoTagChips from '../components/VideoTagChips';
 import WorkoutPatternPicker, { DEFAULT_PATTERN } from '../components/WorkoutPatternPicker';
+import ExportPlanModal from '../components/ExportPlanModal';
+import ImportPlanModal from '../components/ImportPlanModal';
 import FreezePlanModal from '../components/FreezePlanModal';
 import { FREEZE_REASON_EMOJI, FreezeReason } from '../lib/freeze';
 import { localDateString } from '../lib/dates';
@@ -281,6 +283,10 @@ export default function Plans() {
   // show Freeze vs. Unfreeze without computing each plan's full schedule.
   const [freezeStatus, setFreezeStatus] = useState<Record<string, FreezeReason>>({});
   const [freezeModalPlanId, setFreezeModalPlanId] = useState<string | null>(null);
+  // Export dialog target: a plan id, '*' for the whole-library backup, or null.
+  const [exportTarget, setExportTarget] = useState<string | null>(null);
+  // Distinct from isImportOpen above, which is the YouTube playlist dialog.
+  const [isPlanImportOpen, setIsPlanImportOpen] = useState(false);
   const [freezeSaving, setFreezeSaving] = useState(false);
   const [unfreezingPlanId, setUnfreezingPlanId] = useState<string | null>(null);
 
@@ -1122,6 +1128,20 @@ export default function Plans() {
             <button className="btn btn-secondary" onClick={() => setIsAiOpen(true)}>{t('ai.build_btn')}</button>
           )}
         </div>
+
+        {/* Deliberately quieter than the row above: moving plans in and out is
+            an occasional thing, and this page has enough competing for attention
+            already. Small, text-weight, and out of the way. */}
+        <div className="plans-transfer-row">
+          <button type="button" className="plans-transfer-btn" onClick={() => setIsPlanImportOpen(true)}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>{t('transfer.import_btn_label')}</span>
+          </button>
+          <button type="button" className="plans-transfer-btn" onClick={() => setExportTarget('*')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>{t('transfer.backup_all_btn')}</span>
+          </button>
+        </div>
       </div>
 
       {status && (
@@ -1355,6 +1375,7 @@ export default function Plans() {
 
                 <div className="plan-card-actions" onClick={e => e.stopPropagation()}>
                   <button className="btn btn-ghost" onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
+                  <button className="btn btn-ghost" onClick={() => setExportTarget(plan.id)}>{t('transfer.export_btn')}</button>
                   <button className="btn btn-danger-ghost" onClick={() => handleDelete(plan.id)}>{t('plans.delete')}</button>
                 </div>
               </div>
@@ -1579,6 +1600,25 @@ export default function Plans() {
 
       {isImportOpen && (
         <YouTubeImportModal onClose={() => setIsImportOpen(false)} onImported={handleImported} />
+      )}
+
+      {exportTarget && (
+        <ExportPlanModal
+          planId={exportTarget === '*' ? null : exportTarget}
+          planName={plans.find(p => p.id === exportTarget)?.name}
+          onClose={() => setExportTarget(null)}
+        />
+      )}
+
+      {isPlanImportOpen && (
+        <ImportPlanModal
+          onClose={() => setIsPlanImportOpen(false)}
+          onImported={names => {
+            setIsPlanImportOpen(false);
+            setStatus(t('transfer.imported', { names: names.join(', ') }));
+            fetchPlans();
+          }}
+        />
       )}
 
       {freezeModalPlanId && (

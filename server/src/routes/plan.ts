@@ -16,6 +16,8 @@ const DAY_NAMES = new Set([
 ]);
 
 import { matchVideo, rematchPlanWorkouts, rematchAllPlans } from '../matcher.js';
+import { analyzeImport, exportPlans, importPlans, validateExportFile } from '../planTransfer.js';
+import { appVersion } from '../version.js';
 
 function isSkip(cell: string): boolean {
   const t = cell.trim();
@@ -602,5 +604,46 @@ export default async function (fastify: FastifyInstance) {
       rematchPlanWorkouts(plan.id);
     }
     return reply.send({ success: true, count: plans.length });
+  });
+
+  // --- Export / import -------------------------------------------------------
+  // `/export` is registered as a static path, which find-my-way prefers over the
+  // `/:id` route above, so there is no ambiguity between them.
+
+  /** One plan (`?ids=a,b`) or, with no ids, every plan as a backup. */
+  fastify.get('/export', async (request, reply) => {
+    const { ids } = request.query as { ids?: string };
+    const planIds = typeof ids === 'string' && ids.trim()
+      ? ids.split(',').map(v => v.trim()).filter(Boolean)
+      : null;
+
+    const file = exportPlans(planIds, appVersion);
+    if (file.plans.length === 0) return reply.code(404).send({ error: 'No plans to export' });
+
+    return reply.type('application/json').send(file);
+  });
+
+  /**
+   * Create plans from an exported file.
+   *
+   * `dryRun` answers "what would this do" without doing any of it, which is what
+   * the import dialog shows before the user commits — including whether adding
+   * the playlist first would bring more of the plan across.
+   */
+  // Fastify's 1MB default is too small for a whole-library backup: a few hundred
+  // plans' worth of titles, descriptions and tags runs past it easily.
+  fastify.post('/import', { bodyLimit: 20 * 1024 * 1024 }, async (request, reply) => {
+    const body = request.body as { file?: unknown; dryRun?: boolean } | null;
+    const validated = validateExportFile(body?.file);
+    if (!validated.ok) {
+      return reply.code(400).send({ error: validated.error, code: validated.error });
+    }
+
+    if (body?.dryRun) {
+      return reply.send({ dryRun: true, reports: analyzeImport(validated.file) });
+    }
+
+    const { reports, planIds } = importPlans(validated.file);
+    return reply.send({ success: true, reports, planIds });
   });
 }

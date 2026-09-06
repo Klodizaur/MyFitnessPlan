@@ -37,11 +37,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The player shows which of the two is happening, so a file that falls off the
   fast path is visible rather than just feeling slow.
 
+**Export and import individual plans**
+
+- Any plan can be exported to a file from its card, and every plan at once with
+  **Back up all** — a backup you can keep, and put back later.
+- A plan made only of YouTube videos can be shared with anyone: the videos are
+  rebuilt from the file itself, so it works for them without the playlist. The
+  export says so, and says to send the playlist link along.
+- A plan using your own video files is a backup for you; the export says that
+  too, since those files won't be on anyone else's computer.
+- Importing never overwrites anything. It always creates a new plan, switched
+  off until you activate it, and a video already in your library is matched and
+  reused rather than duplicated. Before it commits, the dialog says how much of
+  the plan came across — and offers to add the YouTube playlist right there if
+  the plan is built on one.
+
 **Day Tape marks finished workouts**
 
 - A day whose workout is done now shows a green dot on the tape, in the same
   green the day cards and badges already use — so a month can be scanned for
   what is left without opening each day in turn.
+- In the Forest and Watermelon themes, where the accent is itself green and two
+  green dots would say nothing, the *unfinished* dot moves to orange and pink
+  respectively. Done stays green in every theme.
 
 ### Fixed
 
