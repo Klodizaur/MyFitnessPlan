@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The player shows which of the two is happening, so a file that falls off the
   fast path is visible rather than just feeling slow.
 
+**Day Tape marks finished workouts**
+
+- A day whose workout is done now shows a green dot on the tape, in the same
+  green the day cards and badges already use — so a month can be scanned for
+  what is left without opening each day in turn.
+
 ### Fixed
 
 - **The navigation bar overflowed on tablets.** The menu only collapsed to a

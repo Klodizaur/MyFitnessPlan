@@ -3425,6 +3425,25 @@ nav .nav-links a:hover, nav .nav-links a.active {
   opacity: 0.9;
 }
 
+/* A finished workout turns its dot the same green the day cards, badges and
+   "done" buttons already use, so the tape can be scanned for what's left
+   without opening each day. Full opacity, unlike the plain workout dot: this
+   one is a fact about the day, not just a marker that something is scheduled. */
+.calendar-tape-dot.done {
+  background: #10b981;
+  opacity: 1;
+}
+
+/* On the selected day the dot sits on a solid accent fill, which in some themes
+   is itself green (watermelon swaps the accent for its rind colour) — the halo
+   keeps the dot legible there without giving up the green that carries the
+   meaning. */
+.calendar-tape-day.selected .calendar-tape-dot.done {
+  background: #10b981;
+  opacity: 1;
+  box-shadow: 0 0 0 1.5px var(--accent-contrast, #fff);
+}
+
 .calendar-tape-frozen-mark {
   font-size: 0.7rem;
   line-height: 1;

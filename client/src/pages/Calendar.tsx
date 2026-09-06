@@ -680,7 +680,13 @@ function DayTape({ days, selectedDate, onSelect, today }: {
                     {day.frozen ? (
                       <span className="calendar-tape-frozen-mark" aria-hidden="true">{FREEZE_REASON_EMOJI[day.frozen]}</span>
                     ) : (
-                      <span className={`calendar-tape-dot${day.isWorkoutDay ? ' active' : ''}`} aria-hidden="true" />
+                      <span
+                        className={
+                          `calendar-tape-dot${day.isWorkoutDay ? ' active' : ''}` +
+                          (day.workout?.isCompleted ? ' done' : '')
+                        }
+                        aria-hidden="true"
+                      />
                     )}
                   </button>
                 );
