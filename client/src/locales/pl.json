@@ -218,7 +218,11 @@
     "pattern_following_note": "Ten plan korzysta ze schematu treningowego z Ustawień. Zmień go tam, a zmieni się i ten plan.",
     "pattern_own_note": "Ten plan ma własny rytm, niezależnie od Ustawień. Powtarza się od daty startu planu.",
     "freeze": "Zamroź",
-    "unfreeze": "Odmroź"
+    "unfreeze": "Odmroź",
+    "builder_quick_add_placeholder": "Zacznij pisać, aby dodać film…",
+    "builder_quick_add_none": "Brak pasujących filmów.",
+    "builder_quick_add_more": "Jeszcze {{count}} — pisz dalej, aby zawęzić",
+    "builder_remove_video": "Usuń z tego dnia"
   },
   "calendar": {
     "today": "Dzisiaj",

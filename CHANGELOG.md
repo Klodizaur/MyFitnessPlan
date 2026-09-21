@@ -5,6 +5,36 @@ All notable changes to MyFitnessPlan are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-09-22
+
+### Added
+
+**Add videos to a day by typing**
+
+- In the plan builder, right under the day you're editing: start typing and
+  matching videos appear with their thumbnails. Pick one (click, or arrow keys
+  and Enter) and it's added to that day — no scrolling down to the library.
+  The search stays filled in afterwards, so a series can be added one after
+  another, and picking one that's already on the day takes it off again.
+- The full library with its filters is still below, exactly as before.
+
+**Thumbnails for the videos on a day**
+
+- Each video you've added to a day now shows a small thumbnail next to its
+  title, and titles run to two lines instead of one, so a day with several
+  similarly-named videos is readable at a glance.
+
+### Fixed
+
+- **The plan builder overflowed the screen on phones.** A single long video
+  title set the width of the whole builder header — the save button, the day
+  being edited and the day navigation all ran past the edge of the screen.
+  Titles now shorten properly and nothing in the builder can be wider than
+  the screen.
+- On phones the builder's header no longer stays pinned to the top while you
+  scroll. It took up most of the screen there, leaving only a sliver to see
+  the library through. On larger screens it still stays pinned.
+
 ## [1.7.0] - 2026-09-06
 
 ### Added

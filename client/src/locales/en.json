@@ -159,7 +159,11 @@
     "pattern_following_note": "This plan follows the workout pattern in Settings. Change it there and this plan changes with it.",
     "pattern_own_note": "This plan keeps its own rhythm, whatever Settings says. It repeats from the plan's start date.",
     "freeze": "Freeze",
-    "unfreeze": "Unfreeze"
+    "unfreeze": "Unfreeze",
+    "builder_quick_add_placeholder": "Start typing to add a video…",
+    "builder_quick_add_none": "No videos match.",
+    "builder_quick_add_more": "{{count}} more — keep typing to narrow it down",
+    "builder_remove_video": "Remove from this day"
   },
   "calendar": {
     "today": "Today",

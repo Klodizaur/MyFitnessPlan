@@ -13,6 +13,7 @@ import YouTubeImportModal from '../components/YouTubeImportModal';
 import AiPlanModal, { AiPlanResult } from '../components/ai/AiPlanModal';
 import VideoTagChips from '../components/VideoTagChips';
 import WorkoutPatternPicker, { DEFAULT_PATTERN } from '../components/WorkoutPatternPicker';
+import BuilderQuickAdd from '../components/BuilderQuickAdd';
 import ExportPlanModal from '../components/ExportPlanModal';
 import ImportPlanModal from '../components/ImportPlanModal';
 import FreezePlanModal from '../components/FreezePlanModal';
@@ -739,9 +740,16 @@ export default function Plans() {
             {day.videoIds.map(id => {
               const video = allVideos.find(v => v.id === id);
               return (
-                <div key={id} className="wb-day-video">
-                  <span className="wb-day-video-name">{video ? video.filename : id}</span>
-                  <button type="button" className="wb-day-video-remove" onClick={(e) => { e.stopPropagation(); removeVideoFromDay(builderCurrentWeek, index, id); }}>×</button>
+                <div key={id} className="wb-day-video" title={video?.filename}>
+                  {/* A title alone is hard to scan once a day has a handful of
+                      similarly-named videos; the thumbnail is what you recognise. */}
+                  {video?.thumbnail_path ? (
+                    <img className="wb-mini-thumb" src={`/thumbnails/${video.thumbnail_path}`} alt="" loading="lazy" />
+                  ) : (
+                    <span className="wb-mini-thumb wb-mini-thumb-empty" aria-hidden="true" />
+                  )}
+                  <span className="wb-day-video-name">{video ? stripVideoExt(video.filename) : id}</span>
+                  <button type="button" className="wb-day-video-remove" aria-label={t('plans.builder_remove_video')} onClick={(e) => { e.stopPropagation(); removeVideoFromDay(builderCurrentWeek, index, id); }}>×</button>
                 </div>
               );
             })}
@@ -1754,6 +1762,14 @@ export default function Plans() {
                     <div className="wb-status">{builderStatus}</div>
                   )}
                   {currentDay && renderDayCard(currentDay, builderCurrentDay, true)}
+
+                  {currentDay && (
+                    <BuilderQuickAdd
+                      videos={allVideos}
+                      selectedIds={currentDay.videoIds}
+                      onToggle={toggleVideoForDay}
+                    />
+                  )}
 
                   {/* Directly under the day being edited, where the eye already
                       is after adding videos. Text-style so they don't compete
