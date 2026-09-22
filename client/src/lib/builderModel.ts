@@ -13,6 +13,14 @@
 export interface BuilderDay {
   name: string;
   videoIds: string[];
+  /**
+   * The saved workout this day was loaded from, when editing an existing plan.
+   * Sent back on save so the server can update that day in place instead of
+   * rebuilding it — which is what keeps its completion ticks. It travels with
+   * the day, not the slot, so removing a week or moving things around still
+   * pairs each day with its own progress. Absent on days added in the builder.
+   */
+  workoutId?: string;
 }
 
 export interface BuilderWeek {

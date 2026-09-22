@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Editing a plan no longer wipes your progress.** Saving any change — even
+  adding one video to an active plan — used to reset every day to not done.
+  Now anything you've already ticked stays ticked, and an edit only changes
+  what's left to do. A day you finished stays finished even if you swap one of
+  its videos later; a day in progress keeps the ticks on the videos still in
+  it; new days start unticked. Your Log is unaffected either way, as before.
 - **The plan builder overflowed the screen on phones.** A single long video
   title set the width of the whole builder header — the save button, the day
   being edited and the day navigation all ran past the edge of the screen.

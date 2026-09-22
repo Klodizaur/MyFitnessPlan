@@ -456,8 +456,10 @@ export default function Plans() {
           videoIds = [];
         }
 
-        // Set the video IDs for this day
+        // Set the video IDs for this day, and remember which saved day it is so
+        // saving updates it in place and its progress survives the edit.
         weeks[weekIndex].days[dayIndex].videoIds = videoIds;
+        weeks[weekIndex].days[dayIndex].workoutId = workout.id;
       });
 
       // Use existing weeks or create a default one
