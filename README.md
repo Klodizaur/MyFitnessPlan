@@ -65,6 +65,7 @@ Make the app truly yours with several built-in color themes—from Midnight and 
 
 ### Additional Features
 - **Freeze plans without losing progress**: pause a day or a whole stretch (sick day, time off, whatever) and every workout that would have landed there just moves to the next open day
+- **Export & import plans**: save any plan to a file as a backup, or share one built from YouTube videos with someone else — importing never overwrites what you already have
 - **Local & Self-Hosted**: run entirely on your own machine with no cloud dependency
 - **Desktop app**: an installable macOS/Windows app that wraps the server and UI—no Node.js or terminal required (see [desktop/README.md](desktop/README.md))
 - **Multi-language Support**: available in English and Polish

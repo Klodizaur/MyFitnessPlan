@@ -116,6 +116,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stay visible while it is on.
 - Videos now carry `playsinline`, so an iPhone plays them in the app's own
   player instead of hijacking playback into the system one the moment it starts.
+- A plan's details panel showed six identical-looking buttons in one row, two
+  of which started with the same words. They now read as what they are: the
+  slot to activate into leads, Edit follows, Duplicate and Export are icons,
+  and Delete is set apart. Delete was also drawn as the primary blue button
+  there — the most dangerous action looking like the recommended one — and is
+  now red.
 - A `/videos/...` request could previously be crafted to read files outside the
   configured library folder. It now cannot, which matters considerably more now
   that the server can be reached from other devices.

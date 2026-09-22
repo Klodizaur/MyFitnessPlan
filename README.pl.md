@@ -65,6 +65,7 @@ Dostosuj aplikację do siebie dzięki kilku wbudowanym motywom kolorystycznym �
 
 ### Dodatkowe funkcje
 - **Zamrażanie planów bez utraty postępów**: zatrzymaj jeden dzień lub cały odcinek (choroba, wyjazd, cokolwiek) i każdy trening, który miał tam wypaść, po prostu przesuwa się na najbliższy wolny dzień
+- **Eksport i import planów**: zapisz dowolny plan do pliku jako kopię zapasową albo udostępnij komuś plan zbudowany z filmów z YouTube — import nigdy nie nadpisuje tego, co już masz
 - **Lokalna i self-hosted**: działa całkowicie na Twoim komputerze bez zależności od chmury
 - **Aplikacja desktopowa**: instalowalna aplikacja na macOS/Windows, która pakuje serwer i interfejs — bez potrzeby Node.js ani terminala (patrz [desktop/README.md](desktop/README.md))
 - **Obsługa wielu języków**: dostępna po angielsku i polsku
