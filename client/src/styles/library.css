@@ -284,9 +284,16 @@
   gap: 28px 20px;
 }
 
+/* A <button> centres its content vertically when it's taller than that
+   content, and a grid stretches every card to the tallest in its row — so a
+   card with fewer tags had its thumbnail sitting lower than its neighbours.
+   Laying the card out as a column pins the content to the top. */
 .lib-folder,
 .lib-video {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   min-width: 0;
   padding: 0;
   border: none;

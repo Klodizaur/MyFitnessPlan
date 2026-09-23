@@ -639,8 +639,13 @@
   gap: 18px 14px;
 }
 
+/* Same reason as .lib-video: a stretched <button> centres its content, which
+   dropped the thumbnail of any video without tags below the rest of its row. */
 .pb-pick {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   min-width: 0;
   padding: 0;
   border: none;

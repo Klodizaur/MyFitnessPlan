@@ -469,7 +469,7 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
                   </button>
                 ))}
               </div>
-              {props.category === '__custom__' && (
+              {props.category === 'custom' && (
                 <input
                   className="pb-input pb-input--inline"
                   value={props.customCategory}
