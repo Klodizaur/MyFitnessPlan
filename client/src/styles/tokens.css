@@ -1,0 +1,228 @@
+/**
+ * Redesign design tokens.
+ * =======================
+ * The handoff lists one set of hex values — those are the **Pastel Orange**
+ * theme, which is what its mockups were drawn in. Settings still offers all
+ * seven themes, so the values live here as variables and each theme restates
+ * them. Pastel Orange below matches the handoff exactly; the other six keep the
+ * same *roles* (page behind surfaces, ink for text and primary buttons, one
+ * accent, a warm tint for tracks and soft fills) in their own palette.
+ *
+ * Roles, so a new theme can be added without reading every screen:
+ *   --t-page        the app background
+ *   --t-surface     cards, nav bar, inputs
+ *   --t-surface-warm modal and sheet surfaces
+ *   --t-subtle      inset fields, dropzones, journal rows
+ *   --t-tint        segmented track, soft buttons, icon tiles
+ *   --t-band-odd/even  alternating week bands
+ *   --t-border      the default 1px border
+ *   --t-border-dashed  dashed empty/rest borders
+ *   --t-ink         primary text AND the primary button fill
+ *   --t-ink-muted   secondary text
+ *   --t-ink-faint   tertiary text, placeholders, inactive icons
+ *   --t-on-ink      text on an --t-ink fill
+ *   --t-accent      links, TODAY, progress fill, focus ring
+ *   --t-accent-soft soft accent fill
+ *
+ * Status colours (done/danger/freeze/plan) are deliberately NOT themed: green
+ * has to read as done and red as delete in every theme.
+ */
+
+:root,
+[data-theme='pastel-orange'] {
+  --t-page: #FFF5EC;
+  --t-surface: #FFFFFF;
+  --t-surface-warm: #FFFBF7;
+  --t-subtle: #FFF9F4;
+  --t-tint: #FCE9D8;
+  --t-band-odd: #FCDDC4;
+  --t-band-even: #FFEFE2;
+  --t-border: #F3DCC7;
+  --t-border-dashed: #E9CBB1;
+  --t-ink: #6B2410;
+  --t-ink-muted: #9A5A3A;
+  --t-ink-faint: #B07A5E;
+  --t-on-ink: #FFF5EC;
+  --t-accent: #F08A4B;
+  --t-accent-soft: #F9B27A;
+  --t-overlay: rgba(60, 20, 6, 0.34);
+}
+
+/* --- Dark themes ------------------------------------------------------------
+   The page is the darkest layer and surfaces sit above it, so "ink" becomes a
+   light colour. A primary button is therefore a light fill with dark text,
+   which is the same contrast relationship the light themes have, inverted. */
+
+[data-theme='midnight'] {
+  --t-page: #0B1220;
+  --t-surface: #111A2E;
+  --t-surface-warm: #16203A;
+  --t-subtle: #16203A;
+  --t-tint: #1E2B47;
+  --t-band-odd: #16203A;
+  --t-band-even: #131C33;
+  --t-border: #24314F;
+  --t-border-dashed: #33436B;
+  --t-ink: #E8EEF9;
+  --t-ink-muted: #A8B6D1;
+  --t-ink-faint: #7E8DAC;
+  --t-on-ink: #0B1220;
+  --t-accent: #3B82F6;
+  --t-accent-soft: #2C5FA8;
+  --t-overlay: rgba(4, 8, 18, 0.55);
+}
+
+[data-theme='sunset'] {
+  --t-page: #1E1022;
+  --t-surface: #2E1A33;
+  --t-surface-warm: #38203E;
+  --t-subtle: #38203E;
+  --t-tint: #45284C;
+  --t-band-odd: #38203E;
+  --t-band-even: #311B37;
+  --t-border: #4B2C53;
+  --t-border-dashed: #643C6D;
+  --t-ink: #FBEAF3;
+  --t-ink-muted: #CFA7BE;
+  --t-ink-faint: #A87F98;
+  --t-on-ink: #1E1022;
+  --t-accent: #F97316;
+  --t-accent-soft: #B4571B;
+  --t-overlay: rgba(14, 6, 16, 0.55);
+}
+
+[data-theme='forest'] {
+  --t-page: #04372B;
+  --t-surface: #08503E;
+  --t-surface-warm: #0A5C47;
+  --t-subtle: #0A5C47;
+  --t-tint: #0F6B53;
+  --t-band-odd: #0A5C47;
+  --t-band-even: #075142;
+  --t-border: #14705A;
+  --t-border-dashed: #1D8C71;
+  --t-ink: #E6FAF2;
+  --t-ink-muted: #A3D9C6;
+  --t-ink-faint: #7CBCA6;
+  --t-on-ink: #04372B;
+  --t-accent: #10B981;
+  --t-accent-soft: #0C8560;
+  --t-overlay: rgba(2, 24, 18, 0.55);
+}
+
+/* --- Light themes ----------------------------------------------------------- */
+
+[data-theme='pastel-pink'] {
+  --t-page: #FDF0F6;
+  --t-surface: #FFFFFF;
+  --t-surface-warm: #FFF8FB;
+  --t-subtle: #FFF5FA;
+  --t-tint: #FBDCEB;
+  --t-band-odd: #F9D2E4;
+  --t-band-even: #FDE8F1;
+  --t-border: #F2D2E1;
+  --t-border-dashed: #E8BBD1;
+  --t-ink: #5A1E3A;
+  --t-ink-muted: #8C4364;
+  --t-ink-faint: #A96A87;
+  --t-on-ink: #FDF0F6;
+  --t-accent: #E0579A;
+  --t-accent-soft: #F59AC6;
+  --t-overlay: rgba(52, 10, 30, 0.34);
+}
+
+[data-theme='sky-blue'] {
+  --t-page: #EEF6FD;
+  --t-surface: #FFFFFF;
+  --t-surface-warm: #F7FBFF;
+  --t-subtle: #F4FAFF;
+  --t-tint: #D9EDFA;
+  --t-band-odd: #CFE7F8;
+  --t-band-even: #E6F3FC;
+  --t-border: #CFE4F2;
+  --t-border-dashed: #B4D4E9;
+  --t-ink: #153A5A;
+  --t-ink-muted: #3E6B8E;
+  --t-ink-faint: #6892B0;
+  --t-on-ink: #EEF6FD;
+  --t-accent: #2B93D0;
+  --t-accent-soft: #7CCBF2;
+  --t-overlay: rgba(8, 30, 48, 0.34);
+}
+
+[data-theme='watermelon'] {
+  --t-page: #EAF6EC;
+  --t-surface: #FFFFFF;
+  --t-surface-warm: #F8FCF9;
+  --t-subtle: #F4FAF5;
+  --t-tint: #FBDEE2;
+  --t-band-odd: #F7D2D8;
+  --t-band-even: #E3F2E6;
+  --t-border: #D9E9DC;
+  --t-border-dashed: #BFDCC5;
+  --t-ink: #4A1520;
+  --t-ink-muted: #7E3B46;
+  --t-ink-faint: #9E6570;
+  --t-on-ink: #EAF6EC;
+  --t-accent: #DC2F4B;
+  --t-accent-soft: #F08A9C;
+  --t-overlay: rgba(36, 8, 14, 0.34);
+}
+
+/* --- Fixed status colours ---------------------------------------------------
+   Meaning before palette: these stay put in every theme. */
+:root {
+  --t-success: #2F8F5B;
+  --t-success-bg: #F1F8F3;
+  --t-success-border: #BFE3CC;
+  --t-danger: #B3261E;
+  --t-freeze: #2F6D9A;
+  --t-freeze-bg: #EAF2F8;
+  --t-plan-main: #F08A4B;
+  --t-plan-extra: #5B8C85;
+  --t-video-chip: rgba(40, 14, 4, 0.78);
+
+  /* Tag categories. Their whole job is to tell four kinds of tag apart at a
+     glance, so like the status colours they don't move between themes. */
+  --t-tag-intensity-bg: #F7D3B8;
+  --t-tag-intensity-ink: #8A2E0E;
+  --t-tag-type-bg: #FBE7C6;
+  --t-tag-type-ink: #7A4A0C;
+  --t-tag-body-bg: #E5ECDD;
+  --t-tag-body-ink: #3E5A33;
+  --t-tag-gear-bg: #EFE3EE;
+  --t-tag-gear-ink: #6A3561;
+
+  /* Shadows */
+  --t-shadow-modal: 0 30px 80px rgba(40, 14, 4, 0.35);
+  --t-shadow-popover: 0 14px 40px rgba(20, 8, 3, 0.38);
+  --t-shadow-seg: 0 1px 3px rgba(107, 36, 16, 0.15);
+  --t-shadow-lift: 0 8px 22px rgba(107, 36, 16, 0.13);
+
+  /* Radii, as named steps so screens don't invent their own. */
+  --t-r-badge: 6px;
+  --t-r-tag: 7px;
+  --t-r-chip: 10px;
+  --t-r-btn: 14px;
+  --t-r-card: 18px;
+  --t-r-band: 22px;
+  --t-r-hero: 24px;
+  --t-r-sheet: 28px;
+}
+
+/* On a dark theme the fixed green/red need a lift to stay legible, and the
+   "done" tint has to be dark rather than a near-white wash. */
+[data-theme='midnight'],
+[data-theme='sunset'],
+[data-theme='forest'] {
+  --t-success: #4ADE80;
+  --t-success-bg: rgba(74, 222, 128, 0.12);
+  --t-success-border: rgba(74, 222, 128, 0.35);
+  --t-danger: #F87171;
+  --t-freeze: #7DD3FC;
+  --t-freeze-bg: rgba(125, 211, 252, 0.12);
+  --t-shadow-modal: 0 30px 80px rgba(0, 0, 0, 0.5);
+  --t-shadow-popover: 0 14px 40px rgba(0, 0, 0, 0.5);
+  --t-shadow-seg: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --t-shadow-lift: 0 8px 22px rgba(0, 0, 0, 0.35);
+}

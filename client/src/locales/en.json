@@ -6,7 +6,8 @@
     "settings": "Settings",
     "about": "About",
     "library": "Library",
-    "profile": "Log"
+    "profile": "Log",
+    "home": "Home"
   },
   "dashboard": {
     "todays_workout": "Today's Workout",
@@ -44,7 +45,12 @@
     "plan_finished_title": "You just finished {{plan}}!",
     "plan_finished_msg": "You completed {{completed}} of {{total}} workouts in this plan. Fancy activating a new one?",
     "plan_finished_cta": "Choose a new plan",
-    "plan_starts_on": "Your plan starts on {{date}}."
+    "plan_starts_on": "Your plan starts on {{date}}.",
+    "view_calendar": "View calendar",
+    "album_videos": "{{count}} videos",
+    "plan_finished": "Plan finished",
+    "previous_plan": "Previous plan",
+    "next_plan": "Next plan"
   },
   "plans": {
     "active_plan": "Active Plan",

@@ -60,7 +60,8 @@
     "settings": "Ustawienia",
     "about": "O aplikacji",
     "library": "Biblioteka",
-    "profile": "Dziennik"
+    "profile": "Dziennik",
+    "home": "Start"
   },
   "dashboard": {
     "todays_workout": "Dzisiejszy trening",
@@ -100,7 +101,12 @@
     "plan_finished_title": "Plan {{plan}} ukończony!",
     "plan_finished_msg": "Ukończono {{completed}} z {{total}} treningów w tym planie. Masz ochotę aktywować nowy?",
     "plan_finished_cta": "Wybierz nowy plan",
-    "plan_starts_on": "Twój plan zaczyna się {{date}}."
+    "plan_starts_on": "Twój plan zaczyna się {{date}}.",
+    "view_calendar": "Zobacz kalendarz",
+    "album_videos": "Filmy: {{count}}",
+    "plan_finished": "Plan ukończony",
+    "previous_plan": "Poprzedni plan",
+    "next_plan": "Następny plan"
   },
   "plans": {
     "active_plan": "Aktywny plan",
