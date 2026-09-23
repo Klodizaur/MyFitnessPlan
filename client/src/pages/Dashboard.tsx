@@ -342,29 +342,53 @@ export default function Dashboard() {
               <p className="dash-empty rx-muted">{t('dashboard.no_upcoming')}</p>
             ) : (
               upcomingWorkouts.map(day => {
-                const first = day.workout?.videos[0];
                 const date = new Date(day.date);
+                // A workout day can hold several videos. Show the first two —
+                // enough to know what the day is, without the list becoming the
+                // page — and count the rest.
+                const videos = day.workout?.videos || [];
+                const shown = videos.slice(0, 2);
+                const extra = videos.length - shown.length;
                 return (
-                  <button
-                    type="button"
-                    key={day.date}
-                    className="dash-up-row"
-                    onClick={() => first && day.workout && navigate(`/player/${first.id}/${day.workout.id}`)}
-                  >
+                  <div className="dash-up-row" key={day.date}>
                     <span className="dash-up-date">
                       <span className="dash-up-dow">
                         {date.toLocaleDateString(i18n.language, { weekday: 'short' }).toUpperCase()}
                       </span>
                       <span className="dash-up-day">{date.getDate()}</span>
                     </span>
-                    {first?.thumbnail
-                      ? <img className="dash-up-thumb" src={thumbUrl(first.thumbnail)!} alt="" loading="lazy" />
-                      : <span className="dash-up-thumb" />}
-                    <span className="dash-up-text">
-                      <span className="dash-up-title rx-clamp-2">{stripExt(first?.filename || day.workout?.name || '')}</span>
-                      <span className="dash-up-meta rx-muted">{planInfo?.name}</span>
-                    </span>
-                  </button>
+
+                    <div className="dash-up-main">
+                      <div className="dash-up-plan">
+                        {selectedPlan && (
+                          <span className="dash-plan-pill">
+                            {t(selectedPlan.slot === 'extra' ? 'plans.slot_extra' : 'plans.slot_main')}
+                          </span>
+                        )}
+                        <span className="dash-up-plan-name">{planInfo?.name}</span>
+                      </div>
+
+                      {shown.map(video => (
+                        <button
+                          type="button"
+                          key={video.id}
+                          className="dash-up-video"
+                          onClick={() => day.workout && navigate(`/player/${video.id}/${day.workout.id}`)}
+                        >
+                          {video.thumbnail
+                            ? <img className="dash-up-thumb" src={thumbUrl(video.thumbnail)!} alt="" loading="lazy" />
+                            : <span className="dash-up-thumb" />}
+                          <span className="dash-up-title rx-clamp-2">{stripExt(video.filename)}</span>
+                        </button>
+                      ))}
+
+                      {extra > 0 && (
+                        <span className="dash-up-more rx-muted">
+                          {t('dashboard.more_videos', { count: extra })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 );
               })
             )}

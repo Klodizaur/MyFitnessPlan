@@ -213,13 +213,54 @@
 
 .dash-empty { margin: 0; padding: 16px; font-size: 14px; }
 
+/* A day, not a video: the date, then the plan it belongs to and that day's
+   videos. The row itself isn't clickable any more — each video is, so a day
+   with two parts can start either one. */
 .dash-up-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
-  border: none;
   border-top: 1px solid var(--t-border);
+}
+
+.dash-up-row:first-child { border-top: none; }
+
+.dash-up-date { width: 46px; flex-shrink: 0; text-align: center; padding-top: 2px; }
+
+.dash-up-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-up-plan {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dash-up-plan-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-up-video {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px;
+  margin: -4px;
+  border: none;
+  border-radius: 12px;
   background: none;
   color: inherit;
   font-family: inherit;
@@ -227,10 +268,12 @@
   cursor: pointer;
 }
 
-.dash-up-row:first-child { border-top: none; }
-.dash-up-row:hover { background: var(--t-subtle); }
+.dash-up-video:hover { background: var(--t-subtle); }
 
-.dash-up-date { width: 46px; flex-shrink: 0; text-align: center; }
+.dash-up-more {
+  font-size: 12px;
+  font-weight: 600;
+}
 
 .dash-up-dow {
   display: block;
@@ -243,8 +286,8 @@
 .dash-up-day { display: block; font-size: 20px; font-weight: 700; line-height: 1.1; }
 
 .dash-up-thumb {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 40px;
   border-radius: 12px;
   object-fit: cover;
   display: block;
@@ -252,11 +295,7 @@
   background: var(--t-tint);
 }
 
-.dash-up-text { flex: 1; min-width: 0; }
-
-.dash-up-title { font-weight: 600; font-size: 15px; line-height: 1.3; }
-
-.dash-up-meta { display: block; margin-top: 2px; font-size: 13px; }
+.dash-up-title { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; line-height: 1.3; }
 
 /* --- Your collection -------------------------------------------------------- */
 .dash-collection {

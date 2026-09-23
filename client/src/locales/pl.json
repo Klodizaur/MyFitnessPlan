@@ -107,7 +107,8 @@
     "plan_finished": "Plan ukończony",
     "previous_plan": "Poprzedni plan",
     "next_plan": "Następny plan",
-    "next_workout": "Następny trening"
+    "next_workout": "Następny trening",
+    "more_videos": "+{{count}} więcej"
   },
   "plans": {
     "active_plan": "Aktywny plan",
