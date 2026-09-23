@@ -472,9 +472,16 @@
 
 .lib-video-row-thumb { flex-shrink: 0; width: 180px; }
 
+/* The wrapper sets the row thumbnail's width; the image has to fill it, or it
+   renders at its natural size and swamps the row. */
 .lib-video-row-thumb img,
 .lib-video-row-thumb .lib-video-noimg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
   border-radius: 10px;
+  background: var(--t-tint);
 }
 
 .lib-video-row-text { flex: 1; min-width: 0; padding-top: 2px; }
@@ -522,6 +529,165 @@
   font-size: 15px;
   cursor: pointer;
 }
+
+/* --- Folder view: breadcrumbs and hero ---------------------------------------- */
+.lib-folder-head { padding-top: 32px; padding-bottom: 16px; }
+
+.lib-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--t-ink-muted);
+  margin-bottom: 12px;
+}
+
+.lib-crumb { display: flex; align-items: center; gap: 6px; }
+
+.lib-crumb button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--t-ink-muted);
+  cursor: pointer;
+}
+
+.lib-crumb button.is-current { color: var(--t-ink); font-weight: 600; }
+.lib-crumb button:hover { color: var(--t-accent); }
+.lib-crumb svg { opacity: 0.6; }
+
+.lib-folder-hero { display: flex; align-items: center; gap: 16px; }
+
+/* The back arrow is the mobile header's; on desktop the breadcrumbs do the job. */
+.lib-folder-back {
+  display: none;
+  width: 44px;
+  height: 44px;
+  margin-left: -10px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--t-ink);
+  cursor: pointer;
+}
+
+.lib-folder-hero-img {
+  width: 150px;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 14px;
+  flex-shrink: 0;
+  display: block;
+  background: var(--t-tint);
+}
+
+.lib-folder-hero-text { flex: 1; min-width: 0; }
+
+.lib-folder-hero-text h1 {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+
+.lib-folder-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.lib-folder-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.lib-folder-action:hover { border-color: var(--t-accent); }
+.lib-action-icon { color: var(--t-accent); }
+
+.lib-icon-btn {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  cursor: pointer;
+}
+
+.lib-icon-btn:hover { border-color: var(--t-accent); }
+.lib-icon-btn--danger:hover { border-color: var(--t-danger); color: var(--t-danger); }
+
+/* Subfolders as a strip on a phone, so a folder full of folders doesn't push
+   its own videos off the screen. */
+.lib-sub-strip {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 0 16px;
+  scroll-snap-type: x mandatory;
+}
+
+.lib-sub-strip::-webkit-scrollbar { display: none; }
+.lib-sub-strip .lib-folder { width: 176px; flex-shrink: 0; scroll-snap-align: start; }
+
+/* --- Include subfolders toggle -------------------------------------------------- */
+.lib-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.lib-scope-track {
+  position: relative;
+  width: 36px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--t-border-dashed);
+  transition: background 0.15s;
+}
+
+.lib-scope-track.is-on { background: var(--t-ink); }
+
+.lib-scope-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: left 0.15s;
+}
+
+.lib-scope-track.is-on .lib-scope-knob { left: 16px; }
 
 /* --- Filters sheet --------------------------------------------------------------
    A right-hand panel on desktop, a bottom sheet on a phone. */
@@ -652,6 +818,15 @@
   .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
 
   .lib-video-row-thumb { width: 132px; }
+
+  .lib-folder-head { padding-top: 8px; }
+  .lib-folder-back { display: flex; }
+  .lib-folder-hero-img { width: 96px; }
+  .lib-folder-hero-text h1 { font-size: 28px; }
+  /* The header actions move below the title rather than squeezing it. */
+  .lib-folder-hero { flex-wrap: wrap; }
+  .lib-folder-actions { width: 100%; }
+  .lib-folder-action { flex: 1; justify-content: center; }
   .lib-video-row-text .lib-video-title { font-size: 14px; }
 
   .lib-sheet {

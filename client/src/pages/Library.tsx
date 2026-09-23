@@ -180,8 +180,8 @@ export default function Library() {
   const addYouTube = <AddFromYouTubeCard onOpen={() => setIsImportOpen(true)} />;
 
   return (
-    <div className="rx-wrap lib">
-      <header className="lib-head">
+    <div className="lib">
+      <header className="rx-wrap lib-head">
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1>{t('nav.library')}</h1>
           <div className="lib-head-meta">
@@ -207,7 +207,7 @@ export default function Library() {
         onClearAll={clearAll}
       />
 
-      <div className="lib-body">
+      <div className="rx-wrap lib-body">
         {(visibleFolders.length > 0 || showAddYouTube) && (
           <section>
             {isFiltering && (

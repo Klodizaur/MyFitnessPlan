@@ -76,7 +76,7 @@ export function AddFromYouTubeCard({ onOpen }: { onOpen: () => void }) {
   const { t } = useTranslation();
   return (
     <button type="button" className="lib-add-yt" onClick={onOpen}>
-      <span className="lib-add-yt-icon"><YouTubeGlyph size={26} /></span>
+      <span className="lib-add-yt-icon"><YouTubeGlyph size={26} knockout="var(--t-band-even)" /></span>
       <span className="lib-add-yt-title">{t('library.add_from_youtube')}</span>
       <span className="lib-add-yt-hint">{t('library.add_from_youtube_hint')}</span>
     </button>
@@ -87,7 +87,7 @@ export function AddFromYouTubeRow({ onOpen }: { onOpen: () => void }) {
   const { t } = useTranslation();
   return (
     <button type="button" className="lib-folder-row lib-add-yt-row" onClick={onOpen}>
-      <span className="lib-add-yt-row-thumb"><YouTubeGlyph size={18} /></span>
+      <span className="lib-add-yt-row-thumb"><YouTubeGlyph size={18} knockout="var(--t-subtle)" /></span>
       <span className="lib-folder-row-text">
         <span className="lib-folder-name">{t('library.add_from_youtube')}</span>
         <span className="lib-folder-count">{t('library.add_from_youtube_hint')}</span>

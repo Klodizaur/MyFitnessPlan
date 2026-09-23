@@ -399,7 +399,16 @@
     "show_n_videos": "Pokaż filmy: {{count}}",
     "add_from_youtube": "Dodaj z YouTube",
     "add_from_youtube_hint": "Zamień playlistę YouTube w album",
-    "video_details": "Szczegóły filmu"
+    "video_details": "Szczegóły filmu",
+    "n_subfolders": "Podfoldery: {{count}}",
+    "subfolders": "Podfoldery",
+    "results": "Wyniki",
+    "loose_videos": "Luźne filmy",
+    "all_videos": "Wszystkie filmy",
+    "include_subfolders": "Uwzględnij podfoldery",
+    "no_loose_videos": "Brak luźnych filmów",
+    "no_loose_videos_hint": "Wszystko w tym folderze leży w podfolderach. Włącz „Uwzględnij podfoldery”, aby zobaczyć całość.",
+    "search_in": "Szukaj w {{name}}"
   },
   "profile": {
     "title": "Dziennik",

@@ -338,7 +338,20 @@
     "show_n_videos": "Show {{count}} videos",
     "add_from_youtube": "Add from YouTube",
     "add_from_youtube_hint": "Turn a YouTube playlist into an album",
-    "video_details": "Video details"
+    "video_details": "Video details",
+    "n_subfolders": "{{count}} subfolders",
+    "subfolders": "Subfolders",
+    "results": "Results",
+    "loose_videos": "Loose videos",
+    "all_videos": "All videos",
+    "include_subfolders": "Include subfolders",
+    "no_loose_videos": "No loose videos here",
+    "no_loose_videos_hint": "Everything in this folder lives in subfolders. Turn on “Include subfolders” to see it all.",
+    "search_in": "Search in {{name}}",
+    "n_videos_one": "{{count}} video",
+    "n_videos_other": "{{count}} videos",
+    "n_subfolders_one": "{{count}} subfolder",
+    "n_subfolders_other": "{{count}} subfolders"
   },
   "profile": {
     "title": "Log",
