@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, RotateCcw, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { topLevelAlbumKey, toAlbumRouteParam } from '../lib/paths';
+import { albumKeyForVideo, isExternalAlbumKey, toAlbumRouteParam } from '../lib/paths';
 import { useToday } from '../lib/dates';
 import '../styles/dashboard.css';
 
@@ -97,17 +97,31 @@ export default function Dashboard() {
       .then((data: any[]) => {
         const map = new Map<string, any[]>();
         for (const v of data || []) {
-          const rel = v.relative_path || '';
-          // Group by top-level folder (first segment) or '.' for root
-          const key = topLevelAlbumKey(rel);
+          // Group the way the Library does. Grouping by folder path instead
+          // puts every imported video in one bucket, because an imported video
+          // has no folder — which is where the bogus "Root" album came from.
+          const key = albumKeyForVideo(v);
           const arr = map.get(key) || [];
           arr.push(v);
           map.set(key, arr);
         }
-        const albums = Array.from(map.entries()).slice(0, 4).map(([key, vids]) => ({ key, title: key === '.' ? 'Root' : key, cover: vids[0]?.thumbnail_path ? `/thumbnails/${vids[0].thumbnail_path}` : null, count: vids.length }));
+        const albums = Array.from(map.entries())
+          // '.' is videos sitting loose in the library folder — not an album
+          // anyone made, so it isn't shown as one.
+          .filter(([key]) => key !== '.')
+          .slice(0, 4)
+          .map(([key, vids]) => ({
+            key,
+            title: isExternalAlbumKey(key)
+              ? (vids[0]?.external_playlist_title || t('library.untitled_playlist'))
+              : key,
+            cover: vids[0]?.thumbnail_path ? `/thumbnails/${vids[0].thumbnail_path}` : null,
+            count: vids.length,
+          }));
         setLibraryPreview(albums);
       }).catch(() => {});
-  }, []);
+  // `t` is used for the untitled-playlist fallback, so re-run on language change.
+  }, [t]);
 
   const firstPendingVideo = todaySchedule?.workout?.videos.find(v => !v.isCompleted) || todaySchedule?.workout?.videos[0];
 
