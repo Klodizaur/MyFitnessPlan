@@ -231,6 +231,11 @@
   min-width: 0;
 }
 
+.dash-album-cover {
+  position: relative;
+  display: block;
+}
+
 .dash-album img,
 .dash-album-noimg {
   display: block;

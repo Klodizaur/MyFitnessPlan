@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, RotateCcw, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import YouTubeGlyph from '../components/icons/YouTubeGlyph';
 import { useTranslation } from 'react-i18next';
 import { albumKeyForVideo, isExternalAlbumKey, toAlbumRouteParam } from '../lib/paths';
 import { useToday } from '../lib/dates';
@@ -49,7 +50,7 @@ export default function Dashboard() {
   // stacking two heroes or silently hiding the second.
   const [planIndex, setPlanIndex] = useState(0);
   const today = useToday();
-  const [libraryPreview, setLibraryPreview] = useState<{ key: string; title: string; cover?: string | null; count: number }[]>([]);
+  const [libraryPreview, setLibraryPreview] = useState<{ key: string; title: string; cover?: string | null; count: number; isExternal: boolean }[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -117,6 +118,7 @@ export default function Dashboard() {
               : key,
             cover: vids[0]?.thumbnail_path ? `/thumbnails/${vids[0].thumbnail_path}` : null,
             count: vids.length,
+            isExternal: isExternalAlbumKey(key),
           }));
         setLibraryPreview(albums);
       }).catch(() => {});
@@ -326,9 +328,18 @@ export default function Dashboard() {
                 className="dash-album"
                 onClick={() => navigate(`/library/${toAlbumRouteParam(album.key)}`)}
               >
-                {album.cover
-                  ? <img src={album.cover} alt="" loading="lazy" />
-                  : <span className="dash-album-noimg" />}
+                <span className="dash-album-cover">
+                  {album.cover
+                    ? <img src={album.cover} alt="" loading="lazy" />
+                    : <span className="dash-album-noimg" />}
+                  {/* An imported album streams from YouTube; say so on the cover,
+                      the same as the Library does. */}
+                  {album.isExternal && (
+                    <span className="rx-yt-badge" title={t('library.external_needs_internet')}>
+                      <YouTubeGlyph size={14} />
+                    </span>
+                  )}
+                </span>
                 <span className="dash-album-name">{album.title}</span>
                 <span className="dash-album-count rx-muted">
                   {t('dashboard.album_videos', { count: album.count })}

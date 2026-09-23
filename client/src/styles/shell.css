@@ -280,6 +280,23 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* --- YouTube badge on an imported album's cover ------------------------------
+   Marks an album that streams from YouTube rather than playing from disk. Sits
+   on the cover itself, opposite the duration badge's corner. */
+.rx-yt-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--t-video-chip);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* --- Progress bar ----------------------------------------------------------- */
 .rx-progress {
   height: 8px;
