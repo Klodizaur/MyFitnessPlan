@@ -1,19 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import EquipmentPicker from '../components/EquipmentPicker';
 import { EquipmentIcon } from '../lib/equipment';
-import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, BODY_PARTS, INTENSITIES, TRAINING_TYPES } from '../lib/metadata';
-import { matchesTags, matchesQuery, matchesSource, useFilterMatchMode, FilterMatchToggle, SourceFilter, SourceFilterToggle } from '../lib/filters';
 import { useMetaLabels } from '../lib/labels';
 import { ImportResult, useImportAvailable } from '../lib/externalImport';
-import { BuilderDay, BuilderWeek, createWeek, createInitialBuilderWeeks } from '../lib/builderModel';
+import { BuilderWeek, createWeek, createInitialBuilderWeeks } from '../lib/builderModel';
 import { useAiAvailable } from '../lib/useAiAvailable';
 import YouTubeImportModal from '../components/YouTubeImportModal';
 import AiPlanModal, { AiPlanResult } from '../components/ai/AiPlanModal';
 import VideoTagChips from '../components/VideoTagChips';
-import WorkoutPatternPicker, { DEFAULT_PATTERN } from '../components/WorkoutPatternPicker';
-import BuilderQuickAdd from '../components/BuilderQuickAdd';
+import { DEFAULT_PATTERN } from '../components/WorkoutPatternPicker';
+import PlanBuilderScreen from '../components/builder/PlanBuilderScreen';
 import ExportPlanModal from '../components/ExportPlanModal';
 import ImportPlanModal from '../components/ImportPlanModal';
 import FreezePlanModal from '../components/FreezePlanModal';
@@ -214,7 +211,6 @@ export default function Plans() {
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(readCollapsedCategories);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
-  const [builderStep, setBuilderStep] = useState(1);
   const [planName, setPlanName] = useState('My Custom Plan');
   const [planDescription, setPlanDescription] = useState('');
   // The plan's own workout/rest cycle. Seeded from the global pattern in
@@ -233,15 +229,6 @@ export default function Plans() {
   const [builderCurrentWeek, setBuilderCurrentWeek] = useState(0);
   const [builderCurrentDay, setBuilderCurrentDay] = useState(0);
   const [allVideos, setAllVideos] = useState<Video[]>([]);
-  const [videoSearch, setVideoSearch] = useState('');
-  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
-  const [selectedTrainingType, setSelectedTrainingType] = useState<string[]>([]);
-  const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
-  const [selectedIntensity, setSelectedIntensity] = useState<string>('');
-  const [selectedSource, setSelectedSource] = useState<SourceFilter>('');
-  const [matchMode, setMatchMode] = useFilterMatchMode();
-  const [showBuilderFilters, setShowBuilderFilters] = useState(false);
-  const [videoViewMode, setVideoViewMode] = useState<'grid' | 'list'>('grid');
   const [builderStatus, setBuilderStatus] = useState('');
   const [builderLoading, setBuilderLoading] = useState(false);
 
@@ -251,8 +238,6 @@ export default function Plans() {
   const importAvailable = useImportAvailable(isBuilderOpen);
   const [isImportOpen, setIsImportOpen] = useState(false);
   // IDs from the most recent import, so the builder can filter down to them.
-  const [importedIds, setImportedIds] = useState<string[]>([]);
-  const [showOnlyImported, setShowOnlyImported] = useState(false);
 
   // Optional AI plan drafting. Like the import above, the entry point is hidden
   // entirely unless the server reports a configured model (see server/src/ai/).
@@ -481,7 +466,6 @@ export default function Plans() {
       setBuilderCurrentWeek(0);
       setBuilderCurrentDay(0);
       setEditingPlanId(planId);
-      setBuilderStep(2);
       setIsBuilderOpen(true);
     } catch (error) {
       console.error('Error loading plan for editing:', error);
@@ -514,7 +498,6 @@ export default function Plans() {
     setBuilderCurrentWeek(0);
     setBuilderCurrentDay(0);
     setEditingPlanId(null);
-    setBuilderStep(2);
     setIsBuilderOpen(true);
 
     // The user reviews and edits before saving, so anything the draft couldn't
@@ -552,8 +535,6 @@ export default function Plans() {
       for (const v of imported) byId.set(v.id, v);
       return Array.from(byId.values());
     });
-    setImportedIds(imported.map(v => v.id));
-    setShowOnlyImported(true);
     setIsImportOpen(false);
     setBuilderStatus(
       result.truncated
@@ -581,21 +562,6 @@ export default function Plans() {
     });
   };
 
-  const removeVideoFromDay = (weekIndex: number, dayIndex: number, videoId: string) => {
-    setBuilderWeeks(prev => prev.map((week, wIndex) => {
-      if (wIndex !== weekIndex) return week;
-      return {
-        ...week,
-        days: week.days.map((day, dIndex) => {
-          if (dIndex !== dayIndex) return day;
-          return {
-            ...day,
-            videoIds: day.videoIds.filter(id => id !== videoId)
-          };
-        })
-      };
-    }));
-  };
 
   const handleSaveBuilderPlan = async () => {
     const selectedDays = builderWeeks.flatMap((week, wIndex) =>
@@ -653,7 +619,6 @@ export default function Plans() {
       setBuilderStatus('');
       setIsBuilderOpen(false);
       setEditingPlanId(null);
-      setBuilderStep(1);
       setPlanDescription('');
       setBuilderPattern(globalPattern);
       setBuilderPatternCustom(false);
@@ -662,109 +627,15 @@ export default function Plans() {
       setBuilderWeeks(createInitialBuilderWeeks());
       setBuilderCurrentWeek(0);
       setBuilderCurrentDay(0);
-      setVideoSearch('');
       setStatus(t('plans.builder_saved', { count: selectedDays.length }));
       fetchPlans();
     }
   };
 
-  const renameWeeksAfterDeletion = (weeks: BuilderWeek[]) => {
-    return weeks.map((week, index) => ({
-      ...week,
-      name: `Week ${index + 1}`
-    }));
-  };
-
-  // Advance to the next day. Rolls over to the next week's first day at the end
-  // of a week, creating that week automatically when it doesn't exist yet.
-  const goToNextDay = () => {
-    const week = builderWeeks[builderCurrentWeek];
-    if (!week) return;
-    if (builderCurrentDay < week.days.length - 1) {
-      setBuilderCurrentDay(builderCurrentDay + 1);
-      return;
-    }
-    if (builderCurrentWeek < builderWeeks.length - 1) {
-      setBuilderCurrentWeek(builderCurrentWeek + 1);
-      setBuilderCurrentDay(0);
-      return;
-    }
-    setBuilderWeeks(prev => [...prev, createWeek(prev.length + 1)]);
-    setBuilderCurrentWeek(builderCurrentWeek + 1);
-    setBuilderCurrentDay(0);
-  };
-
-  // Mirror of goToNextDay. Rolls back into the previous week's last day, and
-  // stops at the very first day rather than wrapping around.
-  const goToPrevDay = () => {
-    if (builderCurrentDay > 0) {
-      setBuilderCurrentDay(builderCurrentDay - 1);
-      return;
-    }
-    if (builderCurrentWeek > 0) {
-      const prevWeek = builderWeeks[builderCurrentWeek - 1];
-      setBuilderCurrentWeek(builderCurrentWeek - 1);
-      setBuilderCurrentDay(Math.max((prevWeek?.days.length || 1) - 1, 0));
-    }
-  };
-
-  const isFirstDay = builderCurrentWeek === 0 && builderCurrentDay === 0;
-
-  // Week/day headings are derived from the position, not from the stored
-  // BuilderWeek/BuilderDay `name` (which is an internal English placeholder and
-  // gets replaced by the video titles on save), so they follow the UI language.
-  const weekLabel = (index: number) => t('plans.builder_week_n', { n: index + 1 });
-  const dayLabel = (index: number) => t('plans.builder_day_n', { n: index + 1 });
-
-  // Renders a single day card. `pinned` cards live inside the sticky header
-  // (the day currently being edited) and are not clickable to re-select.
-  const renderDayCard = (day: BuilderDay, index: number, pinned = false) => {
-    const isSelected = builderCurrentDay === index;
-    return (
-      <div
-        key={index}
-        className={`wb-day-card${isSelected ? ' selected' : ''}${pinned ? ' pinned' : ''}`}
-        onClick={pinned ? undefined : () => setBuilderCurrentDay(index)}
-      >
-        <div className="wb-day-card-head">
-          <span className="wb-day-name">
-            {pinned && <span className="wb-day-badge">{t('plans.builder_currently_selected')}</span>}
-            {dayLabel(index)}
-          </span>
-          {day.videoIds.length > 0 && (
-            <span className="wb-day-count">{day.videoIds.length}</span>
-          )}
-        </div>
-        {day.videoIds.length === 0 ? (
-          <p className="wb-day-empty">{t('plans.builder_no_selected_videos')}</p>
-        ) : (
-          <div className="wb-day-videos">
-            {day.videoIds.map(id => {
-              const video = allVideos.find(v => v.id === id);
-              return (
-                <div key={id} className="wb-day-video" title={video?.filename}>
-                  {/* A title alone is hard to scan once a day has a handful of
-                      similarly-named videos; the thumbnail is what you recognise. */}
-                  {video?.thumbnail_path ? (
-                    <img className="wb-mini-thumb" src={`/thumbnails/${video.thumbnail_path}`} alt="" loading="lazy" />
-                  ) : (
-                    <span className="wb-mini-thumb wb-mini-thumb-empty" aria-hidden="true" />
-                  )}
-                  <span className="wb-day-video-name">{video ? stripVideoExt(video.filename) : id}</span>
-                  <button type="button" className="wb-day-video-remove" aria-label={t('plans.builder_remove_video')} onClick={(e) => { e.stopPropagation(); removeVideoFromDay(builderCurrentWeek, index, id); }}>×</button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const closeBuilder = () => {
     setIsBuilderOpen(false);
     setEditingPlanId(null);
-    setBuilderStep(1);
     setPlanDescription('');
     setBuilderPattern(globalPattern);
     setBuilderPatternCustom(false);
@@ -774,30 +645,10 @@ export default function Plans() {
     setBuilderCurrentWeek(0);
     setBuilderCurrentDay(0);
     setBuilderStatus('');
-    setVideoSearch('');
     setIsImportOpen(false);
-    setImportedIds([]);
-    setShowOnlyImported(false);
   };
 
-  const builderVideos = allVideos.filter(video => {
-    // After an import, default to showing just what was brought in — a 40-video
-    // playlist is otherwise lost among the whole library.
-    if (showOnlyImported && !importedIds.includes(video.id)) return false;
 
-    const matchesText = matchesQuery([video.filename, video.description], videoSearch);
-
-    const matchesEquipment = matchesTags(video.equipment, selectedEquipment, matchMode);
-    const matchesTrainingType = matchesTags(video.training_type, selectedTrainingType, matchMode);
-    const matchesIntensity = !selectedIntensity || video.intensity === selectedIntensity;
-    const matchesBodyParts = matchesTags(video.body_parts, selectedBodyParts, matchMode);
-    const matchesVideoSource = matchesSource(video, selectedSource);
-
-    return matchesText && matchesEquipment && matchesTrainingType && matchesIntensity && matchesBodyParts && matchesVideoSource;
-  });
-
-  const currentWeek = builderWeeks[builderCurrentWeek];
-  const currentDay = currentWeek?.days[builderCurrentDay] || currentWeek?.days[0];
 
   // The plan's contents, already resolved by the server: `days` for the
   // day-by-day details view, `videos` (de-duplicated) for the background picker.
@@ -984,99 +835,11 @@ export default function Plans() {
   const resolvedBuilderCategory = () =>
     builderCategory === 'custom' ? builderCustomCategory.trim() : builderCategory;
 
-  // Plan note, offered wherever the category is — the two are the same kind of
-  // "what is this plan" metadata and are easiest to fill in together.
-  const renderDescriptionField = () => (
-    <div className="wb-field">
-      <label className="wb-label">{t('plans.builder_description')}</label>
-      <textarea
-        className="wb-input wb-textarea"
-        value={planDescription}
-        onChange={e => setPlanDescription(e.target.value)}
-        placeholder={t('plans.builder_description_placeholder')}
-        rows={3}
-        maxLength={1000}
-      />
-      <p className="wb-hint">{t('plans.builder_description_hint')}</p>
-    </div>
-  );
 
   // The plan's own rhythm, shown wherever its name and start date are — the
   // three together are what turn an ordered list of workouts into dated days.
-  const renderPatternField = () => (
-    <div className="wb-field">
-      <label className="wb-label">{t('plans.builder_pattern')}</label>
-      <div className="wb-chip-row">
-        <button
-          type="button"
-          className={`wb-chip${builderPatternCustom ? '' : ' selected'}`}
-          onClick={() => { setBuilderPatternCustom(false); setBuilderPattern(globalPattern); }}
-        >
-          {t('plans.pattern_default')}
-        </button>
-        <button
-          type="button"
-          className={`wb-chip${builderPatternCustom ? ' selected' : ''}`}
-          onClick={() => setBuilderPatternCustom(true)}
-        >
-          {t('plans.pattern_custom')}
-        </button>
-      </div>
-      {/* Shown either way: when following the default you should still be able
-          to see the rhythm you're accepting. */}
-      <WorkoutPatternPicker
-        pattern={builderPattern}
-        onChange={setBuilderPattern}
-        disabled={!builderPatternCustom}
-      />
-      <p className="wb-hint">
-        {builderPatternCustom ? t('plans.pattern_own_note') : t('plans.pattern_following_note')}
-      </p>
-    </div>
-  );
 
   // Category chooser used in both the create flow (step 1) and the edit form.
-  const renderCategoryField = () => (
-    <div className="wb-field">
-      <label className="wb-label">{t('plans.builder_category')}</label>
-      <div className="wb-chip-row">
-        <button
-          type="button"
-          className={`wb-chip${builderCategory === '' ? ' selected' : ''}`}
-          onClick={() => setBuilderCategory('')}
-        >
-          {t('plans.category_none')}
-        </button>
-        {PLAN_CATEGORIES.map(cat => (
-          <button
-            type="button"
-            key={cat}
-            className={`wb-chip${builderCategory === cat ? ' selected' : ''}`}
-            onClick={() => setBuilderCategory(cat)}
-          >
-            {t(`plans.category_${cat}`)}
-          </button>
-        ))}
-        <button
-          type="button"
-          className={`wb-chip${builderCategory === 'custom' ? ' selected' : ''}`}
-          onClick={() => setBuilderCategory('custom')}
-        >
-          + {t('plans.category_custom')}
-        </button>
-      </div>
-      {builderCategory === 'custom' && (
-        <input
-          className="wb-input"
-          style={{ marginTop: 10 }}
-          value={builderCustomCategory}
-          onChange={e => setBuilderCustomCategory(e.target.value)}
-          placeholder={t('plans.category_custom_placeholder')}
-          maxLength={60}
-        />
-      )}
-    </div>
-  );
 
   // Warns that a plan can't be done offline because some of its videos stream.
   const renderOfflineWarning = (plan: Plan) => (
@@ -1684,284 +1447,44 @@ export default function Plans() {
         />
       )}
 
-      {isBuilderOpen && createPortal(
-        <div className="wb-overlay">
-          <div className="wb-modal">
-            <div className="wb-header">
-              <div>
-                <h2 className="wb-title">{editingPlanId ? 'Edit Plan' : t('plans.builder_title')}</h2>
-                <p className="wb-subtitle">{t('plans.builder_intro')}</p>
-                <p className="wb-subtitle wb-subtitle-sm">{t('plans.builder_note')}</p>
-              </div>
-              <button className="wb-close" onClick={closeBuilder}>✕</button>
-            </div>
-
-            {builderStep === 1 ? (
-              <div className="wb-form">
-                <div className="wb-field">
-                  <label className="wb-label">{t('plans.builder_plan_name')}</label>
-                  <input className="wb-input" value={planName} onChange={e => setPlanName(e.target.value)} placeholder={t('plans.builder_plan_name')} />
-                </div>
-                <div className="wb-field">
-                  <label className="wb-label">{t('plans.builder_start_date')}</label>
-                  <input className="wb-input" type="date" value={builderStartDate} onChange={e => setBuilderStartDate(e.target.value)} />
-                </div>
-                {renderPatternField()}
-                {renderCategoryField()}
-                {renderDescriptionField()}
-                <div className="wb-actions">
-                  <button className="wb-btn wb-btn-ghost" onClick={closeBuilder}>{t('plans.builder_cancel')}</button>
-                  <button className="wb-btn wb-btn-primary" onClick={() => setBuilderStep(2)}>{t('plans.builder_next')}</button>
-                </div>
-              </div>
-            ) : (
-              <div className="wb-form">
-                {editingPlanId && (
-                  <>
-                    <div className="wb-field">
-                      <label className="wb-label">{t('plans.builder_plan_name')}</label>
-                      <input
-                        className="wb-input"
-                        value={planName}
-                        onChange={e => setPlanName(e.target.value)}
-                        placeholder={t('plans.builder_plan_name')}
-                      />
-                    </div>
-                    {renderPatternField()}
-                    {renderCategoryField()}
-                    {renderDescriptionField()}
-                  </>
-                )}
-                <div className="wb-sticky-head">
-                  <div className="wb-step-header">
-                    <div>
-                      <p className="wb-step-label">{t('plans.builder_step', { current: 2, total: 2 })}</p>
-                      <div className="wb-step-title-row">
-                        <h3 className="wb-step-title">{`${weekLabel(builderCurrentWeek)} - ${dayLabel(builderCurrentDay)}`}</h3>
-                      </div>
-                    </div>
-                    <div className="wb-week-nav">
-                      <button className="wb-btn wb-btn-primary" onClick={() => setBuilderStep(1)}>{t('plans.builder_back')}</button>
-                      <button className="wb-btn wb-btn-primary" onClick={() => setBuilderCurrentWeek(Math.max(builderCurrentWeek - 1, 0))} disabled={builderCurrentWeek === 0}>{t('plans.builder_prev_week')}</button>
-                      <button className="wb-btn wb-btn-primary" onClick={() => setBuilderCurrentWeek(Math.min(builderCurrentWeek + 1, builderWeeks.length - 1))} disabled={builderCurrentWeek === builderWeeks.length - 1}>{t('plans.builder_next_week')}</button>
-                      <button className="wb-btn wb-btn-primary" onClick={() => setBuilderWeeks(prev => [...prev, createWeek(prev.length + 1)])}>{t('plans.builder_add_week')}</button>
-                      {builderWeeks.length > 1 && (
-                        <button className="wb-btn wb-btn-danger" onClick={() => {
-                          const newWeeks = renameWeeksAfterDeletion(
-                            builderWeeks.filter((_, i) => i !== builderCurrentWeek)
-                          );
-                          setBuilderWeeks(newWeeks);
-                          setBuilderCurrentWeek(Math.min(builderCurrentWeek, newWeeks.length - 1));
-                        }}>{t('plans.builder_remove_week')}</button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="wb-save-row">
-                    <button className="wb-btn wb-btn-primary wb-btn-block" onClick={handleSaveBuilderPlan} disabled={builderLoading || !builderWeeks.some(week => week.days.some(day => day.videoIds.length > 0))}>{builderLoading ? t('plans.builder_saving') : t('plans.builder_save')}</button>
-                  </div>
-                  {builderStatus && (
-                    <div className="wb-status">{builderStatus}</div>
-                  )}
-                  {currentDay && renderDayCard(currentDay, builderCurrentDay, true)}
-
-                  {currentDay && (
-                    <BuilderQuickAdd
-                      videos={allVideos}
-                      selectedIds={currentDay.videoIds}
-                      onToggle={toggleVideoForDay}
-                    />
-                  )}
-
-                  {/* Directly under the day being edited, where the eye already
-                      is after adding videos. Text-style so they don't compete
-                      with the solid buttons in the row above. */}
-                  <div className="wb-day-nav">
-                    <button
-                      type="button"
-                      className="wb-day-nav-btn"
-                      onClick={goToPrevDay}
-                      disabled={isFirstDay}
-                    >
-                      ← {t('plans.builder_prev_day')}
-                    </button>
-                    <button type="button" className="wb-day-nav-btn" onClick={goToNextDay}>
-                      {t('plans.builder_next_day')} →
-                    </button>
-                  </div>
-                </div>
-
-                {currentWeek.days.length > 1 && (
-                  <div className="wb-day-list">
-                    <p className="wb-day-list-label">{t('plans.builder_switch_day')}</p>
-                    {/* The selected day is pinned in the sticky header, so in this
-                        list its slot becomes a marker — it keeps the days before and
-                        after visually separated and moves as the selection changes. */}
-                    {currentWeek.days.map((day, index) => (
-                      builderCurrentDay === index ? (
-                        <div key={`current-${index}`} className="wb-day-marker">
-                          <span className="wb-day-marker-line" />
-                          <span className="wb-day-marker-label">{dayLabel(index)} — {t('plans.builder_currently_selected')}</span>
-                          <span className="wb-day-marker-line" />
-                        </div>
-                      ) : renderDayCard(day, index)
-                    ))}
-                  </div>
-                )}
-
-                <div className="wb-lower">
-                  <div className="wb-search-block">
-                  <div className="wb-search-row">
-                    <label className="wb-label">{t('plans.builder_search')}</label>
-                    <div className="wb-search-controls">
-                      <input className="wb-input wb-search-input" value={videoSearch} onChange={e => setVideoSearch(e.target.value)} placeholder={t('plans.builder_search')} />
-                      <button type="button" className="wb-btn wb-btn-primary wb-btn-min" onClick={() => setShowBuilderFilters(prev => !prev)}>{t('plans.builder_filters')}</button>
-                      <button type="button" className="wb-btn wb-btn-primary wb-btn-min" onClick={() => setVideoViewMode(prev => prev === 'grid' ? 'list' : 'grid')}>{videoViewMode === 'grid' ? t('plans.builder_list_view') : t('plans.builder_grid_view')}</button>
-                      {importAvailable && (
-                        <button
-                          type="button"
-                          className="wb-btn wb-btn-primary wb-btn-min"
-                          onClick={() => setIsImportOpen(true)}
-                        >
-                          {t('import.btn')}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Shown only after an import, so the list can be narrowed to
-                      the new videos or widened back to the whole library. */}
-                  {importedIds.length > 0 && (
-                    <div className="wb-import-scope">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={showOnlyImported}
-                          onChange={e => setShowOnlyImported(e.target.checked)}
-                        />
-                        {t('import.show_only', { count: importedIds.length })}
-                      </label>
-                    </div>
-                  )}
-
-                  {showBuilderFilters && (
-                    <div className="wb-filters">
-                      <div className="wb-filter-group">
-                        <div className="wb-filter-head">
-                          <p className="wb-filter-title">{t('plans.builder_filter_equipment')}</p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                            <SourceFilterToggle
-                              value={selectedSource}
-                              onChange={setSelectedSource}
-                              allLabel={t('library.source_all')}
-                              localLabel={t('library.source_local')}
-                              externalLabel={t('library.source_external')}
-                            />
-                            <FilterMatchToggle
-                              mode={matchMode}
-                              onChange={setMatchMode}
-                              label={t('plans.builder_match_label')}
-                              anyLabel={t('plans.builder_match_any')}
-                              allLabel={t('plans.builder_match_all')}
-                              anyHint={t('plans.builder_match_any_hint')}
-                              allHint={t('plans.builder_match_all_hint')}
-                            />
-                            <button type="button" className="wb-btn wb-btn-primary wb-btn-sm" onClick={() => {
-                              setSelectedEquipment([]);
-                              setSelectedTrainingType([]);
-                              setSelectedIntensity('');
-                              setSelectedBodyParts([]);
-                              setSelectedSource('');
-                            }}>{t('plans.builder_clear_filters')}</button>
-                          </div>
-                        </div>
-                        <EquipmentPicker selected={selectedEquipment} onChange={setSelectedEquipment} />
-                      </div>
-                      <div className="wb-filter-cols">
-                        <div className="wb-filter-group">
-                          <p className="wb-filter-title">{t('plans.builder_training_type')}</p>
-                          <div className="wb-chip-row">
-                            {TRAINING_TYPES.map(type => {
-                              const selected = selectedTrainingType.includes(type);
-                              return (
-                                <button type="button" key={type} className={`wb-chip${selected ? ' selected' : ''}`} onClick={() => setSelectedTrainingType(prev => prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type])}>
-                                  <TrainingTypeIcon type={type} />
-                                  <span>{labels.trainingType(type)}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div className="wb-filter-group">
-                          <p className="wb-filter-title">{t('plans.builder_intensity')}</p>
-                          <div className="wb-chip-row">
-                            {INTENSITIES.map(level => {
-                              const selected = selectedIntensity === level;
-                              return (
-                                <button type="button" key={level} className={`wb-chip${selected ? ' selected' : ''}`} onClick={() => setSelectedIntensity(selected ? '' : level)}>
-                                  <IntensityIcon level={level} />
-                                  <span style={{ textTransform: 'capitalize' }}>{labels.intensity(level)}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div className="wb-filter-group">
-                          <p className="wb-filter-title">{t('plans.builder_body_parts')}</p>
-                          <div className="wb-chip-row">
-                            {BODY_PARTS.map(part => {
-                              const selected = selectedBodyParts.includes(part);
-                              return (
-                                <button type="button" key={part} className={`wb-chip${selected ? ' selected' : ''}`} onClick={() => setSelectedBodyParts(prev => prev.includes(part) ? prev.filter(item => item !== part) : [...prev, part])}>
-                                  <BodyPartIcon part={part} />
-                                  <span>{labels.bodyPart(part)}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className={`wb-videos ${videoViewMode === 'grid' ? 'grid' : 'list'}`}>
-                  {builderVideos.length === 0 ? (
-                    <p className="wb-empty">{t('plans.builder_no_videos')}</p>
-                  ) : (
-                    builderVideos.map(video => {
-                      const selected = currentDay.videoIds.includes(video.id);
-                      return (
-                        <button key={video.id} type="button" className={`wb-video-card${selected ? ' selected' : ''}`} title={video.filename} onClick={() => toggleVideoForDay(video.id)}>
-                          {videoViewMode === 'grid' ? (
-                            <>
-                              <span className="wb-video-thumb-wrap">
-                                {video.thumbnail_path ? (
-                                  <img className="wb-video-thumb" src={`/thumbnails/${video.thumbnail_path}`} alt="" loading="lazy" />
-                                ) : (
-                                  <span className="wb-video-thumb wb-video-thumb-empty">—</span>
-                                )}
-                                <span className="wb-video-check">{selected ? '✓' : '+'}</span>
-                              </span>
-                              <span className="wb-video-name">{stripVideoExt(video.filename)}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="wb-video-name">{stripVideoExt(video.filename)}</span>
-                              <span className="wb-video-check">{selected ? '✓' : '+'}</span>
-                            </>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
+      {isBuilderOpen && (
+        <PlanBuilderScreen
+          editing={Boolean(editingPlanId)}
+          onClose={closeBuilder}
+          name={planName}
+          onName={setPlanName}
+          description={planDescription}
+          onDescription={setPlanDescription}
+          startDate={builderStartDate}
+          onStartDate={setBuilderStartDate}
+          categories={[
+            ...PLAN_CATEGORIES.map(value => ({ value, label: categoryLabel(value) })),
+            { value: 'custom', label: t('plans.category_custom') },
+          ]}
+          category={builderCategory}
+          onCategory={setBuilderCategory}
+          customCategory={builderCustomCategory}
+          onCustomCategory={setBuilderCustomCategory}
+          patternCustom={builderPatternCustom}
+          onPatternCustom={next => {
+            setBuilderPatternCustom(next);
+            if (!next) setBuilderPattern(globalPattern);
+          }}
+          pattern={builderPattern}
+          onPattern={setBuilderPattern}
+          weeks={builderWeeks}
+          onWeeks={setBuilderWeeks}
+          currentWeek={builderCurrentWeek}
+          onCurrentWeek={setBuilderCurrentWeek}
+          currentDay={builderCurrentDay}
+          onCurrentDay={setBuilderCurrentDay}
+          videos={allVideos}
+          onToggleVideo={toggleVideoForDay}
+          onAddFromYouTube={importAvailable ? () => setIsImportOpen(true) : undefined}
+          saving={builderLoading}
+          status={builderStatus}
+          onSave={handleSaveBuilderPlan}
+        />
       )}
 
       {/* Renders its own portal; only mounted once the server reports a
