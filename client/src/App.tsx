@@ -38,7 +38,7 @@ function App() {
           <Route path="/calendar" element={<Legacy><Calendar /></Legacy>} />
           <Route path="/profile" element={<Legacy><Profile /></Legacy>} />
           <Route path="/settings" element={<Legacy><Settings /></Legacy>} />
-          <Route path="/library" element={<Legacy><Library /></Legacy>} />
+          <Route path="/library" element={<Library />} />
           <Route path="/library/:albumId" element={<Legacy><Album /></Legacy>} />
           <Route path="/library/:albumId/:subId" element={<Legacy><Album /></Legacy>} />
           <Route path="/player/:videoId/:workoutId" element={<Legacy><Player /></Legacy>} />
