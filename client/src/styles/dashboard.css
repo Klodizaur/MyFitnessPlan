@@ -43,7 +43,52 @@
   overflow: hidden;
 }
 
-.dash-today--rest { grid-template-columns: minmax(0, 1fr); }
+/* Rest day: the media column keeps the workout card's proportions so the card
+   doesn't change size when you step between an active plan and a resting one. */
+.dash-today-rest-media {
+  padding: 12px;
+  background: var(--t-band-even);
+}
+
+.dash-today-rest-panel {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16 / 9;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1.5px dashed var(--t-border-dashed);
+  border-radius: calc(var(--t-r-hero) - 12px);
+  color: var(--t-ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Next workout, in place of the workout's action row. */
+.dash-next {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-next-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-ink-faint);
+}
+
+.dash-next-date {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--t-accent);
+}
 
 .dash-today-media { position: relative; min-height: 0; }
 

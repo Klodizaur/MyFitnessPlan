@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, RotateCcw, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Play, RotateCcw, ChevronLeft, ChevronRight, Check, Moon } from 'lucide-react';
 import YouTubeGlyph from '../components/icons/YouTubeGlyph';
 import { useTranslation } from 'react-i18next';
 import { albumKeyForVideo, isExternalAlbumKey, toAlbumRouteParam } from '../lib/paths';
@@ -154,6 +154,9 @@ export default function Dashboard() {
     ? Math.round((planInfo.completedWorkouts / planInfo.totalWorkouts) * 100)
     : 0;
 
+  /** The first workout day after today — what a rest day counts down to. */
+  const nextWorkout = upcomingWorkouts[0] || null;
+
   const openWorkout = () => {
     if (!todaySchedule?.workout || !firstPendingVideo) return;
     navigate(`/player/${firstPendingVideo.id}/${todaySchedule.workout.id}`);
@@ -260,11 +263,68 @@ export default function Dashboard() {
           </div>
         </section>
       ) : (
-        <section className="dash-today dash-today--rest">
+        /* A rest day keeps the same card: the plan, the progress and the same
+           proportions. Only the middle changes, so stepping between an active
+           plan and a resting one doesn't resize the whole page. */
+        <section className="dash-today">
+          <div className="dash-today-media dash-today-rest-media">
+            <div className="dash-today-rest-panel">
+              <Moon size={30} />
+              <span>{t('dashboard.rest_day')}</span>
+            </div>
+          </div>
+
           <div className="dash-today-body">
-            <div className="rx-eyebrow">{t('dashboard.recharge')}</div>
+            <div className="dash-today-meta">
+              {selectedPlan && (
+                <span className="dash-plan-pill">
+                  {t(selectedPlan.slot === 'extra' ? 'plans.slot_extra' : 'plans.slot_main')}
+                </span>
+              )}
+              <span style={{ fontWeight: 600 }}>{planInfo?.name}</span>
+            </div>
+
             <h2 className="dash-today-title">{t('dashboard.rest_recovery')}</h2>
-            <p className="rx-muted" style={{ margin: 0 }}>{t('dashboard.rest_msg')}</p>
+
+            {nextWorkout ? (
+              <div className="dash-next">
+                <span className="dash-next-label">{t('dashboard.next_workout')}</span>
+                <span className="dash-next-date">
+                  {new Date(nextWorkout.date).toLocaleDateString(i18n.language, {
+                    weekday: 'long', day: 'numeric', month: 'long',
+                  })}
+                </span>
+              </div>
+            ) : (
+              <p className="rx-muted" style={{ margin: 0 }}>{t('dashboard.rest_msg')}</p>
+            )}
+
+            <div className="dash-today-actions">
+              <button type="button" className="rx-btn" onClick={() => navigate('/calendar')}>
+                {t('dashboard.full_plan')}
+              </button>
+            </div>
+
+            {planInfo && (
+              <div className="dash-today-progress">
+                <div className="dash-today-progress-row">
+                  <span style={{ fontWeight: 600 }}>
+                    {t('dashboard.plan_progress', {
+                      completed: planInfo.completedWorkouts,
+                      total: planInfo.totalWorkouts,
+                    })}
+                  </span>
+                  <span className="rx-muted">
+                    {planStatus === 'ended'
+                      ? t('dashboard.plan_finished')
+                      : planDaysLeft === 0
+                        ? t('dashboard.plan_last_day')
+                        : t('dashboard.plan_days_left', { count: planDaysLeft })}
+                  </span>
+                </div>
+                <div className="rx-progress"><span style={{ width: `${planPct}%` }} /></div>
+              </div>
+            )}
           </div>
         </section>
       )}

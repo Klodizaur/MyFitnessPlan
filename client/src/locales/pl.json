@@ -106,7 +106,8 @@
     "album_videos": "Filmy: {{count}}",
     "plan_finished": "Plan ukończony",
     "previous_plan": "Poprzedni plan",
-    "next_plan": "Następny plan"
+    "next_plan": "Następny plan",
+    "next_workout": "Następny trening"
   },
   "plans": {
     "active_plan": "Aktywny plan",

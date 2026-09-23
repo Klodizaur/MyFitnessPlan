@@ -50,7 +50,8 @@
     "album_videos": "{{count}} videos",
     "plan_finished": "Plan finished",
     "previous_plan": "Previous plan",
-    "next_plan": "Next plan"
+    "next_plan": "Next plan",
+    "next_workout": "Next workout"
   },
   "plans": {
     "active_plan": "Active Plan",
