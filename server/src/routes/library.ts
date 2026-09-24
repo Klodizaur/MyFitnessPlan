@@ -78,7 +78,7 @@ function parseTrainingTypes(raw: string | null | undefined): string[] {
 
 /** Columns every endpoint needs to build a client-shaped video object. */
 export const VIDEO_COLUMNS =
-  'id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds, source, external_id, external_url, external_playlist_id, external_playlist_title';
+  'id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds, source, external_id, external_url, external_playlist_id, external_playlist_title, is_favorite';
 
 export function formatVideoRow(row: {
   id: string;
@@ -96,6 +96,7 @@ export function formatVideoRow(row: {
   external_url?: string | null;
   external_playlist_id?: string | null;
   external_playlist_title?: string | null;
+  is_favorite?: number | null;
 }) {
   return {
     id: row.id,
@@ -115,6 +116,7 @@ export function formatVideoRow(row: {
     external_url: row.external_url || null,
     external_playlist_id: row.external_playlist_id || null,
     external_playlist_title: row.external_playlist_title || null,
+    is_favorite: row.is_favorite === 1,
   };
 }
 
@@ -381,6 +383,18 @@ normalizedDir = path.resolve(normalizedDir);
   fastify.get('/videos', async (request, reply) => {
     const videos = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM videos`).all() as any[];
     return reply.send(videos.map(formatVideoRow));
+  });
+
+  // Star or un-star a video.
+  fastify.put('/videos/:id/favorite', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { favorite } = request.body as { favorite?: boolean };
+    const existing = db.prepare('SELECT id FROM videos WHERE id = ?').get(id);
+    if (!existing) return reply.code(404).send({ error: 'Video not found' });
+
+    const value = favorite ? 1 : 0;
+    db.prepare('UPDATE videos SET is_favorite = ? WHERE id = ?').run(value, id);
+    return reply.send({ success: true, isFavorite: value === 1 });
   });
 
   fastify.patch('/videos/:id', async (request, reply) => {

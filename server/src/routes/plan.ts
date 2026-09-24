@@ -682,6 +682,18 @@ export default async function (fastify: FastifyInstance) {
     return reply.send({ success: true, backgroundBlur: value });
   });
 
+  // Star or un-star a plan.
+  fastify.put('/:id/favorite', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { favorite } = request.body as { favorite?: boolean };
+    const plan = db.prepare('SELECT id FROM workout_plans WHERE id = ?').get(id);
+    if (!plan) return reply.code(404).send({ error: 'Plan not found' });
+
+    const value = favorite ? 1 : 0;
+    db.prepare('UPDATE workout_plans SET is_favorite = ? WHERE id = ?').run(value, id);
+    return reply.send({ success: true, isFavorite: value });
+  });
+
   fastify.post('/rematch-all', async (request, reply) => {
     const plans = db.prepare('SELECT id FROM workout_plans').all() as { id: string }[];
     for (const plan of plans) {

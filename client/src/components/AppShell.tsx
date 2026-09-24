@@ -1,3 +1,5 @@
+import Toaster from './Toaster';
+import ConfirmHost from './ConfirmHost';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -47,7 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const brand = (
     <NavLink to="/" className="rx-brand">
       <img src="/logo.png" alt="" />
-      MYFITNESSPLAN
+      <span className="rx-brand-text">MYFITNESSPLAN</span>
     </NavLink>
   );
 
@@ -94,6 +96,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       {children}
+      <Toaster />
+      <ConfirmHost />
 
       {isMobile && (
         <nav className="rx-tabs">

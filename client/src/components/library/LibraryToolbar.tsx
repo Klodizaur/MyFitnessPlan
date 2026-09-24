@@ -2,13 +2,15 @@ import { ArrowUpDown, ChevronDown, LayoutGrid, List, Search, SlidersHorizontal, 
 import { useTranslation } from 'react-i18next';
 import { SourceFilter } from '../../lib/filters';
 
-export type LibrarySort = 'az' | 'za' | 'size';
+/** 'size' and 'small' are the two ends of the same axis: most/fewest videos at
+ *  the index, longest/shortest runtime inside a folder. */
+export type LibrarySort = 'az' | 'za' | 'size' | 'small';
 export type LibraryView = 'grid' | 'list';
 
 export interface ActiveChip {
   key: string;
   label: string;
-  category: 'intensity' | 'type' | 'body' | 'gear';
+  category: 'intensity' | 'type' | 'body' | 'gear' | 'length';
   remove: () => void;
 }
 
@@ -21,10 +23,13 @@ interface Props {
   /** The All / My files / YouTube switch, shown at the library index only. */
   source?: SourceFilter;
   onSource?: (value: SourceFilter) => void;
-  sort: LibrarySort;
-  onSort: (value: LibrarySort) => void;
+  /** Omit `onSort` to leave the pill out (a folder page sorts each section on its own). */
+  sort?: LibrarySort;
+  onSort?: (value: LibrarySort) => void;
   /** "Most videos" at the index, "Longest first" inside a folder. */
-  sizeLabel: string;
+  sizeLabel?: string;
+  /** The opposite end: "Fewest videos" / "Shortest first". */
+  smallLabel?: string;
   view: LibraryView;
   onView: (value: LibraryView) => void;
   activeChips: ActiveChip[];
@@ -37,6 +42,22 @@ const SOURCES: { value: SourceFilter; key: string }[] = [
   { value: 'external', key: 'library.source_external' },
 ];
 
+/** A sort control: a styled pill with the real <select> invisible on top. */
+export function SortPill<T extends string>({ value, onChange, options }: { value: T; onChange: (value: T) => void; options: { value: T; label: string }[] }) {
+  const { t } = useTranslation();
+  const current = options.find(o => o.value === value)?.label ?? '';
+  return (
+    <div className="lib-sort">
+      <ArrowUpDown size={15} />
+      <span>{current}</span>
+      <ChevronDown size={14} className="lib-sort-caret" />
+      <select value={value} onChange={e => onChange(e.target.value as T)} aria-label={t('library.sort')}>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+}
+
 /**
  * The sticky toolbar: search, filters, source, sort, and the grid/list switch.
  *
@@ -48,12 +69,11 @@ export default function LibraryToolbar({
   query, onQuery, placeholder,
   filterCount, onOpenFilters,
   source, onSource,
-  sort, onSort, sizeLabel,
+  sort, onSort, sizeLabel, smallLabel,
   view, onView,
   activeChips, onClearAll,
 }: Props) {
   const { t } = useTranslation();
-  const sortText = sort === 'za' ? t('library.sort_za') : sort === 'size' ? sizeLabel : t('library.sort_az');
 
   return (
     <div className="lib-toolbar">
@@ -101,16 +121,18 @@ export default function LibraryToolbar({
             </div>
           )}
 
-          <div className="lib-sort">
-            <ArrowUpDown size={15} />
-            <span>{sortText}</span>
-            <ChevronDown size={14} className="lib-sort-caret" />
-            <select value={sort} onChange={e => onSort(e.target.value as LibrarySort)} aria-label={t('library.sort')}>
-              <option value="az">{t('library.sort_az')}</option>
-              <option value="za">{t('library.sort_za')}</option>
-              <option value="size">{sizeLabel}</option>
-            </select>
-          </div>
+          {onSort && sort && (
+            <SortPill
+              value={sort}
+              onChange={onSort}
+              options={[
+                { value: 'az', label: t('library.sort_az') },
+                { value: 'za', label: t('library.sort_za') },
+                { value: 'size', label: sizeLabel || '' },
+                { value: 'small', label: smallLabel || '' },
+              ]}
+            />
+          )}
 
           <div className="lib-toolbar-spacer" />
 

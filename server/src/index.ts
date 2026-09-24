@@ -446,9 +446,10 @@ fastify.post('/api/settings', async (request, reply) => {
   }
   if (body.theme !== undefined) {
     updateStmt.run(body.theme, 'theme');
+  }
   if (body.calendar_view !== undefined) {
     updateStmt.run(body.calendar_view, 'calendar_view');
-  }  }
+  }
   return reply.send({ success: true });
 });
 

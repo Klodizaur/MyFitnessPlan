@@ -1,0 +1,198 @@
+/** Redesign: Log — history, activity calendar, breakdown and plans. */
+
+.lg {
+  --lg-s0: var(--t-ink);
+  --lg-s1: color-mix(in srgb, var(--t-ink) 60%, var(--t-accent));
+  --lg-s2: var(--t-accent);
+  --lg-s3: color-mix(in srgb, var(--t-accent) 65%, var(--t-band-even));
+  --lg-s4: color-mix(in srgb, var(--t-accent) 35%, var(--t-band-even));
+  --lg-s5: var(--t-band-odd);
+  /* Text on each shade: light on the two dark ones, ink on the rest. */
+  --lg-on0: var(--t-on-ink);
+  --lg-on1: var(--t-on-ink);
+  --lg-on2: var(--t-ink);
+  --lg-on3: var(--t-ink);
+  --lg-on4: var(--t-ink);
+  --lg-on5: var(--t-ink);
+}
+
+/* Watermelon has pink, red and two greens to draw from, so its chart uses them
+   instead of shades of one dark. */
+[data-theme='watermelon'] .lg {
+  --lg-s0: #C81E5B;
+  --lg-s1: #2F8F5B;
+  --lg-s2: #DC2F4B;
+  --lg-s3: #7CCB9B;
+  --lg-s4: #F08A9C;
+  --lg-s5: #F7D2D8;
+  --lg-on0: #FFFFFF;
+  --lg-on1: #FFFFFF;
+  --lg-on2: #FFFFFF;
+}
+
+.lg-page { padding-top: 32px; padding-bottom: 48px; display: flex; flex-direction: column; gap: 28px; }
+.lg-lede { margin: 6px 0 0; font-size: 15px; color: var(--t-ink-muted); }
+.lg-mtabs.rx-seg { display: none; padding: 4px; border-radius: 14px; }
+.lg-mtabs button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border-radius: 11px; font-size: 14px; font-weight: 700; color: var(--t-ink-muted); }
+.lg-mtabs button.is-on { color: var(--t-ink); }
+
+/* Two columns: the calendar over the history on the left, everything else on the right. */
+.lg-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.lg-left { padding-right: 40px; min-width: 0; }
+.lg-right { padding-left: 40px; border-left: 1px solid var(--t-border); align-self: stretch; display: flex; flex-direction: column; gap: 32px; min-width: 0; }
+
+/* --- Stats ---------------------------------------------------------------------------- */
+.lg-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lg-stat { min-width: 0; padding: 20px 24px; }
+.lg-stat:nth-child(odd) { border-right: 1px solid var(--t-accent); }
+.lg-stat:nth-child(-n + 2) { border-bottom: 1px solid var(--t-accent); }
+.lg-stat-value { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; white-space: nowrap; }
+.lg-stat-label { margin-top: 6px; font-size: 13px; color: var(--t-ink-muted); }
+
+/* --- Activity calendar ------------------------------------------------------------------- */
+.lg-cal { display: flex; flex-direction: column; gap: 16px; }
+.lg-cal-head { display: flex; align-items: center; gap: 6px; }
+.lg-cal-title { flex: 1; min-width: 0; }
+.lg-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; color: var(--t-accent); }
+.lg-cal-count { margin-top: 2px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.lg-circle:disabled { opacity: 0.4; cursor: default; }
+.lg-circle { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 50%; background: var(--t-tint); color: var(--t-ink); cursor: pointer; }
+
+.lg-heat { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.lg-heat-dow { padding-bottom: 2px; text-align: center; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--t-ink-faint); }
+.lg-day {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--t-band-even) 70%, var(--t-page));
+  color: var(--t-ink-faint);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: default;
+}
+.lg-day.is-active { background: var(--t-accent); color: #FFFFFF; cursor: pointer; }
+.lg-day.is-future { background: transparent; color: var(--t-border-dashed); }
+.lg-day.is-today { outline: 2px dashed var(--t-accent); outline-offset: 1px; }
+.lg-day.is-sel { outline: 2px solid var(--t-ink); outline-offset: 1px; }
+.lg-legend { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--t-ink-muted); }
+.lg-legend span { display: flex; align-items: center; gap: 5px; }
+.lg-legend-on { width: 10px; height: 10px; border-radius: 3px; background: var(--t-accent); }
+.lg-legend-today { width: 8px; height: 8px; border-radius: 3px; border: 1px dashed var(--t-accent); }
+
+/* --- Journal ------------------------------------------------------------------------------ */
+.lg-journal { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--t-border); }
+.lg-journal-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; }
+.lg-journal-head h2,
+.lg-mix-head h2,
+.lg-plans h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.lg-journal-head h2 { flex: 1; }
+.lg-link { border: none; background: none; padding: 0; color: var(--t-accent); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.lg-add { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 1px solid var(--t-border); border-radius: 10px; background: var(--t-surface); color: var(--t-ink); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.lg-empty { margin: 8px 0; font-size: 14px; color: var(--t-ink-muted); }
+
+.lg-day-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); padding: 14px 0; }
+.lg-day-num { font-size: 48px; font-weight: 700; letter-spacing: -0.04em; line-height: 0.9; }
+.lg-day-num.is-today { color: var(--t-accent); }
+.lg-day-dow { margin-top: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--t-ink-faint); }
+.lg-day-items { display: flex; flex-direction: column; gap: 22px; min-width: 0; padding-left: 18px; border-left: 2px solid var(--t-border); }
+.lg-day-items.is-today { border-left-color: var(--t-accent); }
+.lg-gap { display: flex; align-items: center; gap: 10px; padding: 6px 0 6px 72px; font-size: 12px; font-weight: 600; color: var(--t-ink-faint); }
+
+.lg-group { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-right: 36px; }
+.lg-group .pl-menu.lg-menu { position: absolute; top: -4px; right: -8px; margin: 0; z-index: 3; }
+.lg-group .pl-menu-pop { width: 250px; }
+.lg-group .pl-menu-pop button { white-space: nowrap; }
+.lg-group .pl-menu-pop svg { flex-shrink: 0; }
+.lg-group:has(.pl-menu-pop) { z-index: 10; } /* an open menu rises above the groups below it */
+.lg-group .pl-menu-btn { width: 32px; height: 32px; }
+.lg-item { display: flex; gap: 14px; align-items: flex-start; }
+.lg-thumb { width: 128px; flex-shrink: 0; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; background: var(--t-tint); }
+.lg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lg-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+.lg-plan { align-self: flex-start; padding: 2px 8px; border-radius: 6px; background: var(--t-plan-main); color: #FFFFFF; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.lg-item-title { font-size: 15px; font-weight: 600; line-height: 1.3; text-wrap: pretty; }
+.lg-loop { margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: var(--t-tint); font-size: 11px; font-weight: 700; vertical-align: 1px; }
+.lg-icon-quiet { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: 4px; padding: 0; border: none; border-radius: 6px; background: none; color: var(--t-ink-faint); vertical-align: -6px; cursor: pointer; }
+.lg-icon-quiet:hover { background: var(--t-tint); color: var(--t-ink); }
+.lg-note { padding: 8px 12px; border-radius: 4px 14px 14px 14px; background: var(--t-tint); font-size: 14px; line-height: 1.4; align-self: flex-start; margin-left: 142px; }
+.lg-edit { display: flex; flex-direction: column; gap: 6px; margin-left: 142px; }
+.lg-edit textarea,
+.lg-edit input { box-sizing: border-box; min-height: 56px; padding: 10px 12px; border: 1px solid var(--t-border); border-radius: 12px; background: var(--t-surface); color: var(--t-ink); font: inherit; font-size: 15px; outline: none; resize: vertical; }
+.lg-edit input { min-height: 0; height: 42px; align-self: flex-start; }
+.lg-edit textarea:focus,
+.lg-edit input:focus { border-color: var(--t-accent); }
+.lg-edit-actions { display: flex; gap: 14px; font-size: 13px; font-weight: 700; }
+.lg-edit-actions button { padding: 0; border: none; background: none; color: var(--t-ink-muted); font: inherit; cursor: pointer; }
+.lg-edit-actions button.is-primary { color: var(--t-accent); }
+
+/* --- What you trained ---------------------------------------------------------------------- */
+.lg-mix { display: flex; flex-direction: column; gap: 16px; }
+.lg-mix-head { display: flex; align-items: baseline; gap: 8px; }
+.lg-mix-head h2 { flex: 1; white-space: nowrap; }
+.lg-range { position: relative; display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border-radius: 10px; background: var(--t-tint); font-size: 13px; font-weight: 600; cursor: pointer; }
+.lg-range select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }
+.lg-mix-tools { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.lg-tabs { display: flex; gap: 12px; font-size: 13px; font-weight: 600; overflow-x: auto; scrollbar-width: none; }
+.lg-tabs button { padding: 0 0 3px; border: none; background: none; box-shadow: inset 0 -2px 0 transparent; color: var(--t-ink-faint); font: inherit; white-space: nowrap; cursor: pointer; }
+.lg-tabs button.is-on { color: var(--t-ink); box-shadow: inset 0 -2px 0 var(--t-accent); }
+
+.lg-bars { display: flex; flex-direction: column; gap: 8px; }
+.lg-bar-row { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: center; gap: 10px; }
+.lg-bar-row b { text-align: right; font-size: 15px; }
+.lg-bar { position: relative; height: 32px; border-radius: 10px; background: var(--t-tint); overflow: hidden; }
+.lg-bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: 10px; }
+.lg-bar-label { position: relative; height: 100%; display: flex; align-items: center; padding: 0 12px; font-size: 13px; font-weight: 600; color: var(--t-ink); white-space: nowrap; }
+.lg-bar-label--fill { position: absolute; inset: 0; }
+
+.lg-pie { display: flex; align-items: center; gap: 20px; }
+.lg-pie-ring { width: 132px; height: 132px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.lg-pie-hole { width: 84px; height: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; background: var(--t-page); }
+.lg-pie-hole strong { font-size: 24px; line-height: 1; }
+.lg-pie-hole span { margin-top: 3px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--t-ink-muted); }
+.lg-legend-list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.lg-legend-list div { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.lg-legend-list i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.lg-legend-list span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* --- Plans ----------------------------------------------------------------------------------- */
+.lg-plans { display: flex; flex-direction: column; gap: 16px; padding-top: 32px; border-top: 1px solid var(--t-border); }
+.lg-plan-row { display: flex; align-items: center; gap: 14px; }
+.lg-ring { width: 52px; height: 52px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.lg-ring span { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--t-page); font-size: 11px; font-weight: 700; }
+.lg-trophy { width: 52px; height: 52px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--t-btn); color: var(--t-accent-soft); }
+.lg-plan-text { flex: 1; min-width: 0; }
+.lg-plan-name { font-size: 15px; font-weight: 700; }
+.lg-plan-sub { font-size: 12px; color: var(--t-ink-muted); }
+.lg-plans-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--t-ink-muted); }
+
+/* --- Empty ------------------------------------------------------------------------------------ */
+.lg-blank { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 24px; border: 1px dashed var(--t-border-dashed); border-radius: var(--t-r-band); text-align: center; }
+.lg-blank h2 { margin: 0; font-size: 20px; }
+.lg-blank p { margin: 0; max-width: 460px; color: var(--t-ink-muted); }
+.lg-blank-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 8px; }
+
+/* --- Mobile: two tabs instead of two columns ----------------------------------------------------- */
+@media (max-width: 767px) {
+  .lg-page { padding-top: 4px; gap: 20px; }
+  .lg-mtabs.rx-seg { display: flex; margin-top: -8px; }
+  .lg-cols { grid-template-columns: minmax(0, 1fr); }
+  .lg-left,
+  .lg-right { padding: 0; border: none; }
+  .lg-show-history .lg-right { display: none; }
+  .lg-show-breakdown .lg-left { display: none; }
+  .lg-stat { padding: 18px 16px; }
+  .lg-stat-value { font-size: 28px; }
+  .lg-day-row { grid-template-columns: 52px minmax(0, 1fr); }
+  .lg-day-num { font-size: 34px; }
+  .lg-gap { padding-left: 52px; }
+  .lg-thumb { width: 92px; }
+  .lg-note,
+  .lg-edit { margin-left: 106px; }
+  .lg-journal { margin-top: 28px; padding-top: 0; border-top: none; }
+}

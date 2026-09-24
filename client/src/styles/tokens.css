@@ -160,18 +160,26 @@
   --t-band-even: #E3F2E6;
   --t-border: #D9E9DC;
   --t-border-dashed: #BFDCC5;
-  --t-ink: #4A1520;
-  --t-ink-muted: #7E3B46;
-  --t-ink-faint: #9E6570;
+  --t-ink: #23292A;
+  --t-ink-muted: #56605F;
+  --t-ink-faint: #8C9694;
   --t-on-ink: #EAF6EC;
   --t-accent: #DC2F4B;
   --t-accent-soft: #F08A9C;
-  --t-overlay: rgba(36, 8, 14, 0.34);
+  --t-overlay: rgba(8, 30, 18, 0.34);
+  /* Filled buttons are watermelon pink rather than the (green-black) ink. */
+  --t-btn: #C81E5B;
+  --t-on-btn: #FFFFFF;
+  /* The plan builder's schedule column: light pink against the green library. */
+  --t-side: #FCE7EA;
+  /* ...and the day you're filling in, a step darker than that column. */
+  --t-side-open: #F8D3DA;
 }
 
 /* --- Fixed status colours ---------------------------------------------------
    Meaning before palette: these stay put in every theme. */
 :root {
+
   --t-success: #2F8F5B;
   --t-success-bg: #F1F8F3;
   --t-success-border: #BFE3CC;
@@ -225,4 +233,11 @@
   --t-shadow-popover: 0 14px 40px rgba(0, 0, 0, 0.5);
   --t-shadow-seg: 0 1px 3px rgba(0, 0, 0, 0.35);
   --t-shadow-lift: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+/* Filled buttons. On body so they resolve against the theme set on body: every theme
+   uses its ink unless it says otherwise (Watermelon does). */
+body {
+  --t-btn: var(--t-ink);
+  --t-on-btn: var(--t-on-ink);
 }

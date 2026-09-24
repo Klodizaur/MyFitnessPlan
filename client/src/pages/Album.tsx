@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import LibraryToolbar, { LibrarySort, LibraryView } from '../components/library/LibraryToolbar';
+import LibraryToolbar, { LibrarySort, LibraryView, SortPill } from '../components/library/LibraryToolbar';
 import FiltersSheet from '../components/library/FiltersSheet';
 import { FolderCard, FolderItem, FolderRow, VideoGridCard, VideoListRow } from '../components/library/LibraryCards';
 import VideoDetailsModal from '../components/VideoDetailsModal';
-import { matchesTags, matchesQuery, useFilterMatchMode } from '../lib/filters';
+import { EMPTY_LENGTH, isLengthActive, LengthRange, matchesLength, matchesTags, matchesQuery, useFilterMatchMode } from '../lib/filters';
+import { useLengthLabel } from '../components/library/LengthFilter';
 import { useIsMobile } from '../lib/useIsMobile';
 import { ChevronLeft, ChevronRight, Sparkles, Pencil, Trash2 } from 'lucide-react';
 import '../styles/library.css';
 import { useMetaLabels } from '../lib/labels';
-import { fromAlbumRouteParam, toAlbumRouteParam, toPosixPath, isExternalVideo, isExternalAlbumKey, playlistIdFromAlbumKey } from '../lib/paths';
+import { fromAlbumRouteParam, toAlbumRouteParam, toPosixPath, isExternalVideo, isExternalAlbumKey, isFavoritesAlbumKey, playlistIdFromAlbumKey } from '../lib/paths';
+import { toggleVideoFavorite } from '../lib/favorites';
+import { notify } from '../lib/notify';
+import { confirmDialog } from '../lib/confirm';
 import { useAiAvailable } from '../lib/useAiAvailable';
 import { Video } from '../types/video';
 
@@ -26,6 +30,8 @@ export default function Album() {
   const [customImage, setCustomImage] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [sortMode, setSortMode] = useState<LibrarySort>('az');
+  // Folders sort by name or by how many videos they hold; videos by name or length.
+  const [folderSort, setFolderSort] = useState<'az' | 'za' | 'most' | 'fewest'>('most');
   const [viewMode, setViewMode] = useState<LibraryView | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE);
@@ -38,6 +44,8 @@ export default function Album() {
   const [selectedTrainingType, setSelectedTrainingType] = useState<string[]>([]);
   const [selectedBodyParts, setSelectedBodyParts] = useState<string[]>([]);
   const [selectedIntensity, setSelectedIntensity] = useState<string[]>([]);
+  const [selectedLength, setSelectedLength] = useState<LengthRange>(EMPTY_LENGTH);
+  const lengthLabel = useLengthLabel();
   const navigate = useNavigate();
   const location = useLocation();
   const [matchMode, setMatchMode] = useFilterMatchMode();
@@ -75,6 +83,11 @@ export default function Album() {
   const isExternalAlbum = isExternalAlbumKey(albumKey);
   const playlistId = isExternalAlbum ? playlistIdFromAlbumKey(albumKey) : null;
 
+  // Favourites is a flat, virtual album: every starred video from anywhere in
+  // the library, with no path, no subfolders and nothing to rename or delete.
+  const isFavoritesAlbum = isFavoritesAlbumKey(albumKey);
+  const isFlatAlbum = isExternalAlbum || isFavoritesAlbum;
+
   // Videos with no file on disk have an empty relative_path, which would match
   // the library-root prefix and show them alongside real files. Folder views
   // consider local videos only.
@@ -82,11 +95,13 @@ export default function Album() {
 
   // Build subfolder map and mainVideos under current base
   const subMap = new Map<string, { key: string; count: number; sample?: Video }>();
-  const mainVideos = isExternalAlbum
-    ? videos.filter(v => isExternalVideo(v) && (v.external_playlist_id || 'unknown') === playlistId)
-    : localVideos.filter(v => isUnderBase(v.relative_path || ''));
+  const mainVideos = isFavoritesAlbum
+    ? videos.filter(v => v.is_favorite)
+    : isExternalAlbum
+      ? videos.filter(v => isExternalVideo(v) && (v.external_playlist_id || 'unknown') === playlistId)
+      : localVideos.filter(v => isUnderBase(v.relative_path || ''));
   // apply filters to mainVideos later when showing
-  for (const v of isExternalAlbum ? [] : localVideos) {
+  for (const v of isFlatAlbum ? [] : localVideos) {
     const rel = toPosixPath(v.relative_path || '');
     const prefix = basePrefix ? basePrefix + '/' : '';
     if (!rel.startsWith(prefix)) continue;
@@ -99,14 +114,18 @@ export default function Album() {
     subMap.set(sub, cur);
   }
 
-  const subfolders = Array.from(subMap.entries()).filter(([k]) => k !== '.').map(([, v]) => v).sort((a, b) => b.count - a.count);
+  const subfolders = Array.from(subMap.entries()).filter(([k]) => k !== '.').map(([, v]) => v).sort((a, b) =>
+      folderSort === 'most' ? b.count - a.count
+      : folderSort === 'fewest' ? a.count - b.count
+      : folderSort === 'za' ? naturalCompare(b.key, a.key)
+      : naturalCompare(a.key, b.key));
 
   const filterCount = selectedEquipment.length + selectedTrainingType.length
-    + selectedBodyParts.length + selectedIntensity.length;
+    + selectedBodyParts.length + selectedIntensity.length + (isLengthActive(selectedLength) ? 1 : 0);
   const isFiltering = filterCount > 0 || q.trim().length > 0;
 
   /** Videos sitting directly in this folder, not in one of its subfolders. */
-  const looseVideos = isExternalAlbum ? mainVideos : mainVideos.filter(v => {
+  const looseVideos = isFlatAlbum ? mainVideos : mainVideos.filter(v => {
     const rel = toPosixPath(v.relative_path || '');
     const remainder = basePrefix ? rel.slice(basePrefix.length + 1) : rel;
     return !remainder.includes('/');
@@ -125,10 +144,12 @@ export default function Album() {
     if (!matchesTags(v.training_type, selectedTrainingType, matchMode)) return false;
     if (selectedIntensity.length > 0 && !selectedIntensity.includes(v.intensity || '')) return false;
     if (!matchesTags(v.body_parts, selectedBodyParts, matchMode)) return false;
+    if (!matchesLength(v.duration_seconds, selectedLength)) return false;
     return true;
   });
   const sorted = [...filtered];
   if (sortMode === 'size') sorted.sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0));
+  else if (sortMode === 'small') sorted.sort((a, b) => (a.duration_seconds || 0) - (b.duration_seconds || 0));
   else sorted.sort((a, b) => naturalCompare(a.filename, b.filename));
   if (sortMode === 'za') sorted.reverse();
 
@@ -186,7 +207,13 @@ export default function Album() {
       // Usage is advisory; a failed check shouldn't block the delete.
     }
 
-    if (!window.confirm(`${t('library.delete_playlist_confirm', { name: playlistTitle })}${warning}`)) return;
+    const ok = await confirmDialog({
+      title: t('library.delete_playlist'),
+      message: `${t('library.delete_playlist_confirm', { name: playlistTitle })}${warning}`.trim(),
+      confirmLabel: t('plans.delete'),
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/external/playlist/${encodeURIComponent(playlistId)}`, { method: 'DELETE' });
@@ -209,7 +236,7 @@ export default function Album() {
   const handleCleanDescriptions = async () => {
     const withDescriptions = mainVideos.filter(v => (v.description || '').trim());
     if (withDescriptions.length === 0) {
-      window.alert(t('ai.cleanup_none'));
+      notify(t('ai.cleanup_none'), 'ok');
       return;
     }
     // Translating is a bigger commitment than tidying — it replaces the
@@ -231,7 +258,12 @@ export default function Album() {
         })
       : t('ai.cleanup_confirm', { count: withDescriptions.length });
 
-    if (!window.confirm(message)) return;
+    const ok = await confirmDialog({
+      title: t('ai.cleanup_album'),
+      message,
+      confirmLabel: t('ai.clean_btn'),
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch('/api/ai/clean-descriptions', {
@@ -239,13 +271,13 @@ export default function Album() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           videoIds: withDescriptions.map(v => v.id),
-          label: isExternalAlbum ? playlistTitle : albumKey === '.' ? 'Root' : albumKey,
+          label: isFavoritesAlbum ? t('library.favorites') : isExternalAlbum ? playlistTitle : albumKey === '.' ? 'Root' : albumKey,
         }),
       });
       const data = await res.json();
-      if (!res.ok) window.alert(data?.error || t('ai.error_generic'));
+      if (!res.ok) notify(data?.error || t('ai.error_generic'));
     } catch {
-      window.alert(t('ai.error_unreachable'));
+      notify(t('ai.error_unreachable'));
     }
   };
 
@@ -255,14 +287,16 @@ export default function Album() {
   const displayed = sorted.slice(0, limit);
   const left = sorted.length - displayed.length;
 
-  const albumTitle = isExternalAlbum
+  const albumTitle = isFavoritesAlbum
+    ? t('library.favorites')
+    : isExternalAlbum
     ? playlistTitle
     : (currentSub ? currentSub.split('/').slice(-1)[0] : albumKey === '.' ? t('library.root_folder') : albumKey);
 
   /** Library › album › each nested folder, each one navigable. */
   const crumbs = [
     { label: t('nav.library'), go: () => navigate('/library') },
-    ...(isExternalAlbum ? [] : [{
+    ...(isFlatAlbum ? [] : [{
       label: albumKey === '.' ? t('library.root_folder') : albumKey,
       go: () => navigate(`/library/${encodeURIComponent(toAlbumRouteParam(albumKey))}`),
     }]),
@@ -287,11 +321,17 @@ export default function Album() {
 
   const clearAll = () => {
     setSelectedEquipment([]); setSelectedTrainingType([]);
-    setSelectedBodyParts([]); setSelectedIntensity([]); setQ('');
+    setSelectedBodyParts([]); setSelectedIntensity([]); setSelectedLength(EMPTY_LENGTH); setQ('');
   };
 
   /** Path shown under a video title, relative to the folder being viewed. */
   const relMeta = (video: Video) => {
+    // Favourites mixes every folder, so say where each video lives.
+    if (isFavoritesAlbum) {
+      if (isExternalVideo(video)) return video.external_playlist_title || undefined;
+      const dirs = toPosixPath(video.relative_path || '').split('/').slice(0, -1);
+      return dirs.length ? dirs.join(' / ') : t('library.root_folder');
+    }
     if (isExternalAlbum) return undefined;
     const rel = toPosixPath(video.relative_path || '');
     const remainder = basePrefix ? rel.slice(basePrefix.length + 1) : rel;
@@ -348,9 +388,10 @@ export default function Album() {
                 </button>
               </>
             )}
-            {aiAvailable && (
+            {/* Only imported playlists carry descriptions worth cleaning up. */}
+            {aiAvailable && isExternalAlbum && (
               <button type="button" className="lib-folder-action" onClick={handleCleanDescriptions}>
-                <Sparkles size={16} className="lib-action-icon" />
+                <Sparkles size={14} className="lib-action-icon" />
                 <span>{t('ai.cleanup_album')}</span>
               </button>
             )}
@@ -364,9 +405,6 @@ export default function Album() {
         placeholder={t('library.search_in', { name: albumTitle })}
         filterCount={filterCount}
         onOpenFilters={() => setFiltersOpen(true)}
-        sort={sortMode}
-        onSort={setSortMode}
-        sizeLabel={t('library.sort_longest')}
         view={effectiveView}
         onView={setViewMode}
         activeChips={[
@@ -374,6 +412,7 @@ export default function Album() {
           ...selectedTrainingType.map(v => ({ key: `type:${v}`, label: labels.trainingType(v), category: 'type' as const, remove: () => setSelectedTrainingType(p => p.filter(x => x !== v)) })),
           ...selectedBodyParts.map(v => ({ key: `body:${v}`, label: labels.bodyPart(v), category: 'body' as const, remove: () => setSelectedBodyParts(p => p.filter(x => x !== v)) })),
           ...selectedIntensity.map(v => ({ key: `int:${v}`, label: labels.intensity(v), category: 'intensity' as const, remove: () => setSelectedIntensity(p => p.filter(x => x !== v)) })),
+          ...(isLengthActive(selectedLength) ? [{ key: 'length', label: lengthLabel(selectedLength), category: 'length' as const, remove: () => setSelectedLength(EMPTY_LENGTH) }] : []),
         ]}
         onClearAll={clearAll}
       />
@@ -384,6 +423,16 @@ export default function Album() {
             <div className="lib-section-head">
               <h2>{t('library.subfolders')}</h2>
               <span className="lib-section-count">{subfolderItems.length}</span>
+              <SortPill
+                value={folderSort}
+                onChange={setFolderSort}
+                options={[
+                  { value: 'az', label: t('library.sort_az') },
+                  { value: 'za', label: t('library.sort_za') },
+                  { value: 'most', label: t('library.sort_most_videos') },
+                  { value: 'fewest', label: t('library.sort_fewest_videos') },
+                ]}
+              />
             </div>
             {/* A strip on a phone, so a folder with many subfolders doesn't
                 push its videos off the screen entirely. */}
@@ -419,6 +468,16 @@ export default function Album() {
                   : t('library.all_videos')}
             </h2>
             <span className="lib-section-count">{sorted.length}</span>
+            <SortPill
+              value={sortMode}
+              onChange={value => { setSortMode(value); setLimit(PAGE); }}
+              options={[
+                { value: 'az', label: t('library.sort_az') },
+                { value: 'za', label: t('library.sort_za') },
+                { value: 'size', label: t('library.sort_longest') },
+                { value: 'small', label: t('library.sort_shortest') },
+              ]}
+            />
 
             {subfolders.length > 0 && !isFiltering && (
               <button
@@ -438,10 +497,10 @@ export default function Album() {
           {sorted.length === 0 ? (
             <div className="lib-empty">
               <div className="lib-empty-title">
-                {isFiltering ? t('library.no_videos_match') : t('library.no_loose_videos')}
+                {isFiltering ? t('library.no_videos_match') : isFavoritesAlbum ? t('library.no_favorites') : t('library.no_loose_videos')}
               </div>
               <div className="lib-empty-hint">
-                {isFiltering ? t('library.no_videos_match_hint') : t('library.no_loose_videos_hint')}
+                {isFiltering ? t('library.no_videos_match_hint') : isFavoritesAlbum ? t('library.no_favorites_hint') : t('library.no_loose_videos_hint')}
               </div>
             </div>
           ) : effectiveView === 'grid' ? (
@@ -452,6 +511,9 @@ export default function Album() {
                   video={video}
                   meta={relMeta(video)}
                   onOpen={() => setDetailsVideo(video)}
+                  onPlay={() => navigate(`/player/${video.id}`)}
+                  onInfo={() => setDetailsVideo(video)}
+                  onFavorite={() => toggleVideoFavorite(video, setVideos)}
                 />
               ))}
             </div>
@@ -464,6 +526,9 @@ export default function Album() {
                   meta={relMeta(video)}
                   onOpen={() => setDetailsVideo(video)}
                   onMenu={() => setDetailsVideo(video)}
+                  onPlay={() => navigate(`/player/${video.id}`)}
+                  onInfo={() => setDetailsVideo(video)}
+                  onFavorite={() => toggleVideoFavorite(video, setVideos)}
                 />
               ))}
             </div>
@@ -488,6 +553,8 @@ export default function Album() {
         onBodyParts={setSelectedBodyParts}
         intensity={selectedIntensity}
         onIntensity={setSelectedIntensity}
+        length={selectedLength}
+        onLength={setSelectedLength}
         matchMode={matchMode}
         onMatchMode={setMatchMode}
         onClearAll={clearAll}

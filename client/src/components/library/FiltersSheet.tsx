@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { EQUIPMENT_ITEMS } from '../../lib/equipment';
 import { BODY_PARTS, INTENSITIES, TRAINING_TYPES } from '../../lib/metadata';
 import { useMetaLabels } from '../../lib/labels';
-import { MatchMode } from '../../lib/filters';
+import { LengthRange, MatchMode } from '../../lib/filters';
+import LengthFilter from './LengthFilter';
 import { TagCategory } from '../../lib/videoTags';
 
 interface Props {
@@ -18,6 +19,8 @@ interface Props {
   onBodyParts: (next: string[]) => void;
   intensity: string[];
   onIntensity: (next: string[]) => void;
+  length: LengthRange;
+  onLength: (next: LengthRange) => void;
   matchMode: MatchMode;
   onMatchMode: (mode: MatchMode) => void;
   onClearAll: () => void;
@@ -137,6 +140,13 @@ export default function FiltersSheet(props: Props) {
               </div>
             </div>
           ))}
+
+          <div>
+            <div className="lib-group-head">
+              <div className="lib-group-title">{t('library.length')}</div>
+            </div>
+            <LengthFilter value={props.length} onChange={props.onLength} />
+          </div>
         </div>
 
         <div className="lib-sheet-foot">

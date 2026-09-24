@@ -1,0 +1,300 @@
+/** Redesign: Player — the video stage, its overlays, the "Today" strip and the info cards. */
+
+.pv-page { max-width: 1200px; margin: 0 auto; padding: 20px 32px 32px; }
+.pv-stage { display: flex; flex-direction: column; gap: 16px; }
+.pv-notice { text-align: center; padding-top: 64px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.pv-muted { color: var(--t-ink-muted); }
+.pv-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.pv-today-cta { display: flex; gap: 8px; }
+.pv-today-cta.pv-mob-only { display: none; }
+.pv-mobile-title { display: none; }
+
+/* --- The video ------------------------------------------------------------------ */
+.pv-theater {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #1E0C05;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(60, 20, 6, 0.22);
+  color: #FFFFFF;
+}
+.pv-theater video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+/* Filling the screen means dropping the card: the 16/9 box is what makes it a
+   panel on the page, and it has to go or fullscreen letterboxes inside it. */
+.pv-theater:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; }
+.pv-theater:-webkit-full-screen { width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; }
+.pv-theater .player-youtube { position: absolute; inset: 0; }
+.pv-hit { position: absolute; inset: 0; cursor: pointer; }
+
+.pv-top {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 36px;
+  background: linear-gradient(180deg, rgba(20, 8, 3, 0.7), rgba(20, 8, 3, 0));
+  /* Only the buttons take clicks; the rest lets a click reach the video (or the YouTube frame). */
+  pointer-events: none;
+}
+.pv-top > * { pointer-events: auto; }
+.pv-top-text { flex: 1; min-width: 0; pointer-events: none; }
+.pv-top-title { font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.8); }
+.pv-meta-src { display: inline-flex; align-items: center; gap: 4px; }
+.pv-dot { width: 3px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.6); }
+
+.pv-round {
+  width: 42px; height: 42px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background-color 0.15s;
+}
+.pv-round:hover { background: rgba(255, 255, 255, 0.28); }
+
+.pv-loop { position: static; flex-shrink: 0; }
+.pv-pill {
+  height: 42px;
+  padding: 0 16px 0 13px;
+  display: flex; align-items: center; gap: 7px;
+  border: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+  font-family: inherit; font-size: 14px; font-weight: 700; line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background-color 0.15s;
+}
+.pv-pill:hover { background: rgba(255, 255, 255, 0.28); }
+.pv-pill.is-on { background: var(--t-accent); }
+.pv-pill.is-on:hover { filter: brightness(1.06); }
+
+.pv-bigplay {
+  position: absolute; left: 50%; top: 50%; z-index: 10;
+  width: 84px; height: 84px;
+  transform: translate(-50%, -50%);
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%;
+  background: rgba(255, 251, 247, 0.95);
+  color: #2A211C;
+  box-shadow: 0 10px 30px rgba(20, 8, 3, 0.4);
+  cursor: pointer;
+  padding-left: 4px;
+  transition: transform 0.15s;
+}
+.pv-bigplay:hover { transform: translate(-50%, -50%) scale(1.05); }
+
+/* --- Controls ------------------------------------------------------------------- */
+.pv-bar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 15;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 28px 16px 10px;
+  background: linear-gradient(0deg, rgba(20, 8, 3, 0.75), rgba(20, 8, 3, 0));
+}
+.pv-scrub { position: relative; height: 16px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+.pv-scrub:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; border-radius: 4px; }
+.pv-scrub-track { position: relative; width: 100%; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.28); }
+.pv-scrub-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--t-accent); }
+.pv-scrub-knob { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.pv-ctrls { display: flex; align-items: center; gap: 6px; }
+.pv-ctrls button {
+  width: 36px; height: 36px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 10px;
+  background: transparent; color: #FFFFFF; cursor: pointer;
+  transition: background-color 0.15s;
+}
+.pv-ctrls button:hover { background: rgba(255, 255, 255, 0.16); }
+.pv-ctrls button:first-child { width: 40px; height: 40px; }
+.pv-ctrls .pv-speed { width: auto; height: 28px; padding: 0 9px; border-radius: 8px; background: rgba(255, 255, 255, 0.16); font-family: inherit; font-size: 12px; font-weight: 700; }
+.pv-clock { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pv-grow { flex: 1; }
+
+/* --- Rest, up next ---------------------------------------------------------------- */
+.pv-rest {
+  position: absolute; inset: 0; z-index: 12;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: rgba(30, 12, 5, 0.78);
+  color: #FFF5EC;
+}
+.pv-rest-label { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; color: #F9B27A; text-transform: uppercase; }
+.pv-rest-time { font-size: 84px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.pv-rest-next { font-size: 14px; color: #F9D9C2; }
+.pv-rest-skip {
+  margin-top: 6px; height: 40px; padding: 0 18px;
+  display: flex; align-items: center; gap: 6px;
+  border: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14); color: inherit;
+  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background-color 0.15s;
+}
+.pv-rest-skip:hover { background: rgba(255, 255, 255, 0.26); }
+
+.pv-upnext {
+  position: absolute; right: 20px; bottom: 76px; z-index: 16;
+  max-width: 420px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px; border-radius: 18px;
+  background: rgba(255, 251, 247, 0.97);
+  color: #2A211C;
+  box-shadow: 0 12px 36px rgba(20, 8, 3, 0.35);
+}
+.pv-upnext .pv-upnext-x { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; padding: 0; background: #2A211C; color: #FFFFFF; box-shadow: 0 2px 8px rgba(20, 8, 3, 0.4); }
+.pv-upnext.is-embed { bottom: 20px; }
+.pv-upnext img, .pv-upnext-blank { width: 96px; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 11px; flex-shrink: 0; background: #F3DCC7; }
+.pv-upnext > div { flex: 1; min-width: 0; }
+.pv-upnext-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #C2410C; }
+.pv-upnext-title { font-size: 14px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pv-upnext button { width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0 0 0 2px; border: 0; border-radius: 50%; background: #6B2410; color: #FFF5EC; cursor: pointer; transition: transform 0.15s; }
+.pv-upnext button:hover { transform: scale(1.07); }
+
+/* --- Loop popover / sheet ------------------------------------------------------------ */
+.pv-loop-panel {
+  position: absolute; right: 16px; top: 70px; z-index: 30;
+  width: 320px; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  box-shadow: 0 16px 44px rgba(20, 8, 3, 0.4);
+  font-family: inherit;
+}
+.pv-loop-head { display: flex; align-items: center; }
+.pv-loop-head h3 { flex: 1; margin: 0; font-size: 17px; font-weight: 700; color: inherit; }
+.pv-loop-head button { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; }
+.pv-loop-head button:hover { background: var(--t-tint); }
+.pv-loop-row { display: flex; align-items: center; gap: 10px; }
+.pv-loop-row span { flex: 1; font-size: 14px; font-weight: 600; }
+.pv-loop-row strong { width: 28px; text-align: center; font-size: 18px; }
+.pv-loop-row button { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--t-border); border-radius: 11px; background: var(--t-page); color: inherit; cursor: pointer; }
+.pv-loop-row button:hover:not(:disabled) { border-color: var(--t-accent); }
+.pv-loop-row button:disabled { opacity: 0.4; cursor: default; }
+.pv-loop-field { display: flex; flex-direction: column; gap: 8px; }
+.pv-loop-field > span { font-size: 14px; font-weight: 600; }
+.pv-seg { display: flex; padding: 3px; border-radius: 12px; background: var(--t-tint); }
+.pv-seg button { flex: 1; height: 32px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: inherit; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.pv-seg button:hover:not(.is-on) { background: rgba(255, 255, 255, 0.35); }
+.pv-seg button.is-on { background: var(--t-surface); box-shadow: 0 1px 3px rgba(60, 20, 6, 0.18); }
+.pv-loop-hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--t-ink-muted); }
+.pv-loop-go { height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 14px; background: var(--t-btn); color: var(--t-on-btn); font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; transition: filter 0.15s; }
+.pv-loop-go:hover { filter: brightness(1.15); }
+.pv-loop-off { align-self: center; padding: 2px 6px; border: 0; background: none; color: var(--t-ink-muted); font-family: inherit; font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.pv-loop-off:hover { color: var(--t-danger); }
+.pv-loop-scrim { position: fixed; inset: 0; z-index: 90; background: rgba(40, 14, 4, 0.4); }
+.pv-loop-panel.is-sheet {
+  position: fixed; z-index: 91; left: 0; right: 0; top: auto; bottom: 0; width: auto;
+  gap: 16px; padding: 10px 20px 28px;
+  border-radius: 26px 26px 0 0;
+  box-shadow: none;
+}
+.pv-loop-grip { align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--t-border); }
+.pv-loop-panel.is-sheet .pv-loop-head h3 { font-size: 20px; }
+.pv-loop-panel.is-sheet .pv-loop-head button { width: 40px; height: 40px; border-radius: 12px; background: var(--t-tint); }
+.pv-loop-panel.is-sheet .pv-loop-row span, .pv-loop-panel.is-sheet .pv-loop-field > span { font-size: 15px; }
+.pv-loop-panel.is-sheet .pv-loop-row button { width: 44px; height: 44px; border-radius: 13px; }
+.pv-loop-panel.is-sheet .pv-loop-row strong { width: 32px; font-size: 20px; }
+.pv-loop-panel.is-sheet .pv-seg { border-radius: 13px; }
+.pv-loop-panel.is-sheet .pv-seg button { height: 40px; border-radius: 10px; font-size: 14px; }
+.pv-loop-panel.is-sheet .pv-loop-hint { font-size: 13px; }
+.pv-loop-panel.is-sheet .pv-loop-go { height: 52px; border-radius: 15px; font-size: 16px; }
+
+/* --- Today ------------------------------------------------------------------------- */
+.pv-today { padding: 16px 0; display: flex; flex-direction: column; gap: 10px; }
+.pv-today-head { display: flex; align-items: center; gap: 12px; padding: 0 16px; }
+.pv-today-head > div:first-child { flex: 1; min-width: 0; }
+.pv-today-sub { margin-top: 2px; font-size: 13px; color: var(--t-ink-muted); }
+.pv-strip { display: flex; gap: 12px; overflow-x: auto; padding: 5px 16px 4px; scrollbar-width: none; }
+.pv-strip::-webkit-scrollbar { display: none; }
+.pv-step { flex: 0 0 176px; display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: none; color: var(--t-ink); font-family: inherit; text-align: left; cursor: pointer; }
+.pv-step-img { position: relative; display: block; border-radius: 12px; overflow: hidden; background: var(--t-tint); aspect-ratio: 16 / 9; transition: box-shadow 0.15s; }
+.pv-step:hover:not(.is-now) .pv-step-img { box-shadow: 0 0 0 2px var(--t-border); }
+.pv-step.is-now { cursor: default; }
+.pv-step.is-now .pv-step-img { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.pv-step-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pv-step.is-done:not(.is-now) .pv-step-img, .pv-step.is-done:not(.is-now) .pv-step-title { opacity: 0.6; }
+.pv-step-badge {
+  position: absolute; left: 6px; top: 6px;
+  min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  border-radius: 7px;
+  background: rgba(255, 251, 247, 0.95); color: #2A211C;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.pv-step-badge.is-now { background: var(--t-accent); color: #FFFFFF; }
+.pv-step-badge.is-done { background: var(--t-success); color: #FFFFFF; }
+.pv-step-dur { position: absolute; right: 6px; bottom: 6px; }
+.pv-step-title { font-size: 12px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.pv-primary { height: 46px; padding: 0 20px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 14px; font-family: inherit; font-size: 15px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: filter 0.15s; }
+.pv-primary:hover:not(:disabled) { filter: brightness(0.96); }
+.pv-primary:disabled { opacity: 0.6; cursor: default; }
+.pv-primary--soft { background: var(--t-tint); color: var(--t-ink); }
+.pv-primary--ink { background: var(--t-btn); color: var(--t-on-btn); }
+.pv-primary--done { background: var(--t-success); color: #FFFFFF; }
+/* The done button says what a click will undo, but only while you're pointing at it. */
+.pv-lbl-undo { display: none; }
+.pv-primary--done:hover:not(:disabled) .pv-lbl { display: none; }
+.pv-primary--done:hover:not(:disabled) .pv-lbl-undo { display: inline; }
+.pv-primary--done:hover:not(:disabled) { background: var(--t-btn); color: var(--t-on-btn); filter: none; }
+.pv-step-play { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; display: flex; align-items: center; justify-content: center; padding-left: 2px; border-radius: 50%; background: rgba(255, 251, 247, 0.95); color: #2A211C; box-shadow: 0 4px 14px rgba(20, 8, 3, 0.35); opacity: 0; transform: scale(0.85); transition: opacity 0.15s, transform 0.15s; }
+.pv-step:hover .pv-step-play, .pv-step:focus-visible .pv-step-play { opacity: 1; transform: none; }
+
+/* --- Info -------------------------------------------------------------------------- */
+.pv-info { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.pv-info--single { grid-template-columns: minmax(0, 1fr); }
+.pv-card { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.pv-card-head { display: flex; align-items: center; }
+.pv-card-head .pv-eyebrow { flex: 1; }
+.pv-link { padding: 0; border: 0; background: none; color: var(--t-accent); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pv-link:hover { text-decoration: underline; }
+.pv-desc-text { font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; }
+.pv-desc-text > :first-child { margin-top: 0; }
+.pv-desc-text > :last-child { margin-bottom: 0; }
+.pv-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.pv-tags .rx-tag { height: 24px; }
+
+/* --- Phone -------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  .pv-page { padding: 0 0 24px; }
+  .pv-stage { gap: 12px; }
+  .pv-theater { border-radius: 0; box-shadow: none; }
+  .pv-top { padding: 10px 12px 24px; }
+  .pv-top-title { display: none; }
+  .pv-round, .pv-pill { height: 40px; }
+  .pv-round { width: 40px; }
+  .pv-bigplay { width: 64px; height: 64px; padding-left: 3px; }
+  .pv-bigplay svg { width: 26px; height: 26px; }
+  .pv-bar { padding: 20px 10px 6px; }
+  .pv-ctrls { gap: 2px; }
+  .pv-ctrls .pv-desk { display: none; }
+  .pv-rest-time { font-size: 54px; }
+  .pv-upnext { left: 10px; right: 10px; bottom: 64px; max-width: none; }
+  .pv-upnext.is-embed { bottom: 10px; }
+  .pv-upnext img, .pv-upnext-blank { width: 72px; }
+  .pv-mobile-title { display: block; margin: 4px 16px 0; font-size: 18px; font-weight: 700; line-height: 1.25; text-wrap: pretty; }
+  .pv-today, .pv-info { margin-left: 0; margin-right: 0; }
+  .pv-today { margin: 0 16px; }
+  .pv-info { margin: 0 16px; grid-template-columns: minmax(0, 1fr); }
+  .pv-tagcard { order: -1; }
+  .pv-step { flex-basis: 140px; }
+  .pv-today-cta.pv-desk-only { display: none; }
+  .pv-today-cta.pv-mob-only { display: flex; padding: 0 16px; }
+  .pv-mob-only { gap: 8px; }
+  .pv-mob-only .pv-primary { flex: 1 1 0; min-width: 0; padding: 0 12px; }}
+
+/* YouTube's IFrame API replaces the inner div with an iframe, so the wrapper and
+   the injected iframe both have to fill the theater. */
+.player-youtube, .player-youtube > div, .player-youtube iframe { display: block; width: 100%; height: 100%; border: 0; background: #000; }
+.player-youtube-error { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 2rem; box-sizing: border-box; text-align: center; color: #fff; background: #000; }
+
+.pv-desc-text p { margin: 0 0 0.9rem; }
+.pv-desc-text ul, .pv-desc-text ol { margin: 0 0 0.9rem; padding-left: 1.5rem; list-style-position: outside; }
+.pv-desc-text li { margin: 0.2rem 0; }

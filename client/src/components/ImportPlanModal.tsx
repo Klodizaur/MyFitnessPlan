@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { Check, Download, FileJson, FileUp, Upload, X } from 'lucide-react';
+import Modal, { CloseButton } from './modal/Modal';
 
 type Props = {
   onClose: () => void;
@@ -127,41 +128,88 @@ export default function ImportPlanModal({ onClose, onImported }: Props) {
     }
   };
 
-  return createPortal(
-    <div className="wb-overlay wb-overlay-top pt-overlay" onClick={() => !busy && onClose()}>
-      <div className="wb-import-modal" onClick={e => e.stopPropagation()}>
-        <h3 className="wb-import-title">{t('transfer.import_title')}</h3>
-        <p className="wb-import-intro">{t('transfer.import_intro')}</p>
+  const [over, setOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const total = reports?.reduce((n, r) => n + r.workoutCount, 0) ?? 0;
 
-        <label className="pt-file">
-          <span>{fileName || t('transfer.choose_file')}</span>
-          <input
-            type="file"
-            accept=".json,application/json"
-            onChange={e => {
-              const selected = e.target.files?.[0];
-              if (selected) pickFile(selected);
-              e.target.value = '';
+  const clearFile = () => {
+    fileRef.current = null;
+    setFileName('');
+    setReports(null);
+    setError('');
+    setPlaylistDone('');
+  };
+
+  return (
+    <Modal width={520} onClose={onClose} busy={busy} label={t('transfer.import_title')}>
+      <div className="md-head" style={{ paddingBottom: 8 }}>
+        <div className="md-icon"><FileUp size={24} /></div>
+        <div style={{ flex: 1 }} />
+        <CloseButton onClick={onClose} disabled={busy} />
+      </div>
+
+      <div className="md-body">
+        <div>
+          <h2 className="md-title">{t('transfer.import_title')}</h2>
+          <p className="md-text">{t('transfer.import_intro')}</p>
+        </div>
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={e => {
+            const selected = e.target.files?.[0];
+            if (selected) pickFile(selected);
+            e.target.value = '';
+          }}
+        />
+
+        {!fileName ? (
+          <div
+            className={`md-drop${over ? ' is-over' : ''}`}
+            role="button"
+            tabIndex={0}
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
+            onDragOver={e => { e.preventDefault(); setOver(true); }}
+            onDragLeave={() => setOver(false)}
+            onDrop={e => {
+              e.preventDefault();
+              setOver(false);
+              const dropped = e.dataTransfer.files?.[0];
+              if (dropped) pickFile(dropped);
             }}
-            style={{ display: 'none' }}
-          />
-        </label>
+          >
+            <div className="md-drop-icon"><Upload size={20} /></div>
+            <strong>{t('transfer.choose_file')}</strong>
+            <span>{t('transfer.or_drop')}</span>
+          </div>
+        ) : (
+          <div className="md-file">
+            <div className="md-file-icon"><FileJson size={18} /></div>
+            <div className="md-file-text">
+              <div className="md-file-name">{fileName}</div>
+              <div className="md-file-sub">
+                {reports ? t('transfer.stat_workouts', { count: total }) : t('transfer.working')}
+              </div>
+            </div>
+            <button type="button" className="md-file-x" onClick={clearFile} disabled={busy} aria-label={t('transfer.remove_file')}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {reports?.map(report => (
-          <div className="pt-report" key={report.importedAs}>
-            <div className="pt-report-name">{report.importedAs}</div>
-            <div className="pt-stats">
+          <div className="md-report" key={report.importedAs}>
+            <div className="md-report-name">{report.importedAs}</div>
+            <div className="md-report-stats">
               <span>{t('transfer.stat_workouts', { count: report.workoutCount })}</span>
               <span>{t('transfer.stat_found', { found: report.matched + report.willCreate, total: report.videoCount })}</span>
             </div>
-            {report.willCreate > 0 && (
-              <div className="pt-note pt-note-good">{t('transfer.will_add', { count: report.willCreate })}</div>
-            )}
-            {report.missing > 0 && (
-              <div className="pt-note pt-note-warn">
-                {t('transfer.missing_local', { count: report.missing })}
-              </div>
-            )}
+            {report.willCreate > 0 && <div className="md-good"><Check size={14} />{t('transfer.will_add', { count: report.willCreate })}</div>}
+            {report.missing > 0 && <div className="md-warn">{t('transfer.missing_local', { count: report.missing })}</div>}
           </div>
         ))}
 
@@ -169,45 +217,40 @@ export default function ImportPlanModal({ onClose, onImported }: Props) {
             missing — the plan may import cleanly and still be nicer with the
             playlist's thumbnails behind it. */}
         {reports && (
-          <div className="pt-playlist">
-            <div className="pt-playlist-q">{t('transfer.playlist_q')}</div>
-            <p className="wb-import-note">{t('transfer.playlist_hint')}</p>
-            <div className="pt-playlist-row">
-              <input
-                className="wb-input"
-                value={playlistUrl}
-                onChange={e => setPlaylistUrl(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') addPlaylist(); }}
-                placeholder="https://www.youtube.com/playlist?list=..."
-                disabled={busy}
-              />
-              <button
-                className="wb-btn wb-btn-primary"
-                onClick={addPlaylist}
-                disabled={busy || !playlistUrl.trim()}
-              >
+          <div className="md-playlist">
+            <strong>{t('transfer.playlist_q')}</strong>
+            <p>{t('transfer.playlist_hint')}</p>
+            <div className="md-playlist-row">
+              <label className="md-field">
+                <input
+                  value={playlistUrl}
+                  onChange={e => setPlaylistUrl(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addPlaylist(); }}
+                  placeholder="https://www.youtube.com/playlist?list=..."
+                  disabled={busy}
+                />
+              </label>
+              <button type="button" className="md-btn" onClick={addPlaylist} disabled={busy || !playlistUrl.trim()}>
                 {t('transfer.playlist_add')}
               </button>
             </div>
-            {playlistDone && <div className="pt-note pt-note-good">{playlistDone}</div>}
+            {playlistDone && <div className="md-good"><Check size={14} />{playlistDone}</div>}
           </div>
         )}
 
-        {error && <div className="wb-import-error">{error}</div>}
-
-        <div className="wb-actions">
-          <button className="wb-btn wb-btn-ghost" onClick={onClose} disabled={busy}>
-            {t('transfer.cancel')}
-          </button>
-          <button className="wb-btn wb-btn-primary" onClick={doImport} disabled={busy || !reports}>
-            {/* Always just "Import". The note above already says what won't come
-                across; an "anyway" here would make a normal outcome sound like
-                a decision to regret. */}
-            {busy ? t('transfer.working') : t('transfer.import_btn')}
-          </button>
-        </div>
+        {error && <div className="md-error" role="alert">{error}</div>}
       </div>
-    </div>,
-    document.body
+
+      <div className="md-foot">
+        <button type="button" className="md-btn" onClick={onClose} disabled={busy}>{t('transfer.cancel')}</button>
+        {/* Always just "Import". The note above already says what won't come
+            across; an "anyway" here would make a normal outcome sound like a
+            decision to regret. */}
+        <button type="button" className="md-btn md-btn--primary" onClick={doImport} disabled={busy || !reports}>
+          <Download size={16} />
+          {busy ? t('transfer.working') : t('transfer.import_btn')}
+        </button>
+      </div>
+    </Modal>
   );
 }

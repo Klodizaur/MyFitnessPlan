@@ -19,6 +19,9 @@
 
 .rx a { color: var(--t-ink); }
 .rx a:hover { color: var(--t-accent); }
+/* The wordmark is always the accent, whatever the generic link colours say. */
+.rx a.rx-brand,
+.rx a.rx-brand:hover { color: var(--t-accent); }
 
 /* Content column: 1200px max, 32px page padding on desktop, 16px on mobile. */
 .rx-wrap {
@@ -109,14 +112,46 @@
   cursor: pointer;
 }
 
+/* --- Tablet: the same card, tighter -------------------------------------------
+   Between the phone layout and a wide window the bar is too long for its links:
+   drop the wordmark (the logo still says whose it is) and close up the spacing. */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .rx-nav { gap: 12px; padding: 8px 8px 8px 12px; }
+  .rx-brand-text { display: none; }
+  .rx-nav-links { gap: 2px; }
+  .rx-nav-links a { padding: 8px 11px; font-size: 14px; }
+}
+
 /* --- Mobile header + bottom tab bar ---------------------------------------- */
+/* The phone header is a floating card like the desktop nav, and it follows the
+   page as you scroll. --rx-stick is how far down it reaches, for anything else
+   that sticks (the Library toolbar) to sit below it. */
+.rx { --rx-stick: 0px; }
+
 .rx-mobile-head {
+  position: sticky;
+  top: 8px;
+  z-index: 12;
   height: 52px;
+  /* Bottom margin matches the 12px page-coloured halo below, so at the top of a
+     page the halo sits in the gap instead of over the first line of content. */
+  margin: 8px 12px 12px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px 0 16px;
+  padding: 0 6px 0 12px;
+  background: color-mix(in srgb, var(--t-surface) 94%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-r-card);
+  /* A page-coloured margin all round, so scrolling content never peeks out
+     around the card. */
+  box-shadow: 0 0 0 12px var(--t-page);
 }
+
+.rx-has-tabs { --rx-stick: 72px; }
 
 .rx-mobile-head .rx-brand { font-size: 15px; flex: 1; gap: 8px; }
 .rx-mobile-head .rx-brand img { width: 28px; height: 28px; }
@@ -191,18 +226,16 @@
 }
 
 .rx-btn--primary {
-  background: var(--t-ink);
-  border-color: var(--t-ink);
-  color: var(--t-on-ink);
+  background: var(--t-btn);
+  border-color: var(--t-btn);
+  color: var(--t-on-btn);
   font-weight: 700;
 }
 
-.rx-btn--soft {
-  background: var(--t-tint);
-  border-color: transparent;
-  color: var(--t-ink);
-}
-
+.rx-btn { transition: background-color 0.15s, border-color 0.15s, filter 0.15s; }
+.rx-btn:not(.rx-btn--primary):hover:not(:disabled) { border-color: var(--t-accent); background: var(--t-tint); }
+.rx-btn--primary:hover:not(:disabled) { filter: brightness(1.18); }
+.rx-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
 .rx-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* --- Cards ------------------------------------------------------------------ */
@@ -297,6 +330,32 @@
   justify-content: center;
 }
 
+/* --- Favourite heart on a cover -----------------------------------------------
+   A small light chip in a corner of the image: ink outline when off, filled in
+   the accent when on. The parent supplies the positioning context. */
+.rx-heart {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--t-surface) 86%, transparent);
+  color: var(--t-ink);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+.rx-heart--top { top: 8px; bottom: auto; }
+.rx-heart:hover { background: var(--t-surface); }
+.rx-heart.is-on { color: var(--t-accent); }
+.rx-heart.is-on svg { fill: currentColor; }
+
 /* --- Progress bar ----------------------------------------------------------- */
 .rx-progress {
   height: 8px;
@@ -348,6 +407,7 @@
   cursor: pointer;
   padding: 0;
 }
+.rx-link:hover { text-decoration: underline; }
 
 .rx-muted { color: var(--t-ink-muted); }
 
@@ -361,5 +421,73 @@
 
 @media (max-width: 767px) {
   .rx-wrap { padding-left: 16px; padding-right: 16px; }
-  .rx-h1 { font-size: 32px; }
+  .rx-h1 { font-size: 32px; }}
+
+/* --- Pop-ups: notices and background jobs ------------------------------------------
+   Dark cards that float above the page (and above the phone's tab bar), the same
+   family as Settings' unsaved-changes bar, so an error is never bare text. */
+.toaster {
+  position: fixed;
+  z-index: 3000;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: 480px;
+  max-width: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 10px 12px 16px;
+  border-radius: 16px;
+  background: var(--t-btn);
+  color: var(--t-on-btn);
+  box-shadow: 0 12px 32px rgba(40, 14, 4, 0.3);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.toast > svg { flex-shrink: 0; margin-top: 1px; color: var(--t-accent-soft); }
+.toast--error > svg { color: #FF9C8F; }
+.toast span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast button { width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 8px; background: none; color: inherit; opacity: 0.7; cursor: pointer; }
+.toast button:hover { opacity: 1; }
+
+.job,
+.job-pill {
+  position: fixed;
+  z-index: 3000;
+  right: 24px;
+  bottom: 24px;
+  background: var(--t-btn);
+  color: var(--t-on-btn);
+  box-shadow: 0 12px 32px rgba(40, 14, 4, 0.3);
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+.job { width: 340px; max-width: calc(100% - 24px); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 14px 16px; border-radius: 18px; }
+.job-head { display: flex; align-items: center; gap: 10px; }
+.job-icon { display: flex; color: var(--t-accent-soft); }
+.job.is-error .job-icon { color: #FF9C8F; }
+.job-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.job-title strong { font-size: 14px; }
+.job-title span { font-size: 12px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 8px; background: none; color: inherit; opacity: 0.7; cursor: pointer; }
+.job-btn:hover { opacity: 1; }
+.job-bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--t-on-ink) 22%, transparent); overflow: hidden; }
+.job-bar span { display: block; height: 100%; border-radius: 3px; background: var(--t-accent-soft); transition: width 0.3s; }
+.job-bar span.is-done { background: #7FD8A4; }
+.job.is-error .job-bar span { background: #FF9C8F; }
+.job-count { font-size: 13px; opacity: 0.85; }
+.job-error { padding: 8px 10px; border-radius: 10px; background: rgba(255, 156, 143, 0.16); color: #FFC4BB; font-size: 13px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.job-stop { align-self: flex-start; height: 32px; padding: 0 14px; border: none; border-radius: 10px; background: var(--t-accent-soft); color: var(--t-ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.job-pill { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border: none; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+@media (max-width: 767px) {
+  .toaster { bottom: 84px; }
+  .job { right: 12px; left: 12px; width: auto; bottom: 84px; max-width: none; }
+  .job-pill { right: 12px; bottom: 84px; }}

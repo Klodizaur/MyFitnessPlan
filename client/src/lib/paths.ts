@@ -72,3 +72,14 @@ export function fromAlbumRouteParam(param: string | undefined): string {
 export function videoStreamUrl(rel: string): string {
   return `/videos/${pathSegments(rel).map(encodeURIComponent).join('/')}`;
 }
+
+/**
+ * The Favourites album isn't a folder: it gathers every starred video from all
+ * of them. This key can't collide with a real folder because folder keys are
+ * either `.` or an ordinary directory name, and `__` names are reserved here.
+ */
+export const FAVORITES_ALBUM_KEY = '__favorites';
+
+export function isFavoritesAlbumKey(key: string): boolean {
+  return key === FAVORITES_ALBUM_KEY;
+}

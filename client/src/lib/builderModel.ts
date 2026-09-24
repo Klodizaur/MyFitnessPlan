@@ -28,13 +28,44 @@ export interface BuilderWeek {
   days: BuilderDay[];
 }
 
-/** A week of seven empty day slots. */
-export const createWeek = (weekNumber: number): BuilderWeek => ({
+/**
+ * A week of empty workout-day slots.
+ *
+ * A builder "week" is one turn of the plan's workout rhythm, and holds only its
+ * workout days — the rest days are drawn between them from the rhythm, never
+ * stored. So the slot count follows the rhythm (five workouts in a seven-day
+ * cycle is five slots); it defaults to seven for callers that don't have one.
+ */
+export const createWeek = (weekNumber: number, slots = 7): BuilderWeek => ({
   name: `Week ${weekNumber}`,
-  days: Array.from({ length: 7 }, (_, i) => ({
+  days: Array.from({ length: slots }, (_, i) => ({
     name: `Day ${i + 1}`,
     videoIds: [] as string[],
   })),
 });
+
+/** Workout days in one turn of a rhythm; a rhythm with none is treated as one. */
+export const workoutSlots = (pattern: number[]): number =>
+  Math.max(1, pattern.filter(day => day === 1).length);
+
+/**
+ * Re-deal the plan's workouts into weeks of `slots` workout days.
+ *
+ * The order of the workouts is what a plan *is*; how they group into weeks is
+ * only how the rhythm lays them out. So when the rhythm changes, the filled days
+ * are taken in order and dealt into the new week size — nothing is lost or
+ * reordered, later workouts just move to where the new rhythm puts them. Empty
+ * days carry no meaning (they are dropped on save) so they are not carried over;
+ * the last week is padded back out to a full week.
+ */
+export function relayoutWeeks(weeks: BuilderWeek[], slots: number): BuilderWeek[] {
+  const filled = weeks.flatMap(week => week.days).filter(day => day.videoIds.length > 0);
+  const count = Math.max(1, Math.ceil(filled.length / slots));
+  return Array.from({ length: count }, (_, w) => {
+    const week = createWeek(w + 1, slots);
+    filled.slice(w * slots, (w + 1) * slots).forEach((day, i) => { week.days[i] = day; });
+    return week;
+  });
+}
 
 export const createInitialBuilderWeeks = (): BuilderWeek[] => [createWeek(1)];

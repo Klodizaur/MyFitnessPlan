@@ -34,15 +34,15 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           {/* Not yet redesigned: still wrapped in the old page container so
               their existing layout holds until each one is migrated. */}
-          <Route path="/plans" element={<Legacy><Plans /></Legacy>} />
-          <Route path="/calendar" element={<Legacy><Calendar /></Legacy>} />
-          <Route path="/profile" element={<Legacy><Profile /></Legacy>} />
-          <Route path="/settings" element={<Legacy><Settings /></Legacy>} />
+          <Route path="/plans" element={<Plans />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/library" element={<Library />} />
           <Route path="/library/:albumId" element={<Album />} />
           <Route path="/library/:albumId/:subId" element={<Album />} />
-          <Route path="/player/:videoId/:workoutId" element={<Legacy><Player /></Legacy>} />
-          <Route path="/player/:videoId" element={<Legacy><Player /></Legacy>} />
+          <Route path="/player/:videoId/:workoutId" element={<Player />} />
+          <Route path="/player/:videoId" element={<Player />} />
         </Routes>
       </main>
 
@@ -51,11 +51,6 @@ function App() {
       <AiCleanupProgress />
     </AppShell>
   );
-}
-
-/** Wrapper for screens still on the old design. Deleted as each is migrated. */
-function Legacy({ children }: { children: React.ReactNode }) {
-  return <div className="app-container legacy-page">{children}</div>;
 }
 
 export default App;

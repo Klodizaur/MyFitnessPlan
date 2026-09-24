@@ -216,6 +216,11 @@ for (const col of ['video_codec', 'audio_codec']) {
     db.exec(`ALTER TABLE videos ADD COLUMN ${col} TEXT`);
   }
 }
+// Starred videos, gathered into a "Favourites" album in the Library. Rescans
+// update rows in place, so the flag survives them.
+if (!codecInfo.some((c: any) => c.name === 'is_favorite')) {
+  db.exec('ALTER TABLE videos ADD COLUMN is_favorite INTEGER DEFAULT 0');
+}
 if (!codecInfo.some((c: any) => c.name === 'codec_probed')) {
   db.exec('ALTER TABLE videos ADD COLUMN codec_probed INTEGER DEFAULT 0');
 }
@@ -229,6 +234,13 @@ if (!hasBackgroundImage) {
 const hasBackgroundBlur = planInfo.some(col => col.name === 'background_blur');
 if (!hasBackgroundBlur) {
   db.exec('ALTER TABLE workout_plans ADD COLUMN background_blur INTEGER DEFAULT 0');
+}
+
+// Plans the user has starred. They are gathered under a "Favourites" heading at
+// the top of the Plans page.
+const hasFavorite = planInfo.some(col => col.name === 'is_favorite');
+if (!hasFavorite) {
+  db.exec('ALTER TABLE workout_plans ADD COLUMN is_favorite INTEGER DEFAULT 0');
 }
 
 // Optional grouping label for the Plans page. Holds either a known preset key

@@ -6,11 +6,14 @@ import FiltersSheet from '../components/library/FiltersSheet';
 import {
   AddFromYouTubeCard, AddFromYouTubeRow, FolderCard, FolderItem, FolderRow, VideoGridCard, VideoListRow,
 } from '../components/library/LibraryCards';
-import { matchesQuery, matchesSource, matchesTags, useFilterMatchMode, SourceFilter } from '../lib/filters';
+import { EMPTY_LENGTH, isLengthActive, LengthRange, matchesLength, matchesQuery, matchesSource, matchesTags, useFilterMatchMode, SourceFilter } from '../lib/filters';
+import { useLengthLabel } from '../components/library/LengthFilter';
 import { useMetaLabels } from '../lib/labels';
-import { albumKeyForVideo, isExternalAlbumKey, toAlbumRouteParam } from '../lib/paths';
+import { albumKeyForVideo, FAVORITES_ALBUM_KEY, isExternalAlbumKey, toAlbumRouteParam } from '../lib/paths';
+import { toggleVideoFavorite } from '../lib/favorites';
 import { ImportResult, useDescriptionProgress, useImportAvailable } from '../lib/externalImport';
 import { useIsMobile } from '../lib/useIsMobile';
+import VideoDetailsModal from '../components/VideoDetailsModal';
 import YouTubeImportModal from '../components/YouTubeImportModal';
 import { Video } from '../types/video';
 import '../styles/library.css';
@@ -34,6 +37,7 @@ export default function Library() {
   const isMobile = useIsMobile();
 
   const [videos, setVideos] = useState<Video[]>([]);
+  const [detailsVideo, setDetailsVideo] = useState<Video | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<LibrarySort>('az');
   const [view, setView] = useState<LibraryView | null>(null);
@@ -42,6 +46,8 @@ export default function Library() {
   const [trainingType, setTrainingType] = useState<string[]>([]);
   const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [intensity, setIntensity] = useState<string[]>([]);
+  const [length, setLength] = useState<LengthRange>(EMPTY_LENGTH);
+  const lengthLabel = useLengthLabel();
   const [matchMode, setMatchMode] = useFilterMatchMode();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE);
@@ -66,7 +72,7 @@ export default function Library() {
   // while that runs rather than leaving the user to reload the page.
   useDescriptionProgress(justImported, loadVideos);
 
-  const filterCount = equipment.length + trainingType.length + bodyParts.length + intensity.length;
+  const filterCount = equipment.length + trainingType.length + bodyParts.length + intensity.length + (isLengthActive(length) ? 1 : 0);
   const trimmedQuery = query.trim();
   const isFiltering = filterCount > 0 || trimmedQuery.length > 0;
 
@@ -77,8 +83,9 @@ export default function Library() {
     if (!matchesTags(video.training_type, trainingType, 'any')) return false;
     if (!matchesTags(video.body_parts, bodyParts, 'any')) return false;
     if (intensity.length > 0 && !intensity.includes(video.intensity || '')) return false;
+    if (!matchesLength(video.duration_seconds, length)) return false;
     return true;
-  }), [videos, source, equipment, trainingType, bodyParts, intensity, matchMode]);
+  }), [videos, source, equipment, trainingType, bodyParts, intensity, length, matchMode]);
 
   const albums = useMemo<FolderItem[]>(() => {
     const map = new Map<string, Video[]>();
@@ -89,7 +96,7 @@ export default function Library() {
       map.set(key, arr);
     }
 
-    const result = Array.from(map.entries()).map(([key, vids]) => {
+    const result: FolderItem[] = Array.from(map.entries()).map(([key, vids]) => {
       const stored = localStorage.getItem(`albumImage:${key}`);
       return {
         key,
@@ -103,10 +110,24 @@ export default function Library() {
     });
 
     if (sort === 'size') result.sort((a, b) => b.count - a.count);
+    else if (sort === 'small') result.sort((a, b) => a.count - b.count);
     else result.sort((a, b) => naturalCompare(a.title, b.title));
     if (sort === 'za') result.reverse();
     // Imported playlists group together after the user's own folders.
     result.sort((a, b) => Number(a.isExternal) - Number(b.isExternal));
+
+    // Favourites is pinned first whatever the sort: it's a shortcut, not a folder.
+    const starred = filteredVideos.filter(v => v.is_favorite);
+    if (starred.length > 0) {
+      result.unshift({
+        key: FAVORITES_ALBUM_KEY,
+        title: t('library.favorites'),
+        cover: starred[0].thumbnail_path ? `/thumbnails/${starred[0].thumbnail_path}` : null,
+        count: starred.length,
+        isExternal: false,
+        isFavorites: true,
+      });
+    }
     return result;
   }, [filteredVideos, sort, t]);
 
@@ -129,6 +150,7 @@ export default function Library() {
       matchesQuery([v.filename, v.description], trimmedQuery));
     const sorted = [...found];
     if (sort === 'size') sorted.sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0));
+    else if (sort === 'small') sorted.sort((a, b) => (a.duration_seconds || 0) - (b.duration_seconds || 0));
     else sorted.sort((a, b) => naturalCompare(a.filename, b.filename));
     if (sort === 'za') sorted.reverse();
     return sorted;
@@ -154,10 +176,14 @@ export default function Library() {
       key: `int:${v}`, label: labels.intensity(v), category: 'intensity' as const,
       remove: () => setIntensity(prev => prev.filter(x => x !== v)),
     })),
+    ...(isLengthActive(length) ? [{
+      key: 'length', label: lengthLabel(length), category: 'length' as const,
+      remove: () => setLength(EMPTY_LENGTH),
+    }] : []),
   ];
 
   const clearAll = () => {
-    setEquipment([]); setTrainingType([]); setBodyParts([]); setIntensity([]); setQuery('');
+    setEquipment([]); setTrainingType([]); setBodyParts([]); setIntensity([]); setLength(EMPTY_LENGTH); setQuery('');
   };
 
   const openAlbum = (key: string) =>
@@ -201,6 +227,7 @@ export default function Library() {
         sort={sort}
         onSort={setSort}
         sizeLabel={t('library.sort_most_videos')}
+        smallLabel={t('library.sort_fewest_videos')}
         view={effectiveView}
         onView={setView}
         activeChips={activeChips}
@@ -257,7 +284,10 @@ export default function Library() {
                     key={video.id}
                     video={video}
                     meta={video.relative_path ? video.relative_path.split('/').slice(0, -1).join(' / ') : undefined}
-                    onOpen={() => navigate(`/player/${video.id}`)}
+                    onOpen={() => setDetailsVideo(video)}
+                    onPlay={() => navigate(`/player/${video.id}`)}
+                    onInfo={() => setDetailsVideo(video)}
+                    onFavorite={() => toggleVideoFavorite(video, setVideos)}
                   />
                 ))}
               </div>
@@ -268,7 +298,10 @@ export default function Library() {
                     key={video.id}
                     video={video}
                     meta={video.relative_path ? video.relative_path.split('/').slice(0, -1).join(' / ') : undefined}
-                    onOpen={() => navigate(`/player/${video.id}`)}
+                    onOpen={() => setDetailsVideo(video)}
+                    onPlay={() => navigate(`/player/${video.id}`)}
+                    onInfo={() => setDetailsVideo(video)}
+                    onFavorite={() => toggleVideoFavorite(video, setVideos)}
                   />
                 ))}
               </div>
@@ -294,11 +327,21 @@ export default function Library() {
         onBodyParts={setBodyParts}
         intensity={intensity}
         onIntensity={setIntensity}
+        length={length}
+        onLength={setLength}
         matchMode={matchMode}
         onMatchMode={setMatchMode}
         onClearAll={clearAll}
         resultCount={filteredVideos.length}
       />
+
+      {detailsVideo && (
+        <VideoDetailsModal
+          video={detailsVideo}
+          onClose={() => setDetailsVideo(null)}
+          onSaved={updated => setVideos(prev => prev.map(v => (v.id === updated.id ? updated : v)))}
+        />
+      )}
 
       {isImportOpen && (
         <YouTubeImportModal onClose={() => setIsImportOpen(false)} onImported={handleImported} />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { Archive, Check, Download, Info } from 'lucide-react';
+import Modal, { CloseButton } from './modal/Modal';
 
 type Props = {
   /** A single plan's id, or null to back up every plan. */
@@ -22,17 +23,18 @@ function safeFilename(name: string): string {
 /**
  * Export dialog.
  *
- * The whole point of the disclaimer here is that the same file means two
- * different things depending on what's inside it, and nobody is going to read a
- * manual to find that out: a plan made only of YouTube videos is something you
- * can hand to another person, and one with your own files on disk is a backup
- * for you. So the file is fetched first and the message is chosen from what it
- * actually contains, rather than explaining both cases every time.
+ * The whole point of the note here is that the same file means two different
+ * things depending on what's inside it, and nobody is going to read a manual to
+ * find that out: a plan made only of YouTube videos is something you can hand to
+ * another person, and one with your own files on disk is a backup for you. So the
+ * file is fetched first and the message is chosen from what it actually
+ * contains, rather than explaining both cases every time.
  */
 export default function ExportPlanModal({ planId, planName, onClose }: Props) {
   const { t } = useTranslation();
   const [file, setFile] = useState<ExportFile | null>(null);
   const [error, setError] = useState('');
+  const [downloaded, setDownloaded] = useState(false);
 
   useEffect(() => {
     const url = planId ? `/api/plan/export?ids=${encodeURIComponent(planId)}` : '/api/plan/export';
@@ -42,15 +44,13 @@ export default function ExportPlanModal({ planId, planName, onClose }: Props) {
       .catch(() => setError(t('transfer.export_failed')));
   }, [planId, t]);
 
-  const videos = file
-    ? file.plans.flatMap(p => p.workouts.flatMap(w => w.videos))
-    : [];
+  const videos = file ? file.plans.flatMap(p => p.workouts.flatMap(w => w.videos)) : [];
   const localCount = videos.filter(v => v.source === 'local').length;
   const externalCount = videos.length - localCount;
   const workoutCount = file ? file.plans.reduce((n, p) => n + p.workouts.length, 0) : 0;
 
   const download = () => {
-    if (!file) return;
+    if (!file || downloaded) return;
     const stamp = new Date().toISOString().split('T')[0];
     const name = planId
       ? `${safeFilename(planName || file.plans[0]?.name || 'plan')}.mfp-plan.json`
@@ -65,57 +65,54 @@ export default function ExportPlanModal({ planId, planName, onClose }: Props) {
     link.remove();
     // Freed on the next tick: revoking immediately can cancel the download.
     setTimeout(() => URL.revokeObjectURL(href), 1000);
-    onClose();
+    setDownloaded(true);
   };
 
-  return createPortal(
-    <div className="wb-overlay wb-overlay-top pt-overlay" onClick={onClose}>
-      <div className="wb-import-modal" onClick={e => e.stopPropagation()}>
-        <h3 className="wb-import-title">
-          {planId ? t('transfer.export_title') : t('transfer.export_all_title')}
-        </h3>
+  const notes: string[] = [];
+  if (externalCount > 0 && localCount === 0) notes.push(t('transfer.note_shareable'));
+  if (localCount > 0 && externalCount > 0) notes.push(t('transfer.note_shareable_partial', { count: externalCount }));
+  if (localCount > 0) notes.push(t('transfer.note_local', { count: localCount }));
 
-        {error && <div className="wb-import-error">{error}</div>}
+  return (
+    <Modal width={540} onClose={onClose} label={planId ? t('transfer.export_title') : t('transfer.export_all_title')}>
+      <div className="md-head" style={{ paddingBottom: 8 }}>
+        <div className="md-icon"><Archive size={24} /></div>
+        <div style={{ flex: 1 }} />
+        <CloseButton onClick={onClose} />
+      </div>
 
-        {!file && !error && <p className="wb-import-intro">{t('transfer.preparing')}</p>}
+      <div className="md-body">
+        <div>
+          <h2 className="md-title">{planId ? t('transfer.export_title') : t('transfer.export_all_title')}</h2>
+          {file && planId && <p className="md-text">{file.plans[0]?.name}</p>}
+        </div>
+
+        {error && <div className="md-error" role="alert">{error}</div>}
+        {!file && !error && <p className="md-text">{t('transfer.preparing')}</p>}
 
         {file && (
           <>
-            <p className="wb-import-intro">
-              {planId
-                ? file.plans[0]?.name
-                : t('transfer.export_all_summary', { plans: file.plans.length })}
-            </p>
-            <div className="pt-stats">
-              <span>{t('transfer.stat_workouts', { count: workoutCount })}</span>
-              <span>{t('transfer.stat_videos', { count: videos.length })}</span>
+            <div className="md-stats">
+              <div className="md-stat"><div className="md-stat-value">{file.plans.length}</div><div className="md-stat-label">{t('transfer.stat_plans', { count: file.plans.length })}</div></div>
+              <div className="md-stat"><div className="md-stat-value">{workoutCount}</div><div className="md-stat-label">{t('transfer.stat_workouts_label', { count: workoutCount })}</div></div>
+              <div className="md-stat"><div className="md-stat-value">{videos.length}</div><div className="md-stat-label">{t('transfer.stat_videos_label', { count: videos.length })}</div></div>
             </div>
-
-            {/* Only the case that applies. Both are shown for a mixed plan,
-                because both are true of it. */}
-            {externalCount > 0 && localCount === 0 && (
-              <div className="pt-note pt-note-good">{t('transfer.note_shareable')}</div>
-            )}
-            {localCount > 0 && externalCount === 0 && (
-              <div className="pt-note">{t('transfer.note_local', { count: localCount })}</div>
-            )}
-            {localCount > 0 && externalCount > 0 && (
-              <>
-                <div className="pt-note pt-note-good">{t('transfer.note_shareable_partial', { count: externalCount })}</div>
-                <div className="pt-note">{t('transfer.note_local', { count: localCount })}</div>
-              </>
+            {notes.length > 0 && (
+              <div className="md-note">
+                {notes.map(text => <p key={text}><Info size={16} /><span>{text}</span></p>)}
+              </div>
             )}
           </>
         )}
-
-        <div className="wb-actions">
-          <button className="wb-btn wb-btn-ghost" onClick={onClose}>{t('transfer.cancel')}</button>
-          <button className="wb-btn wb-btn-primary" onClick={download} disabled={!file}>
-            {t('transfer.download')}
-          </button>
-        </div>
       </div>
-    </div>,
-    document.body
+
+      <div className="md-foot">
+        <button type="button" className="md-btn" onClick={onClose}>{t('transfer.cancel')}</button>
+        <button type="button" className={`md-btn ${downloaded ? 'md-btn--done' : 'md-btn--primary'}`} onClick={download} disabled={!file}>
+          {downloaded ? <Check size={16} /> : <Download size={16} />}
+          {downloaded ? t('transfer.downloaded') : t('transfer.download')}
+        </button>
+      </div>
+    </Modal>
   );
 }

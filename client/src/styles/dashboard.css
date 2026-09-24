@@ -270,10 +270,22 @@
 
 .dash-up-video:hover { background: var(--t-subtle); }
 
+/* "+5 more" is a small pill button now, not a caption: it leads to the calendar. */
 .dash-up-more {
-  font-size: 12px;
+  align-self: flex-start;
+  height: 34px;
+  padding: 0 16px;
+  border: 1.5px solid var(--t-border);
+  border-radius: 999px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 600;
+  cursor: pointer;
 }
+
+.dash-up-more:hover { background: var(--t-subtle); border-color: var(--t-accent); }
 
 .dash-up-dow {
   display: block;

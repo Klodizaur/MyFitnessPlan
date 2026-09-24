@@ -1,12 +1,13 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowRight, Check, ChevronLeft, ChevronRight, Dumbbell, GripVertical, Moon,
+  ArrowRight, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, Dumbbell, GripVertical, Minus, Moon,
   MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, X,
 } from 'lucide-react';
-import { BuilderWeek } from '../../lib/builderModel';
-import { matchesQuery, matchesTags } from '../../lib/filters';
+import { BuilderWeek, createWeek, relayoutWeeks, workoutSlots } from '../../lib/builderModel';
+import { EMPTY_LENGTH, isLengthActive, LengthRange, matchesLength, matchesQuery, matchesTags } from '../../lib/filters';
+import LengthFilter from '../library/LengthFilter';
 import { useMetaLabels } from '../../lib/labels';
 import { BODY_PARTS, INTENSITIES, TRAINING_TYPES } from '../../lib/metadata';
 import { EQUIPMENT_ITEMS } from '../../lib/equipment';
@@ -15,6 +16,7 @@ import { useIsMobile } from '../../lib/useIsMobile';
 import { formatDuration, stripVideoExt, useVideoTags } from '../../lib/videoTags';
 import YouTubeGlyph from '../icons/YouTubeGlyph';
 import { TagRow } from '../library/LibraryCards';
+import type { LibrarySort } from '../library/LibraryToolbar';
 import { Video } from '../../types/video';
 import '../../styles/builder.css';
 
@@ -26,10 +28,6 @@ export interface PlanBuilderScreenProps {
   onName: (value: string) => void;
   description: string;
   onDescription: (value: string) => void;
-  /** Kept out of the handoff's Details tab, but the create API needs one. */
-  startDate: string;
-  onStartDate: (value: string) => void;
-
   categories: { value: string; label: string }[];
   category: string;
   onCategory: (value: string) => void;
@@ -78,7 +76,12 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
 
   const [tab, setTab] = useState<Tab>('details');
   const [weekMenu, setWeekMenu] = useState(false);
+  // While true the custom category shows its text field; once you press Enter it
+  // becomes a chip like the presets, and clicking that chip reopens the field.
+  const [editingCustom, setEditingCustom] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [sort, setSort] = useState<LibrarySort>('az');
+  const [length, setLength] = useState<LengthRange>(EMPTY_LENGTH);
   const [query, setQuery] = useState('');
   const [folder, setFolder] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -95,6 +98,30 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
     setToast(message);
     toastTimer.current = window.setTimeout(() => setToast(null), 1600);
   };
+
+  // A week is one turn of the rhythm: its workout days are the slots, and the rest
+  // days come from the rhythm between them. Slots per week follow the rhythm, so
+  // changing it re-deals the workouts into weeks of the new size.
+  const slots = workoutSlots(props.pattern);
+  const cycle: ({ kind: 'work'; slot: number } | { kind: 'rest'; n: number })[] = (() => {
+    const out: ({ kind: 'work'; slot: number } | { kind: 'rest'; n: number })[] = [];
+    let slot = 0;
+    props.pattern.forEach((isWork, i) => {
+      if (isWork === 1) out.push({ kind: 'work', slot: slot++ });
+      else out.push({ kind: 'rest', n: i + 1 });
+    });
+    // A rhythm with no workout day can't be laid out; show the slots plainly.
+    return out.some(c => c.kind === 'work') ? out : [{ kind: 'work', slot: 0 }];
+  })();
+
+  useEffect(() => {
+    if (!props.weeks.some(w => w.days.length !== slots)) return;
+    const next = relayoutWeeks(props.weeks, slots);
+    props.onWeeks(next);
+    if (props.currentWeek >= next.length) props.onCurrentWeek(next.length - 1);
+    if (props.currentDay >= slots) props.onCurrentDay(slots - 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slots, props.weeks]);
 
   const week = props.weeks[props.currentWeek];
   const day = week?.days[props.currentDay];
@@ -123,9 +150,10 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
       .map(([key, v]) => ({ key, label: v.label }));
   }, [props.videos, t]);
 
-  const filterCount = equipment.length + trainingType.length + bodyParts.length + intensity.length;
+  const filterCount = equipment.length + trainingType.length + bodyParts.length + intensity.length + (isLengthActive(length) ? 1 : 0);
 
-  const pickable = useMemo(() => props.videos.filter(video => {
+  const pickable = useMemo(() => {
+    const found = props.videos.filter(video => {
     if (folder && albumKeyForVideo(video) !== folder) return false;
     if (!matchesQuery([video.filename, video.description], query)) return false;
     // OR inside a group, AND across groups.
@@ -133,8 +161,17 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
     if (!matchesTags(video.training_type, trainingType, 'any')) return false;
     if (!matchesTags(video.body_parts, bodyParts, 'any')) return false;
     if (intensity.length > 0 && !intensity.includes(video.intensity || '')) return false;
+    if (!matchesLength(video.duration_seconds, length)) return false;
     return true;
-  }), [props.videos, folder, query, equipment, trainingType, bodyParts, intensity]);
+    });
+    const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    const sorted = [...found];
+    if (sort === 'size') sorted.sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0));
+    else if (sort === 'small') sorted.sort((a, b) => (a.duration_seconds || 0) - (b.duration_seconds || 0));
+    else sorted.sort((a, b) => naturalCompare(a.filename, b.filename));
+    if (sort === 'za') sorted.reverse();
+    return sorted;
+  }, [props.videos, folder, query, equipment, trainingType, bodyParts, intensity, length, sort]);
 
   const setDayVideos = (next: string[]) => {
     props.onWeeks(props.weeks.map((w, wi) => wi !== props.currentWeek ? w : {
@@ -163,10 +200,7 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
   };
 
   const addWeek = () => {
-    props.onWeeks([...props.weeks, {
-      name: `Week ${props.weeks.length + 1}`,
-      days: Array.from({ length: 7 }, (_, i) => ({ name: `Day ${i + 1}`, videoIds: [] as string[] })),
-    }]);
+    props.onWeeks([...props.weeks, createWeek(props.weeks.length + 1, slots)]);
     props.onCurrentWeek(props.weeks.length);
     props.onCurrentDay(0);
     setWeekMenu(false);
@@ -204,6 +238,16 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
           <SlidersHorizontal size={16} />
           {filterCount ? `${t('library.filters')} · ${filterCount}` : t('library.filters')}
         </button>
+        <div className="pb-sort" title={t('library.sort')}>
+          <ArrowUpDown size={16} />
+          <ChevronDown size={13} />
+          <select value={sort} onChange={e => setSort(e.target.value as LibrarySort)} aria-label={t('library.sort')}>
+            <option value="az">{t('library.sort_az')}</option>
+            <option value="za">{t('library.sort_za')}</option>
+            <option value="size">{t('library.sort_longest')}</option>
+            <option value="small">{t('library.sort_shortest')}</option>
+          </select>
+        </div>
       </div>
 
       {filtersOpen && (
@@ -236,11 +280,15 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
               </div>
             </div>
           ))}
+          <div className="pb-filter-group">
+            <div className="pb-filter-label">{t('library.length')}</div>
+            <LengthFilter value={length} onChange={setLength} />
+          </div>
           {filterCount > 0 && (
             <button
               type="button"
               className="pb-clear-filters"
-              onClick={() => { setEquipment([]); setTrainingType([]); setBodyParts([]); setIntensity([]); }}
+              onClick={() => { setEquipment([]); setTrainingType([]); setBodyParts([]); setIntensity([]); setLength(EMPTY_LENGTH); }}
             >
               {t('plans.builder_clear_filters')}
             </button>
@@ -278,14 +326,14 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
             className={`pb-pick${inDay ? ' is-in' : ''}`}
             onClick={() => toggleVideo(video)}
           >
-            <span className="pb-pick-thumb">
+            <span className="pb-pick-thumb rx-thumb">
               {video.thumbnail_path
                 ? <img src={`/thumbnails/${video.thumbnail_path}`} alt="" loading="lazy" />
                 : <span className="pb-pick-noimg" />}
               <span className="pb-pick-mark">{inDay ? <Check size={16} /> : <Plus size={16} />}</span>
+              {duration && <span className="rx-dur">{duration}</span>}
             </span>
             <span className="pb-pick-title rx-clamp-2">{stripVideoExt(video.filename)}</span>
-            {duration && <span className="pb-pick-meta">{duration}</span>}
             <TagRow tags={tagsFor(video)} rows={1} />
           </button>
         );
@@ -326,7 +374,7 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
                 tabIndex={0}
                 className="pb-day-nav"
                 aria-label={t('plans.builder_next_day')}
-                onClick={e => { e.stopPropagation(); if (props.currentDay < 6) props.onCurrentDay(props.currentDay + 1); }}
+                onClick={e => { e.stopPropagation(); if (props.currentDay < slots - 1) props.onCurrentDay(props.currentDay + 1); }}
               >
                 <ChevronRight size={17} />
               </span>
@@ -458,23 +506,39 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
             <div>
               <div className="pb-label">{t('plans.builder_category')}</div>
               <div className="pb-cats">
-                {props.categories.map(cat => (
-                  <button
-                    key={cat.value}
-                    type="button"
-                    className={`pb-cat${props.category === cat.value ? ' is-on' : ''}`}
-                    onClick={() => props.onCategory(cat.value)}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
+                {props.categories.map(cat => {
+                  const isCustom = cat.value === 'custom';
+                  const named = isCustom && props.category === 'custom' && props.customCategory.trim() && !editingCustom;
+                  return (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      className={`pb-cat${props.category === cat.value ? ' is-on' : ''}`}
+                      onClick={() => {
+                        props.onCategory(cat.value);
+                        // Picking Custom (or the chip that stands for it) opens the field to type in.
+                        setEditingCustom(isCustom);
+                      }}
+                    >
+                      {named ? props.customCategory.trim() : cat.label}
+                    </button>
+                  );
+                })}
               </div>
-              {props.category === 'custom' && (
+              {props.category === 'custom' && (editingCustom || !props.customCategory.trim()) && (
                 <input
                   className="pb-input pb-input--inline"
                   value={props.customCategory}
                   onChange={e => props.onCustomCategory(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (props.customCategory.trim()) setEditingCustom(false);
+                    }
+                  }}
+                  onBlur={() => { if (props.customCategory.trim()) setEditingCustom(false); }}
                   placeholder={t('plans.category_custom_placeholder')}
+                  autoFocus={editingCustom}
                 />
               )}
             </div>
@@ -507,8 +571,30 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
                 ))}
               </div>
 
-              <div className="pb-rhythm-summary">
-                {t('plans.builder_rhythm_summary', { count: workoutDays })}
+              {/* The cycle itself can grow or shrink, so a plan isn't stuck with a
+                  seven-day week: "5 workout days in every [− 7 +] days". */}
+              <div className="pb-cycle">
+                <span>{t('settings.workout_days_in_every', { count: workoutDays })}</span>
+                <div className="pb-stepper">
+                  <button
+                    type="button"
+                    aria-label={t('settings.remove_day')}
+                    disabled={!props.patternCustom || props.pattern.length <= 1 || !props.pattern.slice(0, -1).some(v => v === 1)}
+                    onClick={() => props.onPattern(props.pattern.slice(0, -1))}
+                  >
+                    <Minus size={15} />
+                  </button>
+                  <span>{props.pattern.length}</span>
+                  <button
+                    type="button"
+                    aria-label={t('settings.add_day')}
+                    disabled={!props.patternCustom || props.pattern.length >= 14}
+                    onClick={() => props.onPattern([...props.pattern, 1])}
+                  >
+                    <Plus size={15} />
+                  </button>
+                </div>
+                <span>{t('settings.days_unit')}</span>
               </div>
               {!props.patternCustom && (
                 <div className="pb-hint">{t('plans.pattern_follows_settings')}</div>
@@ -524,19 +610,6 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
                 placeholder={t('plans.builder_description_placeholder')}
               />
               <div className="pb-hint">{t('plans.builder_description_hint')}</div>
-            </div>
-
-            {/* Not in the handoff's Details tab — the redesign moves choosing a
-                date to the Plans "start plan" sheet. Kept until that exists, so
-                creating a plan still sets one. */}
-            <div>
-              <div className="pb-label">{t('plans.builder_start_date')}</div>
-              <input
-                className="pb-input"
-                type="date"
-                value={props.startDate}
-                onChange={e => props.onStartDate(e.target.value)}
-              />
             </div>
 
             <button type="button" className="pb-next" onClick={() => setTab('schedule')}>
@@ -558,7 +631,7 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
                 >
                   {t('plans.builder_week_n', { n: i + 1 })}
                   <span className="pb-week-count">
-                    {w.days.filter(d => d.videoIds.length > 0).length}/7
+                    {w.days.filter(d => d.videoIds.length > 0).length}/{slots}
                   </span>
                 </button>
               ))}
@@ -596,23 +669,34 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
             <p className="pb-note">{t('plans.builder_empty_days_note')}</p>
 
             {isMobile && (
-              <div className="pb-day-pills">
-                {week.days.map((d, i) => (
+              <div className="pb-day-pills" style={{ ['--n' as string]: cycle.length }}>
+                {cycle.map((c, k) => c.kind === 'rest' ? (
+                  <span key={`r${k}`} className="pb-day-pill is-rest" aria-label={t('plans.builder_rest_day')}>
+                    <Moon size={15} />
+                  </span>
+                ) : (
                   <button
-                    key={i}
+                    key={`w${c.slot}`}
                     type="button"
-                    className={`pb-day-pill${i === props.currentDay ? ' is-on' : ''}`}
-                    onClick={() => props.onCurrentDay(i)}
+                    className={`pb-day-pill${c.slot === props.currentDay ? ' is-on' : ''}`}
+                    onClick={() => props.onCurrentDay(c.slot)}
                   >
-                    <span>{i + 1}</span>
-                    <span className={`pb-day-dot${d.videoIds.length ? ' has' : ''}`} />
+                    <span>{c.slot + 1}</span>
+                    <span className={`pb-day-dot${week.days[c.slot]?.videoIds.length ? ' has' : ''}`} />
                   </button>
                 ))}
               </div>
             )}
 
             <div className="pb-day-list">
-              {isMobile ? dayCard(props.currentDay) : week.days.map((_, i) => dayCard(i))}
+              {isMobile
+                ? dayCard(props.currentDay)
+                : cycle.map((c, k) => c.kind === 'rest' ? (
+                  <div key={`r${k}`} className="pb-rest">
+                    <Moon size={15} />
+                    {t('plans.builder_rest_day')}
+                  </div>
+                ) : dayCard(c.slot))}
             </div>
           </div>
 

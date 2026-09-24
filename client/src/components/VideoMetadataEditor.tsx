@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import EquipmentPicker from './EquipmentPicker';
-import { BodyPartIcon, IntensityIcon, TrainingTypeIcon, TRAINING_TYPES, BODY_PARTS } from '../lib/metadata';
+import {
+  Bold, Check, Code, Heading, Italic, Link as LinkIcon, List, ListOrdered, Quote, Sparkles, Strikethrough,
+  SignalHigh, SignalLow, SignalMedium,
+} from 'lucide-react';
+import { EQUIPMENT_ITEMS } from '../lib/equipment';
+import { BODY_PARTS, TRAINING_TYPES } from '../lib/metadata';
 import { useMetaLabels } from '../lib/labels';
 import { useAiAvailable } from '../lib/useAiAvailable';
 import { useTranslation } from 'react-i18next';
 import { Video } from '../types/video';
+import Modal, { CloseButton } from './modal/Modal';
 
 type Props = {
   video: Video;
@@ -14,58 +17,17 @@ type Props = {
   onSaved: (video: Video) => void;
 };
 
-const listIcon = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-    <line x1="3.5" y1="6" x2="3.51" y2="6" /><line x1="3.5" y1="12" x2="3.51" y2="12" /><line x1="3.5" y1="18" x2="3.51" y2="18" />
-  </svg>
-);
+const INTENSITY_ICONS = { low: SignalLow, medium: SignalMedium, high: SignalHigh } as const;
 
-const quoteIcon = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="4" x2="5" y2="20" /><line x1="10" y1="8" x2="19" y2="8" /><line x1="10" y1="16" x2="19" y2="16" />
-  </svg>
-);
+const toggle = (list: string[], value: string) =>
+  list.includes(value) ? list.filter(v => v !== value) : [...list, value];
 
-const linkIcon = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-  </svg>
-);
-
-function MdButton({ title, onClick, children }: { title: string; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      onMouseDown={e => e.preventDefault()}
-      onClick={onClick}
-      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(120,120,120,0.18)'; e.currentTarget.style.borderColor = 'var(--glass-border)'; }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
-      style={{
-        minWidth: 32,
-        height: 30,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '0 8px',
-        borderRadius: 6,
-        border: '1px solid transparent',
-        background: 'transparent',
-        color: 'var(--text-primary)',
-        cursor: 'pointer',
-        fontSize: '0.95rem',
-        lineHeight: 1,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
+/**
+ * The details form: header, body and pinned footer, meant to sit inside a
+ * <Modal>. Shared by the standalone editor and by the details dialog, which
+ * swaps to it in place.
+ */
+export function VideoEditForm({ video, onCancel, onSaved }: { video: Video; onCancel: () => void; onSaved: (video: Video) => void }) {
   const [description, setDescription] = useState(video.description || '');
   const [equipment, setEquipment] = useState<string[]>(video.equipment || []);
   const [trainingType, setTrainingType] = useState<string[]>(video.training_type || []);
@@ -93,14 +55,6 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
     setIntensity(video.intensity || '');
   }, [video]);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
   // Restore the caret/selection after a formatting action mutates the value.
   useEffect(() => {
     if (pendingSelection.current && textareaRef.current) {
@@ -119,8 +73,7 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
     const selected = end > start ? description.slice(start, end) : placeholder;
-    const next = description.slice(0, start) + prefix + selected + suffix + description.slice(end);
-    setDescription(next);
+    setDescription(description.slice(0, start) + prefix + selected + suffix + description.slice(end));
     const selStart = start + prefix.length;
     pendingSelection.current = [selStart, selStart + selected.length];
   };
@@ -139,8 +92,7 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
       .split('\n')
       .map((line, i) => prefixFor(i) + line)
       .join('\n');
-    const next = description.slice(0, lineStart) + transformed + description.slice(lineEnd);
-    setDescription(next);
+    setDescription(description.slice(0, lineStart) + transformed + description.slice(lineEnd));
     pendingSelection.current = [lineStart, lineStart + transformed.length];
   };
 
@@ -151,9 +103,7 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
     const label = end > start ? description.slice(start, end) : 'text';
-    const snippet = `[${label}](url)`;
-    const next = description.slice(0, start) + snippet + description.slice(end);
-    setDescription(next);
+    setDescription(description.slice(0, start) + `[${label}](url)` + description.slice(end));
     const urlStart = start + label.length + 3;
     pendingSelection.current = [urlStart, urlStart + 3];
   };
@@ -198,7 +148,6 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
       onSaved(data);
-      onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to save');
     } finally {
@@ -206,128 +155,80 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
     }
   };
 
+  const tools: ({ sep: true } | { title: string; Icon: typeof Bold; run: () => void })[] = [
+    { title: t('editor.bold'), Icon: Bold, run: () => applyWrap('**', '**', 'bold text') },
+    { title: t('editor.italic'), Icon: Italic, run: () => applyWrap('*', '*', 'italic text') },
+    { title: t('editor.strike'), Icon: Strikethrough, run: () => applyWrap('~~', '~~', 'strikethrough') },
+    { title: t('editor.code'), Icon: Code, run: () => applyWrap('`', '`', 'code') },
+    { sep: true },
+    { title: t('editor.heading'), Icon: Heading, run: () => applyLinePrefix(() => '## ') },
+    { title: t('editor.bullets'), Icon: List, run: () => applyLinePrefix(() => '- ') },
+    { title: t('editor.numbers'), Icon: ListOrdered, run: () => applyLinePrefix(i => `${i + 1}. `) },
+    { title: t('editor.quote'), Icon: Quote, run: () => applyLinePrefix(() => '> ') },
+    { sep: true },
+    { title: t('editor.link'), Icon: LinkIcon, run: insertLink },
+  ];
+
+  const chipGroup = (
+    label: string,
+    category: 'gear' | 'type' | 'body',
+    items: { value: string; label: string }[],
+    selected: string[],
+    set: (next: string[]) => void
+  ) => (
+    <div className="md-group">
+      <div className="md-group-head">
+        <div className="md-label">{label}</div>
+        {selected.length > 0 && <div className="md-count">{t('editor.n_selected', { count: selected.length })}</div>}
+      </div>
+      <div className="md-chips">
+        {items.map(item => {
+          const on = selected.includes(item.value);
+          return (
+            <button key={item.value} type="button" className={`md-chip md-chip--${category}${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => set(toggle(selected, item.value))}>
+              {on && <Check size={14} />}
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
-    <div
-      className="video-metadata-backdrop"
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.55)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 2000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}
-    >
-      <div
-        className="glass-card video-metadata-modal"
-        onClick={e => e.stopPropagation()}
-        style={{
-          width: '100%',
-          maxWidth: 860,
-          padding: '1.75rem',
-          maxHeight: '92vh',
-          overflowY: 'auto',
-          background: 'var(--surface-color)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: '1.25rem' }}>
-          <div style={{ minWidth: 0 }}>
-            <h2 style={{ margin: 0, fontSize: '1.15rem' }}>Video Info</h2>
-            <p style={{ margin: '6px 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {video.filename}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              border: '1px solid var(--glass-border)',
-              background: 'var(--surface-hover)',
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            ✕
-          </button>
+    <>
+      <div className="md-head">
+        <div className="md-head-text">
+          <h2 className="md-title">{t('editor.title')}</h2>
+          <div className="md-sub">{video.filename}</div>
         </div>
+        <CloseButton onClick={onCancel} />
+      </div>
 
-        <div style={{ marginBottom: '1.25rem' }}>
-          <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Description</span>
-          <div style={{ border: '1px solid var(--glass-border)', borderRadius: 12, background: 'var(--surface-hover)', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, padding: '6px 8px', borderBottom: '1px solid var(--glass-border)' }}>
-              <MdButton title="Bold (Ctrl/Cmd+B)" onClick={() => applyWrap('**', '**', 'bold text')}>
-                <span style={{ fontWeight: 800 }}>B</span>
-              </MdButton>
-              <MdButton title="Italic (Ctrl/Cmd+I)" onClick={() => applyWrap('*', '*', 'italic text')}>
-                <span style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>I</span>
-              </MdButton>
-              <MdButton title="Strikethrough" onClick={() => applyWrap('~~', '~~', 'strikethrough')}>
-                <span style={{ textDecoration: 'line-through' }}>S</span>
-              </MdButton>
-              <MdButton title="Inline code" onClick={() => applyWrap('`', '`', 'code')}>
-                <span style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{'</>'}</span>
-              </MdButton>
-              <span style={{ width: 1, alignSelf: 'stretch', margin: '2px 5px', background: 'var(--glass-border)' }} />
-              <MdButton title="Heading" onClick={() => applyLinePrefix(() => '## ')}>
-                <span style={{ fontWeight: 800 }}>H</span>
-              </MdButton>
-              <MdButton title="Bulleted list" onClick={() => applyLinePrefix(() => '- ')}>{listIcon}</MdButton>
-              <MdButton title="Numbered list" onClick={() => applyLinePrefix(i => `${i + 1}. `)}>
-                <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', fontWeight: 700 }}>1.</span>
-              </MdButton>
-              <MdButton title="Quote" onClick={() => applyLinePrefix(() => '> ')}>{quoteIcon}</MdButton>
-              <span style={{ width: 1, alignSelf: 'stretch', margin: '2px 5px', background: 'var(--glass-border)' }} />
-              <MdButton title="Link" onClick={insertLink}>{linkIcon}</MdButton>
-
-              {/* Sits at the end of the toolbar, past the divider, because it
-                  rewrites the whole field rather than formatting a selection. */}
+      <div className="md-body" style={{ gap: 26 }}>
+        <div className="md-group">
+          <div className="md-label">{t('editor.description')}</div>
+          <div className="md-editor">
+            <div className="md-toolbar">
+              {tools.map((tool, i) => 'sep' in tool
+                ? <span key={i} className="md-tool-sep" />
+                : (
+                  <button key={tool.title} type="button" className="md-tool" title={tool.title} aria-label={tool.title} onMouseDown={e => e.preventDefault()} onClick={tool.run}>
+                    <tool.Icon size={16} />
+                  </button>
+                ))}
+              <span className="md-tool-spacer" />
+              {/* At the end of the toolbar because it rewrites the whole field
+                  rather than formatting a selection. */}
               {aiAvailable && (
                 <>
-                  <span style={{ width: 1, alignSelf: 'stretch', margin: '2px 5px', background: 'var(--glass-border)' }} />
-                  <button
-                    type="button"
-                    title={t('ai.clean_hint')}
-                    onClick={handleClean}
-                    disabled={cleaning || !description.trim()}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: 6,
-                      border: '1px solid var(--glass-border)',
-                      background: 'transparent',
-                      color: 'var(--text-primary)',
-                      cursor: cleaning || !description.trim() ? 'default' : 'pointer',
-                      opacity: cleaning || !description.trim() ? 0.5 : 1,
-                      fontSize: '0.78rem',
-                    }}
-                  >
+                  {beforeClean !== null && !cleaning && (
+                    <button type="button" className="md-clean" onClick={() => { setDescription(beforeClean); setBeforeClean(null); }}>{t('ai.clean_undo')}</button>
+                  )}
+                  <button type="button" className="md-clean" title={t('ai.clean_hint')} onClick={handleClean} disabled={cleaning || !description.trim()}>
+                    <Sparkles size={13} />
                     {cleaning ? t('ai.cleaning') : t('ai.clean_btn')}
                   </button>
-                  {beforeClean !== null && !cleaning && (
-                    <button
-                      type="button"
-                      onClick={() => { setDescription(beforeClean); setBeforeClean(null); }}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 6,
-                        border: '1px solid var(--glass-border)',
-                        background: 'transparent',
-                        color: 'var(--text-primary)',
-                        cursor: 'pointer',
-                        fontSize: '0.78rem',
-                      }}
-                    >
-                      {t('ai.clean_undo')}
-                    </button>
-                  )}
                 </>
               )}
             </div>
@@ -342,118 +243,50 @@ function VideoMetadataEditorInner({ video, onClose, onSaved }: Props) {
                   else if (key === 'i') { e.preventDefault(); applyWrap('*', '*', 'italic text'); }
                 }
               }}
-              placeholder="Notes about this video — focus areas, difficulty, etc."
-              rows={8}
-              style={{
-                display: 'block',
-                width: '100%',
-                minHeight: 200,
-                padding: '14px 16px',
-                border: 'none',
-                background: 'transparent',
-                color: 'var(--text-primary)',
-                fontFamily: 'var(--font-family)',
-                fontSize: '1rem',
-                resize: 'vertical',
-                boxSizing: 'border-box',
-                outline: 'none',
-              }}
+              placeholder={t('editor.description_placeholder')}
+              rows={6}
             />
           </div>
-          <span style={{ display: 'block', marginTop: 6, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-            Supports Markdown formatting.
-          </span>
+          <div className="md-help">{t('editor.markdown_hint')}</div>
         </div>
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <span style={{ display: 'block', fontWeight: 700, marginBottom: 10, fontSize: '0.9rem' }}>Equipment</span>
-          <EquipmentPicker selected={equipment} onChange={setEquipment} />
-        </div>
+        {chipGroup(labels.sections.equipment, 'gear', EQUIPMENT_ITEMS.map(i => ({ value: i.id, label: labels.equipment(i.id) })), equipment, setEquipment)}
+        {chipGroup(labels.sections.trainingType, 'type', [...TRAINING_TYPES].map(v => ({ value: v, label: labels.trainingType(v) })), trainingType, setTrainingType)}
+        {chipGroup(labels.sections.bodyParts, 'body', [...BODY_PARTS].map(v => ({ value: v, label: labels.bodyPart(v) })), bodyParts, setBodyParts)}
 
-        <div style={{ marginBottom: '1.25rem' }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ minWidth: 0 }}>
-              <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Training Type</span>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {TRAINING_TYPES.map(t => {
-                  const sel = trainingType.includes(t);
-                  return (
-                    <button key={t} onClick={() => setTrainingType(sel ? trainingType.filter(x => x !== t) : [...trainingType, t])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.trainingType(t)}>
-                      <TrainingTypeIcon type={t} />
-                      <span style={{ fontSize: '0.95rem' }}>{labels.trainingType(t)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div style={{ minWidth: 0 }}>
-              <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Intensity</span>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {['low','medium','high'].map(level => {
-                  const sel = intensity === level;
-                  return (
-                    <button key={level} onClick={() => setIntensity(sel ? '' : level)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: sel ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: sel ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.intensity(level)}>
-                      <IntensityIcon level={level} />
-                      <span style={{ fontSize: '0.95rem', textTransform: 'capitalize' }}>{labels.intensity(level)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '1.5rem' }}>
-          <span style={{ display: 'block', fontWeight: 700, marginBottom: 8, fontSize: '0.9rem' }}>Body Parts</span>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {BODY_PARTS.map(bp => {
-              const selected = bodyParts.includes(bp);
+        <div className="md-group">
+          <div className="md-label">{labels.sections.intensity}</div>
+          <div className="rx-seg md-seg--wide">
+            {(['low', 'medium', 'high'] as const).map(level => {
+              const Icon = INTENSITY_ICONS[level];
               return (
-                <button key={bp} onClick={() => setBodyParts(selected ? bodyParts.filter(b => b !== bp) : [...bodyParts, bp])} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: selected ? '2px solid var(--accent-color)' : '1px solid var(--glass-border)', background: selected ? 'var(--accent-soft)' : 'var(--surface-hover)', cursor: 'pointer' }} title={labels.bodyPart(bp)}>
-                  <BodyPartIcon part={bp} />
-                  <span style={{ fontSize: '0.95rem' }}>{labels.bodyPart(bp)}</span>
+                <button key={level} type="button" className={intensity === level ? 'is-on' : ''} onClick={() => setIntensity(intensity === level ? '' : level)}>
+                  <Icon size={16} />
+                  {labels.intensity(level)}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {error && (
-          <p style={{ color: 'var(--rest-color)', fontSize: '0.9rem', marginBottom: 12 }}>{error}</p>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: '10px 18px',
-              borderRadius: 10,
-              border: '1px solid var(--glass-border)',
-              background: 'transparent',
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="btn"
-            style={{ padding: '10px 20px', opacity: saving ? 0.7 : 1 }}
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
+        {error && <div className="md-error">{error}</div>}
       </div>
-    </div>
+
+      <div className="md-foot md-foot--line">
+        <button type="button" className="md-btn" onClick={onCancel} disabled={saving}>{t('editor.cancel')}</button>
+        <button type="button" className="md-btn md-btn--primary" onClick={handleSave} disabled={saving} style={{ padding: '0 26px' }}>
+          {saving ? t('editor.saving') : t('editor.save')}
+        </button>
+      </div>
+    </>
   );
 }
-export default function VideoMetadataEditor(props: Props) {
-  if (typeof document === 'undefined') return <VideoMetadataEditorInner {...props} />;
-  return createPortal(<VideoMetadataEditorInner {...props} />, document.body);
+
+/** The editor as its own dialog — the Log opens it straight from a logged video. */
+export default function VideoMetadataEditor({ video, onClose, onSaved }: Props) {
+  return (
+    <Modal width={780} onClose={onClose} label="Video info">
+      <VideoEditForm video={video} onCancel={onClose} onSaved={updated => { onSaved(updated); onClose(); }} />
+    </Modal>
+  );
 }

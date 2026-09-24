@@ -383,9 +383,9 @@ export default function Dashboard() {
                       ))}
 
                       {extra > 0 && (
-                        <span className="dash-up-more rx-muted">
+                        <button type="button" className="dash-up-more" onClick={() => navigate('/calendar')}>
                           {t('dashboard.more_videos', { count: extra })}
-                        </span>
+                        </button>
                       )}
                     </div>
                   </div>

@@ -147,9 +147,9 @@
 }
 
 .pb-cat.is-on {
-  background: var(--t-ink);
-  border-color: var(--t-ink);
-  color: var(--t-on-ink);
+  background: var(--t-btn);
+  border-color: var(--t-btn);
+  color: var(--t-on-btn);
 }
 
 .pb-rhythm-head {
@@ -192,7 +192,11 @@
 }
 
 .pb-rhythm-n { font-size: 11px; font-weight: 700; }
-.pb-rhythm-summary { margin-top: 10px; font-size: 14px; font-weight: 700; }
+.pb-cycle { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; font-size: 14px; font-weight: 700; }
+.pb-stepper { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 12px; background: var(--t-tint); }
+.pb-stepper button { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 10px; background: transparent; color: var(--t-ink); cursor: pointer; }
+.pb-stepper button:disabled { opacity: 0.4; cursor: default; }
+.pb-stepper span { min-width: 20px; text-align: center; font-size: 15px; }
 
 .pb-next {
   display: flex;
@@ -219,6 +223,7 @@
 }
 
 .pb-days {
+  background: var(--t-side, transparent);
   min-height: 0;
   overflow-y: auto;
   border-right: 1px solid var(--t-border);
@@ -256,9 +261,9 @@
 }
 
 .pb-week.is-on {
-  background: var(--t-ink);
-  border-color: var(--t-ink);
-  color: var(--t-on-ink);
+  background: var(--t-btn);
+  border-color: var(--t-btn);
+  color: var(--t-on-btn);
 }
 
 .pb-week-count { font-size: 12px; opacity: 0.7; }
@@ -324,7 +329,7 @@
 /* --- Day pills (mobile) -------------------------------------------------------- */
 .pb-day-pills {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--n, 7), minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 14px;
 }
@@ -347,9 +352,9 @@
 }
 
 .pb-day-pill.is-on {
-  background: var(--t-ink);
-  border-color: var(--t-ink);
-  color: var(--t-on-ink);
+  background: var(--t-btn);
+  border-color: var(--t-btn);
+  color: var(--t-on-btn);
 }
 
 .pb-day-dot {
@@ -361,6 +366,21 @@
 
 .pb-day-dot.has { background: var(--t-accent); }
 .pb-day-pill.is-on .pb-day-dot.has { background: var(--t-accent-soft); }
+
+/* A rest day in the rhythm: shown in place, not something you can fill. */
+.pb-day-pill.is-rest { border-style: dashed; background: transparent; color: var(--t-ink-faint); cursor: default; }
+.pb-rest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1.5px dashed var(--t-border-dashed);
+  border-radius: 14px;
+  color: var(--t-ink-faint);
+  font-size: 13px;
+  font-weight: 600;
+}
 
 /* --- Day cards ------------------------------------------------------------------ */
 .pb-day-list { display: flex; flex-direction: column; gap: 8px; }
@@ -374,7 +394,7 @@
 
 .pb-day.is-open {
   border-color: var(--t-accent);
-  background: var(--t-band-even);
+  background: var(--t-side-open, var(--t-band-even));
 }
 
 .pb-day-head {
@@ -432,7 +452,7 @@
   justify-content: center;
 }
 
-.pb-day-count.has { background: var(--t-accent-soft); }
+.pb-day-count.has { background: var(--t-btn); color: var(--t-on-btn); } /* the theme's own contrasting pair, so it reads in every theme */
 
 .pb-day-body {
   display: flex;
@@ -557,11 +577,30 @@
   cursor: pointer;
 }
 
+/* Sort: icon and caret only, so it doesn't crowd the search field; the choice
+   itself is made in the native picker laid over it. */
+.pb-sort {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 44px;
+  padding: 0 11px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--t-border);
+  border-radius: 13px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+}
+.pb-sort svg:last-of-type { color: var(--t-ink-muted); }
+.pb-sort select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }
+
 /* Dark when open or active — the one control whose state changes what you see. */
 .pb-filter-btn.is-on {
-  background: var(--t-ink);
-  border-color: var(--t-ink);
-  color: var(--t-on-ink);
+  background: var(--t-btn);
+  border-color: var(--t-btn);
+  color: var(--t-on-btn);
 }
 
 .pb-filters {
@@ -603,7 +642,7 @@
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding: 10px 24px 0;
+  padding: 10px 24px 12px;
 }
 
 .pb-folders::-webkit-scrollbar { display: none; }
@@ -626,9 +665,9 @@
 }
 
 .pb-folder.is-on {
-  background: var(--t-ink);
-  border-color: var(--t-ink);
-  color: var(--t-on-ink);
+  background: var(--t-btn);
+  border-color: var(--t-btn);
+  color: var(--t-on-btn);
 }
 
 .pb-pick-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 24px 24px; }
@@ -699,8 +738,6 @@
   font-weight: 600;
   line-height: 1.3;
 }
-
-.pb-pick-meta { display: block; margin-top: 2px; font-size: 12px; color: var(--t-ink-muted); }
 .pb-pick .lib-tags { margin-top: 5px; }
 .pb-pick-empty { grid-column: 1 / -1; }
 
@@ -750,8 +787,8 @@
   z-index: 40;
   padding: 10px 18px;
   border-radius: 999px;
-  background: var(--t-ink);
-  color: var(--t-on-ink);
+  background: var(--t-btn);
+  color: var(--t-on-btn);
   font-size: 14px;
   font-weight: 600;
   box-shadow: var(--t-shadow-popover);
@@ -762,5 +799,4 @@
   .pb-bar { height: 56px; padding: 0 12px; }
   .pb-details { padding: 20px 16px 40px; }
   .pb-schedule { grid-template-columns: minmax(0, 1fr); }
-  .pb-days { border-right: none; padding: 14px 16px 40px; }
-}
+  .pb-days { border-right: none; padding: 14px 16px 40px; }}

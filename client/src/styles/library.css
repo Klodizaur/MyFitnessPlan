@@ -203,6 +203,68 @@
   font: inherit;
 }
 
+/* --- Length filter -------------------------------------------------------------
+   A from / up-to pair plus quick windows. The windows are chips like the tag
+   filters', but neutral: length isn't a tag category. */
+.len { display: flex; flex-direction: column; gap: 10px; }
+.len-inputs { display: flex; align-items: center; gap: 8px; }
+.len-dash { color: var(--t-ink-faint); font-weight: 700; }
+.len-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--t-border);
+  border-radius: 10px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+}
+.len-field:focus-within { border-color: var(--t-accent); }
+.len-field span { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--t-ink-muted); white-space: nowrap; }
+.len-field input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.len-field input::placeholder { color: var(--t-ink-faint); font-weight: 500; }
+.len-field input::-webkit-outer-spin-button,
+.len-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.len-field em { font-style: normal; font-size: 12px; color: var(--t-ink-muted); }
+
+.len-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 9px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.len-chip.is-on { background: var(--t-btn); color: var(--t-on-btn); }
+.pb-filters .len-chip { height: 30px; }
+
 /* --- Active filter chips ---------------------------------------------------- */
 .lib-active-chips {
   display: flex;
@@ -236,6 +298,7 @@
 .lib-active-chip--type { background: var(--t-tag-type-ink); }
 .lib-active-chip--body { background: var(--t-tag-body-ink); }
 .lib-active-chip--gear { background: var(--t-tag-gear-ink); }
+.lib-active-chip--length { background: var(--t-btn); color: var(--t-on-btn); }
 
 .lib-clear-all {
   display: flex;
@@ -276,6 +339,8 @@
 }
 
 .lib-section-count { font-size: 14px; color: var(--t-ink-muted); }
+.lib-section-head .lib-sort { margin-left: auto; }
+.lib-section-head .lib-sort + .lib-scope { margin-left: 0; }
 
 /* --- Folder cards ------------------------------------------------------------ */
 .lib-grid {
@@ -304,7 +369,28 @@
   cursor: pointer;
 }
 
-.lib-folder-cover { position: relative; display: block; }
+.lib-folder-cover {
+  position: relative;
+  display: block;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lib-folder-cover img { transition: transform 0.35s ease; }
+
+/* Hover: the cover lifts, the picture eases in a touch, and the name warms to
+   the accent. Only where there is a real pointer — on a phone a tap would leave
+   the last card stuck in its hovered state — and never under reduced motion. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .lib-folder:hover .lib-folder-cover {
+    transform: translateY(-3px);
+    box-shadow: var(--t-shadow-lift);
+  }
+  .lib-folder:hover .lib-folder-cover img { transform: scale(1.05); }
+  .lib-folder .lib-folder-name { transition: color 0.2s ease; }
+  .lib-folder:hover .lib-folder-name { color: var(--t-accent); }
+}
 
 .lib-folder-cover img,
 .lib-folder-noimg {
@@ -379,35 +465,20 @@
 .lib-chevron { color: var(--t-ink-faint); flex-shrink: 0; }
 
 /* --- Add from YouTube -------------------------------------------------------- */
-.lib-add-yt {
+.lib-add-yt-cover {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-height: 120px;
-  height: 100%;
+  width: 100%;
+  aspect-ratio: 16 / 10;
   box-sizing: border-box;
-  padding: 16px;
   border: 1.5px dashed var(--t-accent-soft);
   border-radius: 16px;
   background: var(--t-band-even);
-  color: inherit;
-  font-family: inherit;
-  text-align: center;
-  cursor: pointer;
+  color: var(--t-accent);
 }
 
-.lib-add-yt:hover { background: var(--t-band-odd); }
-.lib-add-yt-icon { color: var(--t-accent); margin-bottom: 4px; }
-.lib-add-yt-title { font-weight: 700; font-size: 16px; }
-
-.lib-add-yt-hint {
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--t-ink-muted);
-  text-wrap: pretty;
-}
+.lib-folder:hover .lib-add-yt-cover { background: var(--t-band-odd); }
 
 .lib-add-yt-row-thumb {
   width: 72px;
@@ -456,6 +527,46 @@
 }
 
 .lib-tags { gap: 4px; margin-top: 6px; }
+
+/* Hover, matching the folders: the thumbnail lifts, the picture eases in, a play
+   button fades up over it and the title warms to the accent. */
+.lib-video-thumb { border-radius: 14px; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.lib-video-row-thumb { border-radius: 10px; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.lib-video-thumb img, .lib-video-row-thumb img { transition: transform 0.35s ease; }
+.lib-video-item, .lib-video-row { position: relative; }
+/* Sits exactly over the thumbnail (16:9, from the card's top / the row's padding). */
+.lib-hover-actions { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: 16 / 9; pointer-events: none; z-index: 2; }
+.lib-video-row .lib-hover-actions { top: 8px; width: 180px; }
+.lib-hover-actions { transition: transform 0.2s ease; }
+.lib-hover-actions button {
+  position: absolute;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+  border: none; border-radius: 50%;
+  background: rgba(255, 251, 247, 0.95); color: #2A211C;
+  box-shadow: 0 6px 18px rgba(20, 8, 3, 0.35);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.15s;
+  cursor: pointer;
+}
+.lib-hover-play { left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; padding-left: 2px !important; transform: scale(0.8); }
+.lib-video-row .lib-hover-play { width: 36px; height: 36px; margin: -18px 0 0 -18px; }
+.lib-hover-info { left: 8px; top: 8px; width: 28px; height: 28px; transform: scale(0.8); }
+.lib-hover-actions button:hover { background: #FFFFFF; }
+.lib-hover-play:hover { transform: scale(1.1) !important; }
+.lib-video-title { transition: color 0.2s ease; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .lib-video-item:hover .lib-hover-actions,
+  .lib-video-row:hover .lib-hover-actions { transform: translateY(-3px); }
+  .lib-video-item:hover .lib-video-thumb,
+  .lib-video-row:hover .lib-video-row-thumb { transform: translateY(-3px); box-shadow: var(--t-shadow-lift); }
+  .lib-video-item:hover img, .lib-video-row:hover .lib-video-row-thumb img { transform: scale(1.05); }
+  .lib-video-item:hover .lib-video-title, .lib-video-row:hover .lib-video-title { color: var(--t-accent); }
+}
+@media (hover: hover) {
+  .lib-video-item:hover .lib-hover-actions button,
+  .lib-video-row:hover .lib-hover-actions button,
+  .lib-hover-actions button:focus-visible { opacity: 1; pointer-events: auto; transform: none; }
+}
 
 /* --- Video list rows ---------------------------------------------------------- */
 .lib-video-rows { display: flex; flex-direction: column; gap: 2px; }
@@ -510,6 +621,16 @@
 }
 
 .lib-video-row-menu:hover { color: var(--t-ink); }
+.lib-video-row-fav.is-on { color: var(--t-accent); }
+.lib-video-row-fav.is-on svg { fill: currentColor; }
+
+/* Grid card wrapper: lets the heart sit over the thumbnail beside the card button. */
+.lib-video-item { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.lib-video-item > .lib-video { flex: 1; }
+
+/* The Favourites album's badge is a heart, not a source mark. */
+.lib-fav-badge { pointer-events: none; }
+.lib-fav-row { color: var(--t-accent); }
 
 /* --- Empty state and paging ---------------------------------------------------- */
 .lib-empty {
@@ -608,16 +729,16 @@
 .lib-folder-action {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 42px;
-  padding: 0 14px;
-  border-radius: 12px;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
   background: var(--t-surface);
   border: 1px solid var(--t-border);
   color: var(--t-ink);
   font-family: inherit;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -625,12 +746,12 @@
 .lib-action-icon { color: var(--t-accent); }
 
 .lib-icon-btn {
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--t-border);
   background: var(--t-surface);
   color: var(--t-ink);
@@ -650,6 +771,8 @@
   margin: 0 -16px;
   padding: 0 16px;
   scroll-snap-type: x mandatory;
+  /* Snap to the padded edge, or the first card is pulled flush with the screen. */
+  scroll-padding: 0 16px;
 }
 
 .lib-sub-strip::-webkit-scrollbar { display: none; }
@@ -680,7 +803,7 @@
   transition: background 0.15s;
 }
 
-.lib-scope-track.is-on { background: var(--t-ink); }
+.lib-scope-track.is-on { background: var(--t-btn); }
 
 .lib-scope-knob {
   position: absolute;
@@ -814,7 +937,7 @@
   .lib-head { padding-top: 8px; }
   .lib-head h1 { font-size: 34px; }
 
-  .lib-toolbar { top: 0; }
+  .lib-toolbar { top: var(--rx-stick); }
   .lib-filter-btn { padding: 0 13px; }
   /* The button is icon-plus-count on a phone; the word doesn't fit next to the
      search field and the icon is unambiguous. */
@@ -825,6 +948,10 @@
   .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
 
   .lib-video-row-thumb { width: 132px; }
+  /* Sort stays on the heading's row, in the corner; the toggle drops to its own line. */
+  .lib-section-head .lib-sort { margin-left: auto; }
+  .lib-section-head .lib-sort + .lib-scope { flex-basis: 100%; margin-left: 0; }
+  .lib-video-row .lib-hover-actions { width: 132px; }
 
   .lib-folder-head { padding-top: 8px; }
   .lib-folder-back { display: flex; }
@@ -833,7 +960,6 @@
   /* The header actions move below the title rather than squeezing it. */
   .lib-folder-hero { flex-wrap: wrap; }
   .lib-folder-actions { width: 100%; }
-  .lib-folder-action { flex: 1; justify-content: center; }
   .lib-video-row-text .lib-video-title { font-size: 14px; }
 
   .lib-sheet {

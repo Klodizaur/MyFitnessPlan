@@ -1,16 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import {
+  Check, CircleCheck, Dumbbell, Folder, FolderX, Info, Loader, Minus, Moon, Palette, Plus, RefreshCw, Sparkles, X,
+} from 'lucide-react';
 import AiSettingsSection from '../components/ai/AiSettingsSection';
-import '../styles/About.css';
+import '../styles/settings.css';
 
+/**
+ * Themes as the settings card draws them: the page colour behind the tile, its
+ * accent, the text colour that reads on it and a surface swatch.
+ */
 const THEMES = [
-  { id: 'midnight', primary: '#3b82f6', bg: '#0f172a' },
-  { id: 'sunset', primary: '#f97316', bg: '#2d1b36' },
-  { id: 'forest', primary: '#10b981', bg: '#064e3b' },
-  { id: 'pastel-orange', primary: '#fdba74', bg: '#fff7ed' },
-  { id: 'pastel-pink', primary: '#f9a8d4', bg: '#fdf2f8' },
-  { id: 'sky-blue', primary: '#7dd3fc', bg: '#f0f9ff' },
-  { id: 'watermelon', primary: '#d81b45', bg: '#e8f8ea' },
+  { id: 'midnight', bg: '#111A2E', accent: '#3B82F6', fg: '#FFFFFF', surface: '#111A2E' },
+  { id: 'sunset', bg: '#2E1A33', accent: '#F97316', fg: '#FFFFFF', surface: '#2E1A33' },
+  { id: 'forest', bg: '#08503E', accent: '#10B981', fg: '#FFFFFF', surface: '#08503E' },
+  { id: 'pastel-orange', bg: '#FFF5EC', accent: '#F9B27A', fg: '#6B2410', surface: '#FFFFFF' },
+  { id: 'pastel-pink', bg: '#FDF0F6', accent: '#F59AC6', fg: '#5A1E3A', surface: '#FFFFFF' },
+  { id: 'sky-blue', bg: '#EEF6FD', accent: '#7CCBF2', fg: '#153A5A', surface: '#FFFFFF' },
+  { id: 'watermelon', bg: '#EAF6EC', accent: '#DC2F4B', fg: '#4A1520', surface: '#FFFFFF' },
 ];
 
 /**
@@ -19,8 +27,20 @@ const THEMES = [
  * Workouts leads because it holds the things a new install has to set before
  * anything works — where the videos are, and the training pattern.
  */
-const SETTINGS_TABS = ['workouts', 'appearance', 'ai', 'about'] as const;
-type SettingsTab = typeof SETTINGS_TABS[number];
+const SETTINGS_TABS = [
+  { id: 'workouts', Icon: Dumbbell },
+  { id: 'appearance', Icon: Palette },
+  { id: 'ai', Icon: Sparkles },
+  { id: 'about', Icon: Info },
+] as const;
+type SettingsTab = typeof SETTINGS_TABS[number]['id'];
+
+/** The calendar views a person can open by default. Older installs stored 'list' or 'slider'; both read as Grid. */
+const LAYOUTS = ['tape', 'week', 'grid'] as const;
+type Layout = typeof LAYOUTS[number];
+const asLayout = (value: string): Layout => (value === 'tape' || value === 'week' ? value : 'grid');
+
+const MAX_CYCLE = 14;
 
 type ScanProgress = {
   active: boolean;
@@ -30,6 +50,14 @@ type ScanProgress = {
   currentFile: string;
 };
 
+/** What the shared Save button writes. */
+interface Saved {
+  pattern: number[];
+  excludePaths: string[];
+  theme: string;
+  calendarView: Layout;
+}
+
 export default function Settings() {
   const { t, i18n } = useTranslation();
   const [directory, setDirectory] = useState('');
@@ -37,9 +65,12 @@ export default function Settings() {
   const [excludePaths, setExcludePaths] = useState<string[]>([]);
   const [newExclude, setNewExclude] = useState('');
   const [theme, setTheme] = useState('midnight');
-  const [calendarView, setCalendarView] = useState('list');
+  const [calendarView, setCalendarView] = useState<Layout>('grid');
+  const [saved, setSaved] = useState<Saved | null>(null);
   const [tab, setTab] = useState<SettingsTab>('workouts');
-  const [status, setStatus] = useState('');
+  const [scanNote, setScanNote] = useState<{ text: string; ok: boolean } | null>(null);
+  const [toast, setToast] = useState('');
+  const toastTimer = useRef<number | undefined>(undefined);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [appVersion, setAppVersion] = useState('');
@@ -49,11 +80,18 @@ export default function Settings() {
     fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
+        const next: Saved = {
+          pattern: Array.isArray(data.workout_pattern) && data.workout_pattern.length ? data.workout_pattern : [1, 1, 1, 1, 1, 0],
+          excludePaths: Array.isArray(data.exclude_paths) ? data.exclude_paths : [],
+          theme: data.theme || 'midnight',
+          calendarView: asLayout(data.calendar_view || ''),
+        };
         if (data.video_directory) setDirectory(data.video_directory);
-        if (data.workout_pattern) setPattern(data.workout_pattern);
-        if (data.exclude_paths) setExcludePaths(data.exclude_paths);
-        if (data.theme) setTheme(data.theme);
-        if (data.calendar_view) setCalendarView(data.calendar_view);
+        setPattern(next.pattern);
+        setExcludePaths(next.excludePaths);
+        setTheme(next.theme);
+        setCalendarView(next.calendarView);
+        setSaved(next);
       });
   }, []);
 
@@ -62,7 +100,31 @@ export default function Settings() {
       .then(res => res.json())
       .then(data => { if (data.version) setAppVersion(data.version); })
       .catch(() => {});
+    return () => window.clearTimeout(toastTimer.current);
   }, []);
+
+  const flash = (text: string) => {
+    window.clearTimeout(toastTimer.current);
+    setToast(text);
+    toastTimer.current = window.setTimeout(() => setToast(''), 1800);
+  };
+
+  // Picking a theme previews it across the whole app straight away; Save keeps
+  // it, and Discard — or leaving without saving — puts the saved one back.
+  const pickTheme = (id: string) => {
+    setTheme(id);
+    document.body.setAttribute('data-theme', id);
+  };
+  const savedThemeRef = useRef<string | null>(null);
+  savedThemeRef.current = saved?.theme ?? null;
+  useEffect(() => () => {
+    if (savedThemeRef.current) document.body.setAttribute('data-theme', savedThemeRef.current);
+  }, []);
+
+  const dirty = useMemo(
+    () => saved !== null && JSON.stringify({ pattern, excludePaths, theme, calendarView }) !== JSON.stringify(saved),
+    [saved, pattern, excludePaths, theme, calendarView]
+  );
 
   const handleBrowseDirectory = async () => {
     const picked = await window.myFitnessPlan?.pickDirectory();
@@ -72,12 +134,12 @@ export default function Settings() {
   const handleBrowseExclude = async () => {
     const picked = await window.myFitnessPlan?.pickDirectory();
     if (!picked) return;
-    setExcludePaths((prev) => (prev.includes(picked) ? prev : [...prev, picked]));
+    setExcludePaths(prev => (prev.includes(picked) ? prev : [...prev, picked]));
     setNewExclude('');
   };
 
   const handleSetDirectory = async () => {
-    setStatus(t('settings.scanning_status'));
+    setScanNote(null);
     setScanning(true);
     setScanProgress(null);
 
@@ -97,16 +159,14 @@ export default function Settings() {
         body: JSON.stringify({ directory })
       });
       const data = await res.json();
-      if (data.error) setStatus(`Error: ${data.error}`);
+      if (data.error) setScanNote({ text: `Error: ${data.error}`, ok: false });
       else if (data.skippedCleanup) {
         // The scan couldn't see the whole folder, so nothing was removed from
         // the library. Say so — a silent "found 0 videos" looks like success.
-        setStatus(
-          `${t('settings.found_videos', { count: data.count })} ${t('settings.scan_incomplete')}`
-        );
-      } else setStatus(t('settings.found_videos', { count: data.count }));
-    } catch (err) {
-      setStatus(t('settings.failed_connect'));
+        setScanNote({ text: `${t('settings.found_videos', { count: data.count })} ${t('settings.scan_incomplete')}`, ok: false });
+      } else setScanNote({ text: t('settings.found_videos', { count: data.count }), ok: true });
+    } catch {
+      setScanNote({ text: t('settings.failed_connect'), ok: false });
     } finally {
       window.clearInterval(poll);
       setScanning(false);
@@ -116,428 +176,309 @@ export default function Settings() {
 
   const handleSaveSettings = async () => {
     try {
-      await fetch('/api/settings', {
+      const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          workout_pattern: pattern, 
+        body: JSON.stringify({
+          workout_pattern: pattern,
           exclude_paths: excludePaths,
           theme: theme,
           calendar_view: calendarView
         })
       });
-      setStatus(t('settings.settings_saved'));
+      if (!res.ok) throw new Error('failed');
+      setSaved({ pattern, excludePaths, theme, calendarView });
       document.body.setAttribute('data-theme', theme);
-    } catch (err) {
-      setStatus(t('settings.failed_save'));
+      flash(t('settings.settings_saved'));
+    } catch {
+      flash(t('settings.failed_save'));
     }
+  };
+
+  const handleDiscard = () => {
+    if (!saved) return;
+    setPattern(saved.pattern);
+    setExcludePaths(saved.excludePaths);
+    setTheme(saved.theme);
+    document.body.setAttribute('data-theme', saved.theme);
+    setCalendarView(saved.calendarView);
   };
 
   const handleAddExclude = () => {
-    if (newExclude.trim()) {
-      const trimmed = newExclude.trim();
-      if (!excludePaths.includes(trimmed)) {
-        setExcludePaths([...excludePaths, trimmed]);
-      }
-      setNewExclude('');
-    }
+    const trimmed = newExclude.trim();
+    if (!trimmed) return;
+    if (!excludePaths.includes(trimmed)) setExcludePaths([...excludePaths, trimmed]);
+    setNewExclude('');
   };
 
-  const handleRemoveExclude = (p: string) => {
-    setExcludePaths(excludePaths.filter(path => path !== p));
-  };
+  const toggleDay = (index: number) => setPattern(pattern.map((v, i) => (i === index ? (v === 1 ? 0 : 1) : v)));
+  const addDay = () => { if (pattern.length < MAX_CYCLE) setPattern([...pattern, 1]); };
+  const removeDay = () => { if (pattern.length > 1) setPattern(pattern.slice(0, -1)); };
 
-  const changeLanguage = (lng: string) => {
-    i18n.changeLanguage(lng);
-  };
-
-  const toggleDay = (index: number) => {
-    const newPattern = [...pattern];
-    newPattern[index] = newPattern[index] === 1 ? 0 : 1;
-    setPattern(newPattern);
-  };
-
-  const addDay = () => {
-    setPattern([...pattern, 1]);
-  };
-
-  const removeDay = () => {
-    if (pattern.length > 1) {
-      setPattern(pattern.slice(0, -1));
-    }
-  };
+  const workoutDays = pattern.filter(v => v === 1).length;
+  const scanPct = scanProgress && scanProgress.total > 0 ? (scanProgress.processed / scanProgress.total) * 100 : null;
 
   return (
-    <>
-    <div className="glass-card" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <h1>{t('nav.settings')}</h1>
+    <div className="st">
+      <div className="rx-wrap st-wrap">
+        <h1 className="rx-h1 st-title">{t('nav.settings')}</h1>
 
-      {/* Grouping only — every field keeps the behaviour it had, including the
-          shared Save button, which still writes the pattern, exclusions, theme
-          and calendar layout together regardless of which tab is open. */}
-      <div className="settings-tabs">
-        {SETTINGS_TABS.map(id => (
-          <button
-            key={id}
-            type="button"
-            className={`settings-tab${tab === id ? ' selected' : ''}`}
-            onClick={() => setTab(id)}
-          >
-            {t(`settings.tab_${id}`)}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'appearance' && (<>
-      <div style={{ marginBottom: '2rem' }}>
-        <h2>{t('settings.appearance')}</h2>
-        <p style={{ marginBottom: '1rem' }}>{t('settings.appearance_msg')}</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '1rem' }}>
-          {THEMES.map(theTheme => (
-            <div 
-              key={theTheme.id}
-              onClick={() => setTheme(theTheme.id)}
-              style={{ 
-                cursor: 'pointer',
-                padding: '12px',
-                borderRadius: '12px',
-                border: `2px solid ${theme === theTheme.id ? 'var(--accent-color)' : 'var(--glass-border)'}`,
-                background: theTheme.bg,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                transition: 'all 0.2s',
-                boxShadow: theme === theTheme.id ? '0 4px 15px rgba(0,0,0,0.05)' : 'none'
-              }}
-            >
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: theTheme.primary }} />
-                <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: theTheme.bg, border: '1px solid rgba(0,0,0,0.1)' }} />
-              </div>
-              <span style={{ 
-                fontSize: '0.85rem', 
-                fontWeight: 600, 
-                color: ['midnight', 'sunset', 'forest'].includes(theTheme.id) ? '#f8fafc' : '#1e293b' 
-              }}>
-                {t(`settings.themes.${theTheme.id}`)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '2rem' }}>
-        <h2>{t('settings.language')}</h2>
-        <p style={{ marginBottom: '1rem' }}>{t('settings.select_language')}</p>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
-            className={`btn ${i18n.language.startsWith('en') ? '' : 'btn-secondary'}`}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-            onClick={() => changeLanguage('en')}
-          >
-            <span>🇬🇧</span> English
-          </button>
-          <button 
-            className={`btn ${i18n.language.startsWith('pl') ? '' : 'btn-secondary'}`}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-            onClick={() => changeLanguage('pl')}
-          >
-            <span>🇵🇱</span> Polski
-          </button>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '2rem' }}>
-        <h2>{t('settings.calendar_layout')}</h2>
-        <p style={{ marginBottom: '1rem' }}>{t('settings.calendar_layout_msg')}</p>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
-            className={`btn ${calendarView === 'list' ? '' : 'btn-secondary'}`}
-            style={{ flex: 1 }}
-            onClick={() => setCalendarView('list')}
-          >
-            {t('settings.classic_list')}
-          </button>
-          <button
-            className={`btn ${calendarView === 'slider' ? '' : 'btn-secondary'}`}
-            style={{ flex: 1 }}
-            onClick={() => setCalendarView('slider')}
-          >
-            {t('settings.modern_slider')}
-          </button>
-          <button
-            className={`btn ${calendarView === 'tape' ? '' : 'btn-secondary'}`}
-            style={{ flex: 1 }}
-            onClick={() => setCalendarView('tape')}
-          >
-            {t('settings.day_tape')}
-          </button>
-        </div>
-      </div>
-
-      </>)}
-
-      {tab === 'workouts' && (<>
-      <div style={{ marginBottom: '2rem' }}>
-        <h2>{t('settings.video_library_path')}</h2>
-        <p style={{ marginBottom: '1rem' }}>{t('settings.video_library_path_msg')}</p>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <input 
-            type="text" 
-            value={directory} 
-            onChange={e => setDirectory(e.target.value)}
-            style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
-          />
-          {canBrowseFolders && (
-            <button className="btn btn-secondary" type="button" onClick={handleBrowseDirectory}>
-              {t('settings.browse')}
-            </button>
-          )}
-          <button className="btn" onClick={handleSetDirectory} disabled={scanning}>
-            {scanning ? t('settings.scanning') : t('settings.scan')}
-          </button>
-        </div>
-
-        {scanning && (
-          <div className="scan-progress">
-            <div className="scan-progress-head">
-              <span>
-                {scanProgress && scanProgress.phase === 'processing' && scanProgress.total > 0
-                  ? t('settings.scan_progress', { processed: scanProgress.processed, total: scanProgress.total })
-                  : t('settings.scan_discovering')}
-              </span>
-              {scanProgress && scanProgress.total > 0 && (
-                <strong>{Math.round((scanProgress.processed / scanProgress.total) * 100)}%</strong>
-              )}
-            </div>
-            <div className="scan-progress-track">
-              {/* Before the file list is known there is no percentage to show, so
-                  the bar runs as an indeterminate sweep instead. */}
-              <div
-                className={`scan-progress-fill${scanProgress && scanProgress.total > 0 ? '' : ' indeterminate'}`}
-                style={scanProgress && scanProgress.total > 0
-                  ? { width: `${(scanProgress.processed / scanProgress.total) * 100}%` }
-                  : undefined}
-              />
-            </div>
-            {scanProgress?.currentFile && (
-              <div className="scan-progress-file" title={scanProgress.currentFile}>{scanProgress.currentFile}</div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginBottom: '2rem' }}>
-        <h2>{t('settings.exclude_folders')}</h2>
-        <p style={{ marginBottom: '1rem' }}>{t('settings.exclude_folders_msg')}</p>
-        
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <input 
-            type="text" 
-            placeholder={t('settings.path_placeholder')}
-            value={newExclude} 
-            onChange={e => setNewExclude(e.target.value)}
-            style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
-          />
-          {canBrowseFolders && (
-            <button className="btn btn-secondary" type="button" onClick={handleBrowseExclude}>
-              {t('settings.browse')}
-            </button>
-          )}
-          <button className="btn btn-secondary" onClick={handleAddExclude}>{t('settings.add')}</button>
-        </div>
-
-        {excludePaths.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(0,0,0,0.05)', padding: '1rem', borderRadius: '8px' }}>
-            {excludePaths.map((p, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
-                <span style={{ wordBreak: 'break-all' }}>{p}</span>
-                <button 
-                  onClick={() => handleRemoveExclude(p)}
-                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px 8px' }}
-                >
-                  {t('settings.remove')}
-                </button>
-              </div>
+        {/* Grouping only — every field keeps the behaviour it had, including the
+            shared Save, which writes the pattern, exclusions, theme and calendar
+            layout together whichever tab is open. */}
+        <div className="st-tabs-wrap">
+          <div className="st-tabs" role="tablist">
+            {SETTINGS_TABS.map(({ id, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={tab === id}
+                className={tab === id ? 'is-on' : ''}
+                onClick={() => setTab(id)}
+              >
+                <Icon size={15} />
+                {t(`settings.tab_${id}`)}
+              </button>
             ))}
           </div>
+        </div>
+
+        {tab === 'workouts' && (
+          <div className="st-stack">
+            <section className="st-card">
+              <header>
+                <h2>{t('settings.video_library_path')}</h2>
+                <p>{t('settings.video_library_path_msg')}</p>
+              </header>
+              <div className="st-row">
+                <label className="st-field st-field--mono">
+                  <Folder size={17} />
+                  <input type="text" value={directory} onChange={e => setDirectory(e.target.value)} spellCheck={false} />
+                </label>
+                <div className="st-btns">
+                  {canBrowseFolders && (
+                    <button type="button" className="st-btn" onClick={handleBrowseDirectory}>{t('settings.browse')}</button>
+                  )}
+                  <button type="button" className="st-btn st-btn--primary" onClick={handleSetDirectory} disabled={scanning}>
+                    {scanning ? <Loader size={15} className="st-spin" /> : <RefreshCw size={15} />}
+                    {scanning ? t('settings.scanning') : t('settings.scan')}
+                  </button>
+                </div>
+              </div>
+
+              {scanning && (
+                <div className="st-scan">
+                  <div className="st-scan-head">
+                    <span>
+                      {scanProgress && scanProgress.phase === 'processing' && scanProgress.total > 0
+                        ? t('settings.scan_progress', { processed: scanProgress.processed, total: scanProgress.total })
+                        : t('settings.scan_discovering')}
+                    </span>
+                    {scanPct !== null && <strong>{Math.round(scanPct)}%</strong>}
+                  </div>
+                  {/* Before the file list is known there is no percentage to show,
+                      so the bar runs as an indeterminate sweep instead. */}
+                  <div className={`rx-progress st-scan-bar${scanPct === null ? ' is-indeterminate' : ''}`}>
+                    <span style={scanPct !== null ? { width: `${scanPct}%` } : undefined} />
+                  </div>
+                  {scanProgress?.currentFile && <div className="st-scan-file" title={scanProgress.currentFile}>{scanProgress.currentFile}</div>}
+                </div>
+              )}
+
+              {scanNote && !scanning && (
+                <div className={`st-note ${scanNote.ok ? 'is-ok' : 'is-bad'}`}>
+                  <CircleCheck size={15} />
+                  {scanNote.text}
+                </div>
+              )}
+            </section>
+
+            <section className="st-card">
+              <header>
+                <h2>{t('settings.exclude_folders')}</h2>
+                <p>{t('settings.exclude_folders_msg')}</p>
+              </header>
+              <div className="st-row">
+                <input
+                  className="st-input st-input--mono"
+                  type="text"
+                  placeholder={t('settings.path_placeholder')}
+                  value={newExclude}
+                  onChange={e => setNewExclude(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddExclude(); }}
+                  spellCheck={false}
+                />
+                <div className="st-btns">
+                  {canBrowseFolders && (
+                    <button type="button" className="st-btn" onClick={handleBrowseExclude}>{t('settings.browse')}</button>
+                  )}
+                  <button type="button" className="st-btn st-btn--soft" onClick={handleAddExclude}>{t('settings.add')}</button>
+                </div>
+              </div>
+              {excludePaths.length > 0 && (
+                <ul className="st-list">
+                  {excludePaths.map(p => (
+                    <li key={p}>
+                      <FolderX size={16} />
+                      <span title={p}>{p}</span>
+                      <button type="button" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={() => setExcludePaths(excludePaths.filter(x => x !== p))}>
+                        <X size={16} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="st-card">
+              <header>
+                <h2>{t('settings.schedule_pattern')}</h2>
+                <p>{t('settings.schedule_pattern_msg')}</p>
+              </header>
+              <div className="st-days" style={{ ['--cols' as string]: Math.max(7, pattern.length) }}>
+                {pattern.map((isWorkout, idx) => (
+                  <button key={idx} type="button" className={`st-day${isWorkout ? ' is-work' : ''}`} onClick={() => toggleDay(idx)} aria-pressed={isWorkout === 1}>
+                    <span>{t('settings.day_n', { n: idx + 1 })}</span>
+                    {isWorkout ? <Dumbbell size={19} /> : <Moon size={19} />}
+                    <span>{isWorkout ? t('settings.workout') : t('settings.rest')}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="st-cycle">
+                <span>{t('settings.workout_days_in_every', { count: workoutDays })}</span>
+                <div className="st-stepper">
+                  <button type="button" onClick={removeDay} disabled={pattern.length <= 1} aria-label={t('settings.remove_day')}><Minus size={15} /></button>
+                  <span>{pattern.length}</span>
+                  <button type="button" onClick={addDay} disabled={pattern.length >= MAX_CYCLE} aria-label={t('settings.add_day')}><Plus size={15} /></button>
+                </div>
+                <span>{t('settings.days_unit')}</span>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {tab === 'appearance' && (
+          <div className="st-stack">
+            <section className="st-card">
+              <header>
+                <h2>{t('settings.appearance')}</h2>
+                <p>{t('settings.appearance_msg')}</p>
+              </header>
+              <div className="st-themes">
+                {THEMES.map(th => (
+                  <button
+                    key={th.id}
+                    type="button"
+                    className={`st-theme${theme === th.id ? ' is-on' : ''}`}
+                    style={{ background: th.bg, color: th.fg }}
+                    onClick={() => pickTheme(th.id)}
+                    aria-pressed={theme === th.id}
+                  >
+                    <span className="st-theme-dots">
+                      <i style={{ background: th.accent }} />
+                      <i style={{ background: th.surface, border: '1px solid rgba(0,0,0,0.08)' }} />
+                    </span>
+                    <span className="st-theme-name">{t(`settings.themes.${th.id}`)}</span>
+                    {theme === th.id && <span className="st-theme-check"><Check size={13} /></span>}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="st-card st-card--inline">
+              <header>
+                <h2>{t('settings.language')}</h2>
+                <p>{t('settings.select_language')}</p>
+              </header>
+              <div className="rx-seg">
+                <button type="button" className={i18n.language.startsWith('en') ? 'is-on' : ''} onClick={() => i18n.changeLanguage('en')}>English</button>
+                <button type="button" className={i18n.language.startsWith('pl') ? 'is-on' : ''} onClick={() => i18n.changeLanguage('pl')}>Polski</button>
+              </div>
+            </section>
+
+            <section className="st-card">
+              <header>
+                <h2>{t('settings.calendar_layout')}</h2>
+                <p>{t('settings.calendar_layout_msg')}</p>
+              </header>
+              <div className="st-layouts">
+                {LAYOUTS.map(key => (
+                  <button key={key} type="button" className={`st-layout${calendarView === key ? ' is-on' : ''}`} onClick={() => setCalendarView(key)} aria-pressed={calendarView === key}>
+                    <span className={`st-layout-art st-layout-art--${key}`}>
+                      {Array.from({ length: key === 'grid' ? 3 : 7 }).map((_, i) => <i key={i} className={key === 'tape' && i === 2 ? 'is-sel' : ''} />)}
+                    </span>
+                    <span className="st-layout-label">{t(`settings.layout_${key}`)}</span>
+                    <span className="st-layout-note">{t(`settings.layout_${key}_note`)}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* Optional AI integration. Saves through its own endpoint, so it is
+            unaffected by (and does not affect) the shared Save. */}
+        {tab === 'ai' && <AiSettingsSection />}
+
+        {tab === 'about' && (
+          <div className="st-stack">
+            <section className="st-card st-about-logo">
+              <img src="/logo.png" alt="" />
+              <div className="st-about-name">MYFITNESSPLAN</div>
+              <div className="st-about-version">{t('about.version')} {appVersion || '—'}</div>
+            </section>
+
+            <section className="st-card">
+              <div className="st-about-item">
+                <h3>{t('about.description')}</h3>
+                <p>{t('about.description_text')}</p>
+              </div>
+              <div className="st-about-item">
+                <h3>{t('about.website')}</h3>
+                <p><a href="https://myfitnessplan.bigdeckit.com/" target="_blank" rel="noopener noreferrer">myfitnessplan.bigdeckit.com</a></p>
+              </div>
+              <div className="st-about-item">
+                <h3>{t('about.created_by')}</h3>
+                <p>
+                  <strong>Klaudia Krzos</strong>
+                  <br />
+                  <a href="https://www.linkedin.com/in/klaudiacreativestuff/" target="_blank" rel="noopener noreferrer">{t('about.linkedin')}</a>
+                  {' · '}
+                  <a href="https://github.com/Klodizaur" target="_blank" rel="noopener noreferrer">{t('about.github')}</a>
+                </p>
+              </div>
+              <div className="st-about-item">
+                <h3>{t('about.license')}</h3>
+                <p>{t('about.license_text')}</p>
+                <p>
+                  {t('about.non_commercial')}
+                  <a href="https://github.com/Klodizaur/MyFitnessPlan" target="_blank" rel="noopener noreferrer">{t('about.contribute')}</a>
+                </p>
+              </div>
+            </section>
+          </div>
         )}
       </div>
 
-      <div style={{ marginBottom: '2rem' }}>
-        <h2>{t('settings.schedule_pattern')}</h2>
-        <p style={{ marginBottom: '1rem' }}>{t('settings.schedule_pattern_msg')}</p>
-        
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', 
-          gap: '0.75rem',
-          marginBottom: '1.5rem' 
-        }}>
-          {pattern.map((isWorkout, idx) => (
-            <div 
-              key={idx}
-              onClick={() => toggleDay(idx)}
-              style={{
-                cursor: 'pointer',
-                padding: '1rem',
-                borderRadius: '12px',
-                textAlign: 'center',
-                background: isWorkout ? 'var(--accent-color)' : 'var(--surface-color)',
-                border: `2px solid ${isWorkout ? 'var(--accent-hover)' : 'var(--glass-border)'}`,
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: isWorkout ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
-                transform: 'translateY(0)',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-            >
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, opacity: 0.8, color: isWorkout ? 'white' : 'var(--text-secondary)' }}>
-                {t('settings.day_n', { n: idx + 1 })}
-              </span>
-              <span style={{ fontSize: '1.5rem' }}>
-                {isWorkout ? '💪' : '🧘'}
-              </span>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: isWorkout ? 'white' : 'var(--text-primary)' }}>
-                {isWorkout ? t('settings.workout') : t('settings.rest')}
-              </span>
-            </div>
-          ))}
-          
-          <button 
-            onClick={addDay}
-            className="btn btn-secondary"
-            style={{ 
-              height: '100%', 
-              minHeight: '85px',
-              borderStyle: 'dashed',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              fontSize: '0.85rem'
-            }}
-          >
-            <span style={{ fontSize: '1.5rem', marginBottom: '4px' }}>+</span>
-            {t('settings.add_day')}
-          </button>
-        </div>
-
-        {pattern.length > 1 && (
-          <button 
-            onClick={removeDay}
-            className="btn btn-secondary"
-            style={{ 
-              width: '100%', 
-              color: '#ef4444', 
-              borderColor: '#ef4444',
-              background: 'transparent',
-              fontSize: '0.9rem'
-            }}
-          >
-            {t('settings.remove_day')}
-          </button>
-        )}
-      </div>
-
-      </>)}
-
-      {/* Optional AI integration. Saves through its own endpoint, so it is
-          unaffected by (and does not affect) the Save button below. */}
-      {tab === 'ai' && <AiSettingsSection />}
-
-      {/* Only on the tabs that hold fields this button writes. */}
-      {(tab === 'workouts' || tab === 'appearance') && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-          <button className="btn" onClick={handleSaveSettings} style={{ width: '100%' }}>{t('settings.save_settings')}</button>
+      {createPortal(
+        <>
+      {dirty && !toast && (
+        <div className="st-bar" role="region" aria-label={t('settings.unsaved_changes')}>
+          <span>{t('settings.unsaved_changes')}</span>
+          <button type="button" className="st-bar-discard" onClick={handleDiscard}>{t('settings.discard')}</button>
+          <button type="button" className="st-bar-save" onClick={handleSaveSettings}>{t('settings.save')}</button>
         </div>
       )}
-
-      {status && (
-        <div style={{ marginTop: '2rem', padding: '1rem', background: 'var(--surface-hover)', borderRadius: '8px', color: 'var(--accent-color)', textAlign: 'center' }}>
-          {status}
+      {toast && (
+        <div className="st-toast" role="status">
+          <Check size={16} />
+          {toast}
         </div>
       )}
+        </>,
+        document.body
+      )}
     </div>
-
-    {tab === 'about' && (
-    <div className="about-card" style={{ maxWidth: '800px', margin: '2rem auto' }}>
-      <h1>MyFitnessPlan</h1>
-
-      <div className="about-section">
-        <h2>{t('about.version')}</h2>
-        <p>{appVersion || '\u2014'}</p>
-      </div>
-
-      <div className="about-section">
-        <h2>{t('about.website')}</h2>
-        <p>
-          <a
-            href="https://myfitnessplan.bigdeckit.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="about-link"
-          >
-            myfitnessplan.bigdeckit.com
-          </a>
-        </p>
-      </div>
-
-      <div className="about-section">
-        <h2>{t('about.created_by')}</h2>
-        <p>
-          <strong>Klaudia Krzos</strong>
-          <br />
-          <a
-            href="https://www.linkedin.com/in/klaudiacreativestuff/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="about-link"
-          >
-            {t('about.linkedin')}
-          </a>
-          <br />
-          <a
-            href="https://github.com/Klodizaur"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="about-link"
-          >
-            {t('about.github')}
-          </a>
-          <br />
-          <em>{t('about.role')}</em>
-        </p>
-      </div>
-
-      <div className="about-section">
-        <h2>{t('about.description')}</h2>
-        <p>
-          {t('about.description_text')}
-        </p>
-      </div>
-
-      <div className="about-section">
-        <h2>{t('about.license')}</h2>
-        <p>{t('about.license_text')}</p>
-        <p className="about-highlight">
-          {t('about.non_commercial')}
-          <a
-            href="https://github.com/Klodizaur/MyFitnessPlan"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="about-link"
-          >
-          {t('about.contribute')}
-          </a>
-        </p>
-      </div>
-    </div>
-    )}
-    </>
   );
 }

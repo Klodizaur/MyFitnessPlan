@@ -1,29 +1,34 @@
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { EquipmentIcon } from '../lib/equipment';
+import { Check, ChevronDown, ChevronRight, HardDriveUpload, ListPlus, Plus, Search, Sparkles } from 'lucide-react';
 import { useMetaLabels } from '../lib/labels';
 import { ImportResult, useImportAvailable } from '../lib/externalImport';
-import { BuilderWeek, createWeek, createInitialBuilderWeeks } from '../lib/builderModel';
+import { BuilderWeek, createWeek, createInitialBuilderWeeks, workoutSlots } from '../lib/builderModel';
 import { useAiAvailable } from '../lib/useAiAvailable';
 import YouTubeImportModal from '../components/YouTubeImportModal';
 import AiPlanModal, { AiPlanResult } from '../components/ai/AiPlanModal';
-import VideoTagChips from '../components/VideoTagChips';
 import { DEFAULT_PATTERN } from '../components/WorkoutPatternPicker';
 import PlanBuilderScreen from '../components/builder/PlanBuilderScreen';
 import ExportPlanModal from '../components/ExportPlanModal';
 import ImportPlanModal from '../components/ImportPlanModal';
 import FreezePlanModal from '../components/FreezePlanModal';
-import { FREEZE_REASON_EMOJI, FreezeReason } from '../lib/freeze';
-import { localDateString } from '../lib/dates';
+import { FreezeReason } from '../lib/freeze';
+import { localDateString, useToday } from '../lib/dates';
+import { confirmDialog } from '../lib/confirm';
+import { ActivePlanCard, EmptySlot, PlanCard, PlanCardData } from '../components/plans/PlanCards';
+import StartPlanSheet, { Slot } from '../components/plans/StartPlanSheet';
+import PlanPreviewModal from '../components/plans/PlanPreviewModal';
+import CoverPickerModal from '../components/plans/CoverPickerModal';
+import CreateSheet from '../components/plans/CreateSheet';
+import ImportMenu from '../components/plans/ImportMenu';
+import '../styles/plans.css';
 import { Video } from '../types/video';
 
 /**
  * Two plans can run at once, each in its own slot: the main plan and an
  * optional extra alongside it. The slot is stored in `is_active`
- * (0 = inactive, 1 = main, 2 = extra).
+ * (0 = inactive, 1 = main, 2 = extra). `Slot` itself lives with the start sheet.
  */
-type Slot = 'main' | 'extra';
 const ACTIVE_MAIN = 1;
 const ACTIVE_EXTRA = 2;
 
@@ -46,6 +51,7 @@ interface Plan {
   workout_count?: number;
   equipment?: string[];
   category?: string | null;
+  is_favorite?: number;
   /** True when the plan contains videos that stream instead of playing offline. */
   has_external?: boolean;
 }
@@ -62,6 +68,9 @@ interface PlanDay {
 }
 
 const API_BASE = '';
+const ALL = '__all';
+/** Group key for starred plans, which are gathered above the categories. */
+const FAVORITES_KEY = '__favorites';
 
 const resolveBackgroundUrl = (backgroundImage?: string | null) => {
   if (!backgroundImage) return null;
@@ -97,9 +106,6 @@ function categoryStorageKey(key: string): string {
   return key || UNCATEGORIZED_KEY;
 }
 
-// Display-only: the extension is noise when browsing for videos to add.
-const stripVideoExt = (filename: string) => filename.replace(/\.[^/.]+$/, '');
-
 /** A plan's stored rhythm, or null when it follows the global one. */
 function parsePlanPattern(raw?: string | null): number[] | null {
   if (!raw) return null;
@@ -113,101 +119,21 @@ function parsePlanPattern(raw?: string | null): number[] | null {
   }
 }
 
-// "1:04:20" for long videos, "32:15" otherwise — the usual player convention.
-function formatRuntime(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
-}
-
-/**
- * One workout day in the plan details view.
- *
- * Deliberately the same shape as a calendar day card: a preview with the
- * slider arrows when the day holds more than one video, so browsing a plan
- * works the way browsing the schedule already does. It carries no dates,
- * completion state or playback — this view is a look at what's in the plan.
- */
-function PlanDayCard({ day, index }: { day: PlanDay; index: number }) {
-  const { t } = useTranslation();
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  const videos = day.videos;
-  const current = videos[Math.min(currentIndex, Math.max(videos.length - 1, 0))];
-
-  const step = (delta: number) => (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentIndex(prev => (prev + delta + videos.length) % videos.length);
-  };
-
-  return (
-    <div className="plan-day-card">
-      <div className="plan-day-thumb">
-        {current?.thumbnail_path ? (
-          <img src={`/thumbnails/${current.thumbnail_path}`} alt={current.filename} />
-        ) : (
-          <span className="plan-day-noimg">{t('calendar.no_preview')}</span>
-        )}
-
-        <span className="plan-day-badge">{t('plans.details_day_n', { n: index + 1 })}</span>
-
-        {current?.duration_seconds ? (
-          <span className="plan-day-runtime">{formatRuntime(current.duration_seconds)}</span>
-        ) : null}
-
-        {videos.length > 1 && (
-          <>
-            <button
-              type="button"
-              className="slider-nav-btn"
-              style={{ left: '8px' }}
-              aria-label={t('plans.scroll_prev')}
-              onClick={step(-1)}
-            >
-              <span>‹</span>
-            </button>
-            <button
-              type="button"
-              className="slider-nav-btn"
-              style={{ right: '8px' }}
-              aria-label={t('plans.scroll_next')}
-              onClick={step(1)}
-            >
-              <span>›</span>
-            </button>
-            <span className="plan-day-counter">
-              {Math.min(currentIndex, videos.length - 1) + 1} / {videos.length}
-            </span>
-          </>
-        )}
-      </div>
-
-      <span className="plan-day-video-name" title={current?.filename}>
-        {current ? stripVideoExt(current.filename) : ''}
-      </span>
-
-      {current && (
-        <VideoTagChips
-          className="plan-day-tags"
-          intensity={current.intensity}
-          trainingType={current.training_type}
-          bodyParts={current.body_parts}
-          equipment={current.equipment}
-          max={3}
-        />
-      )}
-    </div>
-  );
-}
-
 export default function Plans() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const labels = useMetaLabels();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [status, setStatus] = useState('');
-  const [activationDate, setActivationDate] = useState(localDateString());
+  const today = useToday();
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  // The plan whose "start plan" sheet is open.
+  const [startPlanId, setStartPlanId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState(ALL);
+  // Finished workouts per active plan, for the progress bar on its card.
+  const [doneByPlan, setDoneByPlan] = useState<Record<string, number>>({});
+  const [activationDate] = useState(localDateString());
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(readCollapsedCategories);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -245,13 +171,6 @@ export default function Plans() {
   const aiAvailable = useAiAvailable();
   const [isAiOpen, setIsAiOpen] = useState(false);
 
-  // Horizontal scroller holding the active plans, and whether either arrow has
-  // anywhere left to go. The scrollbar itself is hidden, so the arrows are the
-  // only affordance and have to reflect the real scroll position.
-  const featuredRowRef = useRef<HTMLDivElement | null>(null);
-  const [featuredCanScrollPrev, setFeaturedCanScrollPrev] = useState(false);
-  const [featuredCanScrollNext, setFeaturedCanScrollNext] = useState(false);
-
   // Plan details modal, opened by clicking a plan card (rather than one of the
   // buttons on it). Loads the plan's videos lazily, one plan at a time.
   const [detailsPlanId, setDetailsPlanId] = useState<string | null>(null);
@@ -260,7 +179,6 @@ export default function Plans() {
 
   // Background image picker state (scoped per-plan)
   const [bgPickerPlanId, setBgPickerPlanId] = useState<string | null>(null);
-  const [bgPickerTab, setBgPickerTab] = useState<'thumbnail' | 'upload'>('thumbnail');
   const [bgUploading, setBgUploading] = useState(false);
   const [bgPickerVideos, setBgPickerVideos] = useState<Video[]>([]);
   const [bgPickerLoading, setBgPickerLoading] = useState(false);
@@ -280,6 +198,24 @@ export default function Plans() {
     const res = await fetch('/api/plan');
     const data = await res.json();
     setPlans(data);
+    fetchProgress();
+  };
+
+  const fetchProgress = async () => {
+    try {
+      const res = await fetch('/api/schedule');
+      if (!res.ok) return;
+      const data = await res.json();
+      const done: Record<string, number> = {};
+      for (const entry of data.schedules || []) {
+        done[entry.planId] = (entry.schedule || []).filter(
+          (d: { isWorkoutDay: boolean; workout?: { isCompleted?: boolean } | null }) => d.isWorkoutDay && d.workout?.isCompleted
+        ).length;
+      }
+      setDoneByPlan(done);
+    } catch {
+      /* the bar just stays empty */
+    }
   };
 
   const fetchFreezeStatus = async () => {
@@ -290,6 +226,7 @@ export default function Plans() {
   useEffect(() => {
     fetchPlans();
     fetchFreezeStatus();
+    fetchProgress();
     fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
@@ -350,12 +287,12 @@ export default function Plans() {
     }
   };
 
-  const handleActivate = async (id: string, slot: Slot) => {
+  const handleActivate = async (id: string, slot: Slot, startDate: string = activationDate) => {
     setStatus(t('plans.activating_status'));
     const res = await fetch(`/api/plan/activate/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ startDate: activationDate, slot })
+      body: JSON.stringify({ startDate, slot })
     });
     const data = await res.json();
     if (data.success) {
@@ -396,8 +333,31 @@ export default function Plans() {
     }
   };
 
+  const handleToggleFavorite = async (plan: Plan) => {
+    const next = plan.is_favorite === 1 ? 0 : 1;
+    // Optimistic: the heart should answer the tap, not the round trip.
+    setPlans(prev => prev.map(p => (p.id === plan.id ? { ...p, is_favorite: next } : p)));
+    try {
+      const res = await fetch(`/api/plan/${plan.id}/favorite`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite: next === 1 }),
+      });
+      if (!res.ok) throw new Error('failed');
+    } catch {
+      setPlans(prev => prev.map(p => (p.id === plan.id ? { ...p, is_favorite: plan.is_favorite ?? 0 } : p)));
+    }
+  };
+
   const handleDelete = async (id: string) => {
-    if (!confirm(t('plans.delete_confirm'))) return;
+    const plan = plans.find(p => p.id === id);
+    const ok = await confirmDialog({
+      title: t('plans.delete_title', { name: plan?.name ?? '' }),
+      message: t('plans.delete_confirm'),
+      confirmLabel: t('plans.delete'),
+      danger: true,
+    });
+    if (!ok) return;
     setStatus(t('plans.deleting_status'));
     const res = await fetch(`/api/plan/${id}`, {
       method: 'DELETE'
@@ -564,8 +524,8 @@ export default function Plans() {
 
 
   const handleSaveBuilderPlan = async () => {
-    const selectedDays = builderWeeks.flatMap((week, wIndex) =>
-      week.days.map((day, dIndex) => {
+    const selectedDays = builderWeeks.flatMap(week =>
+      week.days.map(day => {
         // Include video filenames in the day name (no week-day heading)
         const videoTitles = day.videoIds.map(videoId => {
           const video = allVideos.find(v => v.id === videoId);
@@ -682,7 +642,6 @@ export default function Plans() {
   // videos that actually appear somewhere within that plan's workouts.
   const openBackgroundPicker = async (planId: string) => {
     setBgPickerPlanId(planId);
-    setBgPickerTab('thumbnail');
     setBgPickerLoading(true);
     setBgPickerVideos([]);
     try {
@@ -761,40 +720,15 @@ export default function Plans() {
   const activePlans = plans.filter(p => slotOf(p) !== null);
   const otherPlans = plans.filter(p => slotOf(p) === null);
 
-  const syncFeaturedArrows = () => {
-    const row = featuredRowRef.current;
-    if (!row) return;
-    // A pixel of slack: fractional widths can leave a sub-pixel gap at the end.
-    setFeaturedCanScrollPrev(row.scrollLeft > 1);
-    setFeaturedCanScrollNext(row.scrollLeft + row.clientWidth < row.scrollWidth - 1);
-  };
-
-  // Re-checked when the number of active plans changes (a plan was activated or
-  // deactivated) and on resize, since either can change what fits.
-  useEffect(() => {
-    syncFeaturedArrows();
-    window.addEventListener('resize', syncFeaturedArrows);
-    return () => window.removeEventListener('resize', syncFeaturedArrows);
-  }, [activePlans.length]);
-
-  // Steps by one card, which is what the row is sized in. The arrows are also
-  // re-synced once the smooth scroll has settled: `onScroll` normally covers
-  // this, but resolving it here too means the arrows can't be left stale if the
-  // scroll finishes without one.
-  const scrollFeatured = (direction: -1 | 1) => {
-    const row = featuredRowRef.current;
-    if (!row) return;
-    const card = row.firstElementChild as HTMLElement | null;
-    const step = card ? card.getBoundingClientRect().width + 20 : row.clientWidth;
-    row.scrollBy({ left: direction * step, behavior: 'smooth' });
-    window.setTimeout(syncFeaturedArrows, 450);
-  };
-
   // Remaining plans are grouped under category headings: known presets first (in
   // their canonical order), then custom labels A→Z, then uncategorized plans last.
   const planGroups = (() => {
+    // Starred plans live in their own group above the categories, and only
+    // there — listing them twice would make every count on the page lie.
+    const favorites = otherPlans.filter(p => p.is_favorite === 1);
     const byCategory = new Map<string, Plan[]>();
     for (const plan of otherPlans) {
+      if (plan.is_favorite === 1) continue;
       const key = plan.category?.trim() || '';
       const arr = byCategory.get(key) || [];
       arr.push(plan);
@@ -806,7 +740,10 @@ export default function Plans() {
     );
     const custom = keys.filter(k => k && !isPresetCategory(k)).sort((a, b) => a.localeCompare(b));
     const ordered = [...presets, ...custom, ...(byCategory.has('') ? [''] : [])];
-    return ordered.map(key => ({ key, plans: byCategory.get(key) || [] }));
+    return [
+      ...(favorites.length > 0 ? [{ key: FAVORITES_KEY, plans: favorites }] : []),
+      ...ordered.map(key => ({ key, plans: byCategory.get(key) || [] })),
+    ];
   })();
 
   // Only show headings once there is something to distinguish.
@@ -841,578 +778,278 @@ export default function Plans() {
 
   // Category chooser used in both the create flow (step 1) and the edit form.
 
-  // Warns that a plan can't be done offline because some of its videos stream.
-  const renderOfflineWarning = (plan: Plan) => (
-    plan.has_external ? (
-      <span className="plan-offline-warning" title={t('plans.needs_internet_hint')}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-        {t('plans.needs_internet')}
-      </span>
-    ) : null
-  );
+  // The confirmation line is a passing note, not a fixture of the page.
+  useEffect(() => {
+    if (!status) return;
+    const timer = window.setTimeout(() => setStatus(''), 6000);
+    return () => window.clearTimeout(timer);
+  }, [status]);
 
-  // Workout count + equipment tags, shared by the featured card and the grid cards.
-  const renderPlanInfo = (plan: Plan) => (
-    <div className="plan-card-info">
-      <span className="plan-card-workouts">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M6.5 2v4.5M17.5 2v4.5M6.5 17.5V22M17.5 17.5V22M2 6.5h4.5M2 17.5h4.5M17.5 6.5H22M17.5 17.5H22"/></svg>
-        {t('plans.workout_count', { count: plan.workout_count ?? 0 })}
-      </span>
-      {renderOfflineWarning(plan)}
-      {(plan.equipment || []).map(eq => (
-        <span key={eq} className="plan-card-tag" title={labels.equipment(eq)}>
-          <EquipmentIcon id={eq} size={13} />
-          {labels.equipment(eq)}
-        </span>
-      ))}
-    </div>
-  );
+  const openUploadPicker = () => uploadInputRef.current?.click();
+
+  const formatShort = (date: string) =>
+    new Date(`${date}T12:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' });
+
+  const cardData = (plan: Plan): PlanCardData => ({
+    id: plan.id,
+    name: plan.name,
+    cover: resolveBackgroundUrl(plan.background_image),
+    blur: Boolean(plan.background_blur),
+    workoutCount: plan.workout_count ?? 0,
+    equipment: (plan.equipment || []).map(id => labels.equipment(id)),
+    hasExternal: Boolean(plan.has_external),
+    favorite: plan.is_favorite === 1,
+  });
+
+  const startPlan = plans.find(p => p.id === startPlanId) || null;
+
+  const groupLabel = (key: string) =>
+    key === FAVORITES_KEY ? t('plans.favorites') : key ? categoryLabel(key) : t('plans.category_none');
+
+  const categoryTabs = planGroups.map(g => ({
+    key: g.key || UNCATEGORIZED_KEY,
+    label: groupLabel(g.key),
+    n: g.plans.length,
+  }));
+
+  const needle = query.trim().toLowerCase();
+  const visibleGroups = planGroups
+    .filter(g => categoryFilter === ALL || (g.key || UNCATEGORIZED_KEY) === categoryFilter)
+    .map(g => ({ ...g, plans: g.plans.filter(p => !needle || p.name.toLowerCase().includes(needle)) }))
+    .filter(g => g.plans.length > 0);
 
   return (
-    <div className="plans-container">
-      <div className="glass-card plans-hero" style={{ marginBottom: '2rem' }}>
-        <div className="plans-hero-top">
-          <div className="plans-hero-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+    <div className="rx-wrap pl-page">
+      <header className="pl-head">
+        <div className="pl-head-row">
+          <div className="pl-head-text">
+            <h1 className="rx-h1">{t('plans.title')}</h1>
+            <p className="pl-lede">{t('plans.upload_msg')}</p>
           </div>
-          <div>
-            <h1 style={{ marginBottom: '0.35rem' }}>{t('plans.manage_plans')}</h1>
-            <p style={{ margin: 0 }}>{t('plans.upload_msg')}</p>
-          </div>
+          <button type="button" className="pl-plus" aria-label={t('plans.create')} onClick={() => setIsCreateOpen(true)}>
+            <Plus size={20} />
+          </button>
         </div>
 
-        <div className="plans-upload-row">
-          <label className="file-picker">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span>{t('plans.upload_btn')}</span>
-            <input
-              type="file"
-              accept=".csv, .tsv"
-              onChange={e => {
-                const selected = e.target.files?.[0];
-                if (selected) handleFileUpload(selected);
-                e.target.value = '';
-              }}
-              style={{ display: 'none' }}
-            />
-          </label>
-          <button className="btn btn-secondary" onClick={() => setIsBuilderOpen(true)}>{t('plans.build_btn')}</button>
+        <div className="pl-actions">
+          <button type="button" className="rx-btn rx-btn--primary" onClick={() => setIsBuilderOpen(true)}>
+            <ListPlus size={17} />
+            {t('plans.build_btn')}
+          </button>
           {aiAvailable && (
-            <button className="btn btn-secondary" onClick={() => setIsAiOpen(true)}>{t('ai.build_btn')}</button>
+            <button type="button" className="rx-btn" onClick={() => setIsAiOpen(true)}>
+              <Sparkles size={17} />
+              {t('ai.build_btn')}
+            </button>
           )}
-        </div>
-
-        {/* Deliberately quieter than the row above: moving plans in and out is
-            an occasional thing, and this page has enough competing for attention
-            already. Small, text-weight, and out of the way. */}
-        <div className="plans-transfer-row">
-          <button type="button" className="plans-transfer-btn" onClick={() => setIsPlanImportOpen(true)}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>{t('transfer.import_btn_label')}</span>
-          </button>
-          <button type="button" className="plans-transfer-btn" onClick={() => setExportTarget('*')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span>{t('transfer.backup_all_btn')}</span>
+          <span className="pl-actions-spacer" />
+          {/* Bringing a plan in from a file is one quiet button that asks which
+              format, so the two ways of *making* a plan are the only loud ones. */}
+          <ImportMenu onCsv={openUploadPicker} onJson={() => setIsPlanImportOpen(true)} />
+          <span className="pl-actions-divider" aria-hidden="true" />
+          <button type="button" className="pl-quiet" onClick={() => setExportTarget('*')}>
+            <HardDriveUpload size={16} />
+            {t('transfer.backup_all_btn')}
           </button>
         </div>
-      </div>
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept=".csv, .tsv"
+          hidden
+          onChange={e => {
+            const selected = e.target.files?.[0];
+            if (selected) handleFileUpload(selected);
+            e.target.value = '';
+          }}
+        />
+      </header>
 
       {status && (
-        <div className="glass-card" style={{ padding: '1rem', marginBottom: '2rem', background: 'rgba(0, 255, 157, 0.1)', color: 'var(--accent-color)', textAlign: 'center' }}>
+        <div className="pl-status" role="status">
+          <Check size={16} />
           {status}
         </div>
       )}
 
-      {/* One active plan fills the row as before; two become a horizontal
-          scroller where the main plan leads and the extra one peeks in. The
-          scrollbar is hidden, so the arrows below are the visible affordance. */}
-      <div className={`plans-featured-wrap${activePlans.length > 1 ? ' multi' : ''}`}>
-      {activePlans.length > 1 && (
-        <>
-          <button
-            type="button"
-            className="plans-featured-nav prev"
-            aria-label={t('plans.scroll_prev')}
-            disabled={!featuredCanScrollPrev}
-            onClick={() => scrollFeatured(-1)}
-          >
-            <span>‹</span>
-          </button>
-          <button
-            type="button"
-            className="plans-featured-nav next"
-            aria-label={t('plans.scroll_next')}
-            disabled={!featuredCanScrollNext}
-            onClick={() => scrollFeatured(1)}
-          >
-            <span>›</span>
-          </button>
-        </>
-      )}
-      <div
-        className={`plans-featured-row${activePlans.length > 1 ? ' multi' : ''}`}
-        ref={featuredRowRef}
-        onScroll={syncFeaturedArrows}
-      >
-      {activePlans.map(plan => {
-        const slot = slotOf(plan) as Slot;
-        return (
-        <div
-          key={plan.id}
-          className="plan-featured"
-          role="button"
-          tabIndex={0}
-          onClick={() => openPlanDetails(plan.id)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              openPlanDetails(plan.id);
-            }
-          }}
-        >
-          {/* Full-bleed image with a dark scrim, so every label on top is white —
-              readable in all themes regardless of the theme's accent lightness. */}
-          {(() => {
-            const bgUrl = resolveBackgroundUrl(plan.background_image);
-            return bgUrl ? (
-              <div className={`plan-card-bg${plan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
-            ) : (
-              <>
-                <div className="plan-card-bg no-image" />
-                <div className="plan-card-logo" />
-              </>
-            );
-          })()}
-          <div className="plan-featured-scrim" />
+      <h2 className="pl-section-label">{t('plans.active_caps')}</h2>
+      <div className="pl-active-grid">
+        {(['main', 'extra'] as Slot[]).map(slot => {
+          const plan = activePlans.find(p => slotOf(p) === slot);
+          if (!plan) return <EmptySlot key={slot} slot={slot} />;
+          const frozen = Boolean(freezeStatus[plan.id]);
+          return (
+            <ActivePlanCard
+              key={plan.id}
+              plan={cardData(plan)}
+              slot={slot}
+              category={plan.category ? categoryLabel(plan.category) : null}
+              frozen={frozen}
+              status={
+                frozen
+                  ? t('plans.status_paused')
+                  : t(plan.start_date > today ? 'plans.status_starts' : 'plans.status_started', { date: formatShort(plan.start_date) })
+              }
+              done={doneByPlan[plan.id] || 0}
+              freezeBusy={unfreezingPlanId === plan.id}
+              onOpen={() => openPlanDetails(plan.id)}
+              onEdit={() => handleEditPlan(plan.id)}
+              onFreeze={() => (frozen ? handleUnfreeze(plan.id) : setFreezeModalPlanId(plan.id))}
+              onDeactivate={() => handleDeactivate(plan.id)}
+              onChangeCover={() => openBackgroundPicker(plan.id)}
+              onBackup={() => setExportTarget(plan.id)}
+              onFavorite={() => handleToggleFavorite(plan)}
+            />
+          );
+        })}
+      </div>
 
-          <button
-            type="button"
-            className="plan-card-export-btn"
-            title={t('transfer.export_btn')}
-            aria-label={t('transfer.export_btn')}
-            onClick={e => { e.stopPropagation(); setExportTarget(plan.id); }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          </button>
-
-          <button
-            type="button"
-            className="plan-card-bg-btn"
-            title={t('plans.set_background') || 'Set background image'}
-            onClick={e => { e.stopPropagation(); openBackgroundPicker(plan.id); }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          </button>
-
-          <div className="plan-featured-content">
-            <div className="plan-featured-main">
-              <div className="plan-featured-eyebrow">
-                <span className="plan-featured-active">
-                  {t(slot === 'extra' ? 'plans.slot_extra' : 'plans.slot_main')}
-                </span>
-                {plan.category && (
-                  <span className="plan-featured-category">{categoryLabel(plan.category)}</span>
-                )}
-                {renderOfflineWarning(plan)}
-                {freezeStatus[plan.id] && (
-                  <span className="plan-featured-frozen">
-                    {FREEZE_REASON_EMOJI[freezeStatus[plan.id]]} {t(`calendar.freeze_reason_${freezeStatus[plan.id]}`)}
-                  </span>
-                )}
-              </div>
-              <h2 className="plan-featured-title">{plan.name}</h2>
-              {plan.description && (
-                <p className="plan-featured-description" title={plan.description}>{plan.description}</p>
-              )}
-              <p className="plan-featured-date">
-                <span>{t('plans.start_date')}</span>
-                <strong>{plan.start_date}</strong>
-              </p>
+      {otherPlans.length > 0 && (
+        <div className="pl-find">
+          <label className="pl-search">
+            <Search size={18} />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder={t('plans.search_placeholder')}
+              aria-label={t('plans.search_placeholder')}
+            />
+          </label>
+          {showCategoryHeadings && (
+            <div className="pl-cats">
+              {[{ key: ALL, label: t('plans.filter_all'), n: otherPlans.length }, ...categoryTabs].map(c => (
+                <button
+                  key={c.key}
+                  type="button"
+                  className={`pl-cat${categoryFilter === c.key ? ' is-on' : ''}`}
+                  onClick={() => setCategoryFilter(c.key)}
+                >
+                  {c.label}<span>{c.n}</span>
+                </button>
+              ))}
             </div>
-
-            <div className="plan-featured-panel">
-              <span className="plan-featured-count">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11v11h-11z"/><path d="M6.5 2v4.5M17.5 2v4.5M6.5 17.5V22M17.5 17.5V22M2 6.5h4.5M2 17.5h4.5M17.5 6.5H22M17.5 17.5H22"/></svg>
-                {t('plans.workout_count', { count: plan.workout_count ?? 0 })}
-              </span>
-
-              {/* Always shown, even when empty: hiding the row made a plan whose
-                  videos carry no equipment tags look identical to one that was
-                  never checked. */}
-              <div className="plan-featured-equipment">
-                <span className="plan-featured-panel-label">{t('plans.builder_filter_equipment')}</span>
-                {(plan.equipment || []).length > 0 ? (
-                  <div className="plan-featured-tags">
-                    {(plan.equipment || []).map(eq => (
-                      <span key={eq} className="plan-featured-tag" title={labels.equipment(eq)}>
-                        <EquipmentIcon id={eq} size={13} />
-                        {labels.equipment(eq)}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="plan-featured-equipment-none">{t('plans.equipment_none')}</span>
-                )}
-              </div>
-
-              <div className="plan-card-actions" onClick={e => e.stopPropagation()}>
-                <button className="btn btn-ghost" onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
-                {freezeStatus[plan.id] ? (
-                  <button
-                    className="btn btn-ghost"
-                    disabled={unfreezingPlanId === plan.id}
-                    onClick={() => handleUnfreeze(plan.id)}
-                  >
-                    {t('plans.unfreeze')}
-                  </button>
-                ) : (
-                  <button className="btn btn-ghost" onClick={() => setFreezeModalPlanId(plan.id)}>
-                    {t('plans.freeze')}
-                  </button>
-                )}
-                <button className="btn btn-ghost" onClick={() => handleDeactivate(plan.id)}>{t('plans.deactivate')}</button>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
-        );
-      })}
-      </div>
-      </div>
+      )}
 
-      {planGroups.map(group => {
+      {visibleGroups.map(group => {
         const storageKey = categoryStorageKey(group.key);
         const collapsed = showCategoryHeadings && collapsedCategories.has(storageKey);
-        const headingLabel = group.key ? categoryLabel(group.key) : t('plans.category_none');
+        const headingLabel = groupLabel(group.key);
         return (
-        <section key={storageKey} className={`plans-category${collapsed ? ' collapsed' : ''}`}>
-          {showCategoryHeadings && (
-            <button
-              type="button"
-              className="plans-category-heading"
-              aria-expanded={!collapsed}
-              onClick={() => toggleCategoryCollapsed(group.key)}
-            >
-              <span className={`plans-category-chevron${collapsed ? '' : ' open'}`} aria-hidden="true" />
-              <span className="plans-category-heading-label">{headingLabel}</span>
-              <span className="plans-category-count">{group.plans.length}</span>
-            </button>
-          )}
-          {!collapsed && (
-          <div className="plans-grid">
-            {group.plans.map(plan => {
-          const bgUrl = resolveBackgroundUrl(plan.background_image);
-          return (
-            <div
-              key={plan.id}
-              className="glass-card plan-card"
-              role="button"
-              tabIndex={0}
-              onClick={() => openPlanDetails(plan.id)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  openPlanDetails(plan.id);
-                }
-              }}
-            >
-              {bgUrl ? (
-                <div className={`plan-card-bg${plan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
-              ) : (
-                <>
-                  <div className="plan-card-bg no-image" />
-                  <div className="plan-card-logo" />
-                </>
-              )}
-              <div className="plan-card-overlay" />
-
+          <section key={storageKey} className="pl-group">
+            {showCategoryHeadings && (
               <button
                 type="button"
-                className="plan-card-export-btn"
-                title={t('transfer.export_btn')}
-                aria-label={t('transfer.export_btn')}
-                onClick={e => { e.stopPropagation(); setExportTarget(plan.id); }}
+                className="pl-group-head"
+                aria-expanded={!collapsed}
+                onClick={() => toggleCategoryCollapsed(group.key)}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                {collapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                <h2>{headingLabel}</h2>
+                <span className="pl-group-count">{group.plans.length}</span>
               </button>
-
-              <button
-                type="button"
-                className="plan-card-bg-btn"
-                title={t('plans.set_background') || 'Set background image'}
-                onClick={e => { e.stopPropagation(); openBackgroundPicker(plan.id); }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              </button>
-
-              <div className="plan-card-body">
-                <h3 className="plan-card-title">{plan.name}</h3>
-
-                {renderPlanInfo(plan)}
-
-                <div className="plan-card-datefield" onClick={e => e.stopPropagation()}>
-                  <label>{t('plans.set_start_date')}</label>
-                  <input
-                    type="date"
-                    value={activationDate}
-                    onChange={e => setActivationDate(e.target.value)}
+            )}
+            {!collapsed && (
+              <div className="pl-grid">
+                {group.plans.map(plan => (
+                  <PlanCard
+                    key={plan.id}
+                    plan={cardData(plan)}
+                    onOpen={() => openPlanDetails(plan.id)}
+                    onStart={() => setStartPlanId(plan.id)}
+                    onEdit={() => handleEditPlan(plan.id)}
+                    onChangeCover={() => openBackgroundPicker(plan.id)}
+                    onBackup={() => setExportTarget(plan.id)}
+                    onFavorite={() => handleToggleFavorite(plan)}
+                    onDelete={() => handleDelete(plan.id)}
                   />
-                </div>
-
-                {/* Two slots to activate into, so a plan can run alongside the main one. */}
-                <div className="plan-card-activate" onClick={e => e.stopPropagation()}>
-                  <span className="plan-card-activate-label">{t('plans.activate_as')}</span>
-                  <button className="btn btn-ghost" onClick={() => handleActivate(plan.id, 'main')}>{t('plans.slot_main')}</button>
-                  <button className="btn btn-ghost" onClick={() => handleActivate(plan.id, 'extra')}>{t('plans.slot_extra')}</button>
-                </div>
-
-                <div className="plan-card-actions" onClick={e => e.stopPropagation()}>
-                  <button className="btn btn-ghost" onClick={() => handleEditPlan(plan.id)}>{t('plans.edit')}</button>
-                  <button className="btn btn-danger-ghost" onClick={() => handleDelete(plan.id)}>{t('plans.delete')}</button>
-                </div>
+                ))}
               </div>
-            </div>
-          );
-            })}
-          </div>
-          )}
-        </section>
+            )}
+          </section>
         );
       })}
 
+      {otherPlans.length > 0 && visibleGroups.length === 0 && (
+        <div className="pl-none">{t('plans.no_match')}</div>
+      )}
+
       {plans.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '4rem', color: '#888' }}>
+        <div className="pl-none">
           {t('plans.no_plans')}
         </div>
       )}
 
-      {detailsPlan && createPortal(
-        <div className="plan-details-overlay" onClick={closePlanDetails}>
-          <div className="plan-details-panel" onClick={e => e.stopPropagation()}>
-            {(() => {
-              const bgUrl = resolveBackgroundUrl(detailsPlan.background_image);
-              const slot = slotOf(detailsPlan);
-              return (
-                <div className="plan-details-header">
-                  {bgUrl ? (
-                    <div className={`plan-card-bg${detailsPlan.background_blur ? ' blurred' : ''}`} style={{ backgroundImage: `url(${bgUrl})` }} />
-                  ) : (
-                    <>
-                      <div className="plan-card-bg no-image" />
-                      <div className="plan-card-logo" />
-                    </>
-                  )}
-                  <div className="plan-featured-scrim" />
-                  <button type="button" className="plan-details-close" onClick={closePlanDetails} aria-label={t('plans.builder_cancel')}>✕</button>
-                  <div className="plan-details-header-content">
-                    <div className="plan-featured-eyebrow">
-                      {slot && (
-                        <span className="plan-featured-active">
-                          {t(slot === 'extra' ? 'plans.slot_extra' : 'plans.slot_main')}
-                        </span>
-                      )}
-                      {detailsPlan.category && (
-                        <span className="plan-featured-category">{categoryLabel(detailsPlan.category)}</span>
-                      )}
-                      {/* The offline warning lives in the info row below, next to
-                          the workout count, so it isn't repeated here. */}
-                    </div>
-                    <h2 className="plan-featured-title">{detailsPlan.name}</h2>
-                    <p className="plan-featured-date">
-                      <span>{t('plans.start_date')}</span>
-                      <strong>{detailsPlan.start_date}</strong>
-                    </p>
-                    {renderPlanInfo(detailsPlan)}
-                    {detailsPlan.description && (
-                      <p className="plan-details-description">{detailsPlan.description}</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="plan-details-body">
-              <h3 className="plan-details-section-title">
-                {t('plans.details_days')}
-                {detailsDays.length > 0 && (
-                  <span className="plan-details-video-count">{detailsDays.length}</span>
-                )}
-              </h3>
-
-              {detailsLoading ? (
-                <p style={{ color: 'var(--text-secondary)' }}>{t('plans.details_loading')}</p>
-              ) : detailsDays.length === 0 ? (
-                <p style={{ color: 'var(--text-secondary)' }}>{t('plans.details_no_videos')}</p>
-              ) : (
-                <div className="plan-day-grid">
-                  {detailsDays.map((day, index) => (
-                    <PlanDayCard key={day.id} day={day} index={index} />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Everything you can do to a plan, in the view you opened to look at
-                it — so inspecting and acting aren't two different trips. */}
-            <div className="plan-details-actions">
-              <label className="plan-details-date">
-                <span>{t('plans.set_start_date')}</span>
-                <input
-                  type="date"
-                  value={activationDate}
-                  onChange={e => setActivationDate(e.target.value)}
-                />
-              </label>
-
-              {/* Three tiers, because these six things are not equally important.
-                  What you open a plan to do is put it into a slot (or take it
-                  out); editing is the next thing down; duplicating and exporting
-                  are occasional and get icons; deleting is set apart because it
-                  is the one that cannot be undone. Six identically-weighted
-                  pills said none of that. */}
-              <div className="plan-details-action-buttons">
-                <div className="plan-details-primary">
-                  {/* Switching slots only makes sense for a plan that isn't running yet —
-                      re-slotting an already-active plan would just evict whatever
-                      currently occupies the other slot. An active plan only offers
-                      Deactivate. */}
-                  {slotOf(detailsPlan) === null ? (
-                    <>
-                      <span className="plan-details-primary-label">{t('plans.activate_as')}</span>
-                      <button
-                        className="btn"
-                        onClick={() => { handleActivate(detailsPlan.id, 'main'); closePlanDetails(); }}
-                      >
-                        {t('plans.slot_main')}
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => { handleActivate(detailsPlan.id, 'extra'); closePlanDetails(); }}
-                      >
-                        {t('plans.slot_extra')}
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => { handleDeactivate(detailsPlan.id); closePlanDetails(); }}
-                    >
-                      {t('plans.deactivate')}
-                    </button>
-                  )}
-                </div>
-
-                <div className="plan-details-utilities">
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => { closePlanDetails(); handleEditPlan(detailsPlan.id); }}
-                  >
-                    {t('plans.edit')}
-                  </button>
-                  <button
-                    type="button"
-                    className="plan-details-icon-btn"
-                    title={t('plans.duplicate')}
-                    aria-label={t('plans.duplicate')}
-                    onClick={() => { handleDuplicate(detailsPlan.id); closePlanDetails(); }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  </button>
-                  {/* Closes this panel first: the export dialog is its own overlay,
-                      and stacking the two would bury one behind the other. */}
-                  <button
-                    type="button"
-                    className="plan-details-icon-btn"
-                    title={t('transfer.export_btn')}
-                    aria-label={t('transfer.export_btn')}
-                    onClick={() => { const id = detailsPlan.id; closePlanDetails(); setExportTarget(id); }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  </button>
-                  <button
-                    className="btn btn-danger-ghost plan-details-delete"
-                    onClick={async () => { await handleDelete(detailsPlan.id); closePlanDetails(); }}
-                  >
-                    {t('plans.delete')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
+      {isCreateOpen && (
+        <CreateSheet
+          aiAvailable={aiAvailable === true}
+          onUpload={openUploadPicker}
+          onBuild={() => setIsBuilderOpen(true)}
+          onAi={() => setIsAiOpen(true)}
+          onImport={() => setIsPlanImportOpen(true)}
+          onBackup={() => setExportTarget('*')}
+          onClose={() => setIsCreateOpen(false)}
+        />
       )}
 
-      {bgPickerPlanId && createPortal(
-        <div className="bg-picker-overlay" onClick={closeBackgroundPicker}>
-          <div className="bg-picker-panel" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0 }}>{t('plans.set_background') || 'Set background image'}</h3>
-              <button className="btn" style={{ background: 'transparent', border: '1px solid var(--glass-border)', padding: '6px 12px' }} onClick={closeBackgroundPicker}>✕</button>
-            </div>
+      {startPlan && (
+        <StartPlanSheet
+          plan={cardData(startPlan)}
+          occupied={{
+            main: activePlans.find(p => slotOf(p) === 'main')?.name ?? null,
+            extra: activePlans.find(p => slotOf(p) === 'extra')?.name ?? null,
+          }}
+          defaultSlot={activePlans.some(p => slotOf(p) === 'main') && !activePlans.some(p => slotOf(p) === 'extra') ? 'extra' : 'main'}
+          defaultDate={today}
+          onClose={() => setStartPlanId(null)}
+          onConfirm={(slot, date) => {
+            const id = startPlan.id;
+            setStartPlanId(null);
+            handleActivate(id, slot, date);
+          }}
+        />
+      )}
 
-            <div className="bg-picker-tabs">
-              <button className={`btn ${bgPickerTab === 'thumbnail' ? '' : 'btn-secondary'}`} onClick={() => setBgPickerTab('thumbnail')}>{t('plans.choose_from_library') || 'Choose from this plan'}</button>
-              <button className={`btn ${bgPickerTab === 'upload' ? '' : 'btn-secondary'}`} onClick={() => setBgPickerTab('upload')}>{t('plans.upload_image') || 'Upload image'}</button>
-            </div>
+      {detailsPlan && (
+        <PlanPreviewModal
+          name={detailsPlan.name}
+          slot={slotOf(detailsPlan)}
+          categoryLabel={detailsPlan.category ? categoryLabel(detailsPlan.category) : null}
+          cover={resolveBackgroundUrl(detailsPlan.background_image)}
+          description={detailsPlan.description}
+          equipment={(detailsPlan.equipment || []).map(eq => labels.equipment(eq))}
+          startDate={detailsPlan.start_date}
+          done={doneByPlan[detailsPlan.id] ?? 0}
+          days={detailsDays}
+          loading={detailsLoading}
+          perWeek={workoutSlots(parsePlanPattern(detailsPlan.workout_pattern) ?? globalPattern)}
+          needsInternet={Boolean(detailsPlan.has_external)}
+          defaultDate={activationDate}
+          onClose={closePlanDetails}
+          onEdit={() => { closePlanDetails(); handleEditPlan(detailsPlan.id); }}
+          onDuplicate={() => { handleDuplicate(detailsPlan.id); closePlanDetails(); }}
+          onExport={() => { const id = detailsPlan.id; closePlanDetails(); setExportTarget(id); }}
+          onDelete={async () => { await handleDelete(detailsPlan.id); closePlanDetails(); }}
+          onDeactivate={() => { handleDeactivate(detailsPlan.id); closePlanDetails(); }}
+          onStart={(slot, date) => { handleActivate(detailsPlan.id, slot, date); closePlanDetails(); }}
+        />
+      )}
 
-            {bgPickerCurrentUrl && (
-              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!bgPickerPlan?.background_blur}
-                    onChange={e => bgPickerPlanId && handleToggleBackgroundBlur(bgPickerPlanId, e.target.checked)}
-                    style={{ width: 16, height: 16, accentColor: 'var(--accent-color)', cursor: 'pointer' }}
-                  />
-                  {t('plans.blur_background') || 'Blur background'}
-                </label>
-                <button className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '0.85rem' }} onClick={() => bgPickerPlanId && handleClearBackground(bgPickerPlanId)}>
-                  {t('plans.remove_background') || 'Remove background image'}
-                </button>
-              </div>
-            )}
-
-            {bgPickerTab === 'thumbnail' ? (
-              bgPickerLoading ? (
-                <p style={{ color: 'var(--text-secondary)' }}>{t('plans.builder_saving')}</p>
-              ) : bgPickerVideos.length === 0 ? (
-                <p style={{ color: 'var(--text-secondary)' }}>{t('plans.builder_no_videos')}</p>
-              ) : (
-                <div className="bg-picker-thumb-grid">
-                  {bgPickerVideos.map(video => (
-                    <div
-                      key={video.id}
-                      className="bg-picker-thumb"
-                      title={video.filename}
-                      onClick={() => bgPickerPlanId && handleSelectThumbnailBackground(bgPickerPlanId, video.thumbnail_path as string)}
-                    >
-                      <img src={`/thumbnails/${video.thumbnail_path}`} alt={video.filename} />
-                    </div>
-                  ))}
-                </div>
-              )
-            ) : (
-              <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
-                <label className="file-picker" style={{ justifyContent: 'center' }}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  <span>{bgUploading ? t('plans.builder_saving') : (t('plans.upload_image') || 'Upload image')}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    disabled={bgUploading}
-                    onChange={e => {
-                      const f = e.target.files?.[0];
-                      if (f && bgPickerPlanId) handleUploadBackground(bgPickerPlanId, f);
-                    }}
-                  />
-                </label>
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
+      {bgPickerPlanId && (
+        <CoverPickerModal
+          planName={bgPickerPlan?.name ?? ''}
+          currentUrl={bgPickerCurrentUrl}
+          blurred={Boolean(bgPickerPlan?.background_blur)}
+          loading={bgPickerLoading}
+          videos={bgPickerVideos}
+          uploading={bgUploading}
+          onClose={closeBackgroundPicker}
+          onPick={path => handleSelectThumbnailBackground(bgPickerPlanId, path)}
+          onUpload={file => handleUploadBackground(bgPickerPlanId, file)}
+          onBlur={blur => handleToggleBackgroundBlur(bgPickerPlanId, blur)}
+          onRemove={() => handleClearBackground(bgPickerPlanId)}
+        />
       )}
 
       {isImportOpen && (
@@ -1455,8 +1092,6 @@ export default function Plans() {
           onName={setPlanName}
           description={planDescription}
           onDescription={setPlanDescription}
-          startDate={builderStartDate}
-          onStartDate={setBuilderStartDate}
           categories={[
             ...PLAN_CATEGORIES.map(value => ({ value, label: categoryLabel(value) })),
             { value: 'custom', label: t('plans.category_custom') },
@@ -1493,6 +1128,7 @@ export default function Plans() {
         open={isAiOpen}
         onClose={() => setIsAiOpen(false)}
         onGenerated={handleAiGenerated}
+        onSaved={count => { setIsAiOpen(false); setStatus(t('plans.builder_saved', { count })); fetchPlans(); }}
       />
     </div>
   );
