@@ -1,0 +1,376 @@
+/** Redesign: Dashboard. */
+
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding-top: 32px;
+  padding-bottom: 40px;
+}
+
+.dash-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dash-plan-step { display: flex; gap: 6px; }
+
+.dash-plan-step button {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  cursor: pointer;
+}
+
+.dash-plan-step button:hover { background: var(--t-tint); }
+
+/* --- Today's workout hero --------------------------------------------------
+   Image and text side by side on desktop, stacked on mobile. */
+.dash-today {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-r-hero);
+  overflow: hidden;
+}
+
+/* Rest day: the media column keeps the workout card's proportions so the card
+   doesn't change size when you step between an active plan and a resting one. */
+.dash-today-rest-media {
+  padding: 12px;
+  background: var(--t-band-even);
+}
+
+.dash-today-rest-panel {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16 / 9;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1.5px dashed var(--t-border-dashed);
+  border-radius: calc(var(--t-r-hero) - 12px);
+  color: var(--t-ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Next workout, in place of the workout's action row. */
+.dash-next {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-next-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-ink-faint);
+}
+
+.dash-next-date {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--t-accent);
+}
+
+.dash-today-media { position: relative; min-height: 0; }
+
+.dash-today-media img,
+.dash-today-noimg {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  background: var(--t-tint);
+}
+
+.dash-today-pill {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(40, 14, 4, 0.72);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dash-today-done {
+  position: absolute;
+  inset: 0;
+  background: rgba(40, 14, 4, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-today-done span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: var(--t-success);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.dash-today-body {
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+  min-width: 0;
+}
+
+.dash-today-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--t-ink-muted);
+}
+
+.dash-plan-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dash-today-title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
+}
+
+.dash-today-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.dash-today-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--t-border);
+}
+
+.dash-today-progress-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* --- Two columns: Upcoming and Your collection ------------------------------ */
+.dash-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
+}
+
+.dash-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.dash-section-head .rx-section-title { flex: 1; }
+
+.dash-upcoming { display: flex; flex-direction: column; overflow: hidden; }
+
+.dash-empty { margin: 0; padding: 16px; font-size: 14px; }
+
+/* A day, not a video: the date, then the plan it belongs to and that day's
+   videos. The row itself isn't clickable any more — each video is, so a day
+   with two parts can start either one. */
+.dash-up-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--t-border);
+}
+
+.dash-up-row:first-child { border-top: none; }
+
+.dash-up-date { width: 46px; flex-shrink: 0; text-align: center; padding-top: 2px; }
+
+.dash-up-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-up-plan {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dash-up-plan-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-up-video {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px;
+  margin: -4px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dash-up-video:hover { background: var(--t-subtle); }
+
+/* "+5 more" is a small pill button now, not a caption: it leads to the calendar. */
+.dash-up-more {
+  align-self: flex-start;
+  height: 34px;
+  padding: 0 16px;
+  border: 1.5px solid var(--t-border);
+  border-radius: 999px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dash-up-more:hover { background: var(--t-subtle); border-color: var(--t-accent); }
+
+.dash-up-dow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--t-accent);
+}
+
+.dash-up-day { display: block; font-size: 20px; font-weight: 700; line-height: 1.1; }
+
+.dash-up-thumb {
+  width: 64px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
+  display: block;
+  flex-shrink: 0;
+  background: var(--t-tint);
+}
+
+.dash-up-title { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; line-height: 1.3; }
+
+/* --- Your collection -------------------------------------------------------- */
+.dash-collection {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dash-album {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.dash-album-cover {
+  position: relative;
+  display: block;
+}
+
+.dash-album img,
+.dash-album-noimg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 14px;
+  background: var(--t-tint);
+}
+
+.dash-album-name {
+  display: block;
+  margin-top: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-album-count { display: block; font-size: 12px; }
+
+@media (max-width: 767px) {
+  .dash { gap: 24px; padding-top: 4px; }
+  .dash-today { grid-template-columns: minmax(0, 1fr); }
+  .dash-today-body { padding: 16px 16px 18px; }
+  .dash-today-title { font-size: 22px; }
+  .dash-today-actions .rx-btn { flex: 1; padding: 0 14px; }
+  .dash-cols { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+
+  /* The strip bleeds to both page edges so a partly-visible fourth album
+     signals that it scrolls. */
+  .dash-collection {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -16px;
+    padding: 0 16px;
+  }
+  .dash-collection::-webkit-scrollbar { display: none; }
+  .dash-album { width: 150px; flex-shrink: 0; }
+}

@@ -8,6 +8,8 @@ export type Video = {
   training_type?: string[];
   body_parts?: string[];
   intensity?: string;
+  /** Starred by the user; gathered into the Favourites album. */
+  is_favorite?: boolean;
   /** Runtime in seconds, filled in by the library scan. Null when not probed. */
   duration_seconds?: number | null;
   /**

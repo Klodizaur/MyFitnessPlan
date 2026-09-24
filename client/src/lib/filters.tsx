@@ -18,6 +18,29 @@ export function matchesTags(videoTags: string[] | undefined, selected: string[],
     : selected.some(tag => tags.includes(tag));
 }
 
+/** A runtime window in whole minutes. Either end can be open. */
+export interface LengthRange {
+  min: number | null;
+  max: number | null;
+}
+
+export const EMPTY_LENGTH: LengthRange = { min: null, max: null };
+
+export const isLengthActive = (range: LengthRange) => range.min !== null || range.max !== null;
+
+/**
+ * Whether a video's runtime falls inside the window (inclusive at both ends).
+ * With a window set, a video whose runtime was never probed can't be shown to
+ * fit, so it is left out; with no window everything matches.
+ */
+export function matchesLength(seconds: number | null | undefined, range: LengthRange): boolean {
+  if (!isLengthActive(range)) return true;
+  if (!seconds) return false;
+  if (range.min !== null && seconds < range.min * 60) return false;
+  if (range.max !== null && seconds > range.max * 60) return false;
+  return true;
+}
+
 /**
  * Persisted (localStorage) match-mode toggle, shared across the Library,
  * Album and plan-builder filter panels so the preference stays consistent.

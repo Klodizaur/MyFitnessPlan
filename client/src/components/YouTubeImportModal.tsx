@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { CircleCheck, Download, Link as LinkIcon, LockOpen, Wifi } from 'lucide-react';
 import { ImportResult } from '../lib/externalImport';
+import YouTubeGlyph from './icons/YouTubeGlyph';
+import Modal, { CloseButton } from './modal/Modal';
 
 type Props = {
   onClose: () => void;
   /** Called with the imported videos once the playlist has been read. */
   onImported: (result: ImportResult) => void;
 };
+
+/** A playlist link always carries `list=`; until it does there is nothing to import. */
+const looksLikePlaylist = (url: string) => /list=/.test(url);
 
 /**
  * Playlist import dialog, shared by the Library page and the plan builder so
@@ -18,10 +23,11 @@ export default function YouTubeImportModal({ onClose, onImported }: Props) {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const ok = looksLikePlaylist(url);
 
   const submit = async () => {
     const trimmed = url.trim();
-    if (!trimmed || loading) return;
+    if (!ok || loading) return;
 
     setLoading(true);
     setError('');
@@ -50,46 +56,51 @@ export default function YouTubeImportModal({ onClose, onImported }: Props) {
     }
   };
 
-  return createPortal(
-    <div className="wb-overlay wb-overlay-top" onClick={() => !loading && onClose()}>
-      <div className="wb-import-modal" onClick={e => e.stopPropagation()}>
-        <h3 className="wb-import-title">{t('import.title')}</h3>
-        <p className="wb-import-intro">{t('import.intro')}</p>
+  return (
+    <Modal width={560} onClose={onClose} busy={loading} label={t('import.title')}>
+      <div className="md-head" style={{ paddingBottom: 8 }}>
+        <div className="md-icon"><YouTubeGlyph size={26} knockout="var(--t-tint)" /></div>
+        <div style={{ flex: 1 }} />
+        <CloseButton onClick={onClose} disabled={loading} />
+      </div>
+
+      <div className="md-body">
+        <div>
+          <h2 className="md-title">{t('import.title')}</h2>
+          <p className="md-text">{t('import.intro')}</p>
+        </div>
+
+        <label className={`md-field${ok ? ' is-ok' : ''}`}>
+          <LinkIcon size={17} />
+          <input
+            value={url}
+            onChange={e => { setUrl(e.target.value); setError(''); }}
+            onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+            placeholder="https://www.youtube.com/playlist?list=..."
+            disabled={loading}
+            autoFocus
+          />
+          {ok && <CircleCheck size={18} className="is-ok-icon" />}
+        </label>
 
         {/* The single most common failure is pointing this at a private
             playlist, which YouTube refuses with a bare 403. Say so up front
             rather than only in the error message. */}
-        <div className="wb-import-warning">
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <span>{t('import.public_warning')}</span>
+        <div className="md-note">
+          <p><LockOpen size={16} /><b>{t('import.public_warning')}</b></p>
+          <p><Wifi size={16} /><span>{t('import.note')}</span></p>
         </div>
 
-        <input
-          className="wb-input"
-          value={url}
-          onChange={e => { setUrl(e.target.value); setError(''); }}
-          onKeyDown={e => { if (e.key === 'Enter') submit(); }}
-          placeholder="https://www.youtube.com/playlist?list=..."
-          disabled={loading}
-          autoFocus
-        />
-
-        <p className="wb-import-note">{t('import.note')}</p>
-
-        {error && <div className="wb-import-error">{error}</div>}
-
-        <div className="wb-actions">
-          <button className="wb-btn wb-btn-ghost" onClick={onClose} disabled={loading}>
-            {t('import.cancel')}
-          </button>
-          <button className="wb-btn wb-btn-primary" onClick={submit} disabled={loading || !url.trim()}>
-            {loading ? t('import.loading') : t('import.confirm')}
-          </button>
-        </div>
+        {error && <div className="md-error" role="alert">{error}</div>}
       </div>
-    </div>,
-    document.body
+
+      <div className="md-foot">
+        <button type="button" className="md-btn" onClick={onClose} disabled={loading}>{t('import.cancel')}</button>
+        <button type="button" className="md-btn md-btn--primary" onClick={submit} disabled={loading || !ok}>
+          <Download size={16} />
+          {loading ? t('import.loading') : t('import.confirm')}
+        </button>
+      </div>
+    </Modal>
   );
 }

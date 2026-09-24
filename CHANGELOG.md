@@ -5,6 +5,184 @@ All notable changes to MyFitnessPlan are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-09-24
+
+A ground-up redesign of the whole app. Your plans, videos, log and settings carry over untouched; what changed is how everything looks and feels.
+
+### Changed
+
+**A new look, everywhere**
+
+- Every screen has been redesigned: Dashboard, Library and folders, Plans, the plan builder, the AI plan builder, Calendar, Log, Settings and the Player. It's built on shared colours and components, so all seven themes (Midnight, Sunset, Forest, Pastel Orange, Pastel Pink, Sky Blue and Watermelon) carry the new design, and Settings applies a theme as soon as you pick it.
+- On a phone the header floats and follows you as you scroll, with a bottom tab bar; on a tablet the top bar tightens up so every link fits.
+- Dialogs share one style: a centred card on desktop and a bottom sheet on a phone. Errors and notices appear as pop-ups instead of bare text, and deleting a plan asks you first.
+- Buttons and cards react when you hover or focus them, throughout the app.
+
+**Dashboard**
+
+- Today's workout, your upcoming days and the plans you're running, in the new style. When two plans are active you page between them.
+
+**Library**
+
+- Folders and videos as grids or lists, with hover animations. Hover a video for a play button and an info button; a click opens its details.
+- The folder page sorts subfolders (A → Z, Z → A, most or fewest videos) and videos (A → Z, Z → A, longest or shortest first) separately.
+- Video details, the details editor and the YouTube import each have their own redesigned dialog; the description clean-up button appears only on albums imported from YouTube.
+
+**Plans**
+
+- "Build your own plan" leads the page, and importing is grouped in one menu: from a CSV/TSV sheet, or a plan file exported from the app.
+- Each plan card has a ⋯ menu (edit, change cover, back up, duplicate, delete), and running plans scroll sideways when there's more than one.
+- A new start-plan sheet asks for the start date and whether it's your main or extra plan. The plan preview shows a plan week by week, with grid and list views, and Change plan cover is a dialog of its own.
+
+**Plan builder and AI plan builder**
+
+- Days show their rest days according to the rhythm, the rhythm's length can be changed, and the videos re-deal when it does. Videos on a day show thumbnails and lengths, and a custom category becomes a chip once you press Enter.
+- The AI plan builder is a step-by-step flow (or one page, as before), lets you include or skip subfolders, and shows the drafted days in a sideways preview. You can save the draft straight away or open it in the builder first.
+
+**Calendar**
+
+- Tape, Week and Grid views were rebuilt. The Tape has a switcher for days with several videos, the Week and Grid show rest days clearly, and the view you choose is remembered.
+- The Freeze sheet shows the last frozen day and the day workouts resume.
+
+**Log**
+
+- History and Breakdown are tabs on a phone, and future months can't be opened. Each logged workout has a ⋯ menu (note, date, edit video, remove), and the breakdown chart takes its colours from the theme.
+
+**Player**
+
+- New controls: a scrubber, skip back and forward, speed and fullscreen. Loop is a labelled control with a rest countdown between plays, an "Up next" card follows, and a "Today" strip lists the workout's videos. One button marks a part done and undoes it again.
+
+**Settings**
+
+- Reorganised into sections with a bar that appears when you have unsaved changes.
+
+### Added
+
+- **Favourites.** Star plans and videos; they gather into a Favourites category on Plans and a Favourites album in the Library.
+- **Length filter** (from / up to, with quick ranges) wherever you filter videos, and **Shortest first** alongside Longest first, including in the plan builder.
+- The AI plan builder can leave chosen subfolders out.
+
+## [1.8.0] - 2026-09-22
+
+### Added
+
+**Add videos to a day by typing**
+
+- In the plan builder, right under the day you're editing: start typing and
+  matching videos appear with their thumbnails. Pick one (click, or arrow keys
+  and Enter) and it's added to that day — no scrolling down to the library.
+  The search stays filled in afterwards, so a series can be added one after
+  another, and picking one that's already on the day takes it off again.
+- The full library with its filters is still below, exactly as before.
+
+**Thumbnails for the videos on a day**
+
+- Each video you've added to a day now shows a small thumbnail next to its
+  title, and titles run to two lines instead of one, so a day with several
+  similarly-named videos is readable at a glance.
+
+### Fixed
+
+- **Editing a plan no longer wipes your progress.** Saving any change — even
+  adding one video to an active plan — used to reset every day to not done.
+  Now anything you've already ticked stays ticked, and an edit only changes
+  what's left to do. A day you finished stays finished even if you swap one of
+  its videos later; a day in progress keeps the ticks on the videos still in
+  it; new days start unticked. Your Log is unaffected either way, as before.
+- **The plan builder overflowed the screen on phones.** A single long video
+  title set the width of the whole builder header — the save button, the day
+  being edited and the day navigation all ran past the edge of the screen.
+  Titles now shorten properly and nothing in the builder can be wider than
+  the screen.
+- On phones the builder's header no longer stays pinned to the top while you
+  scroll. It took up most of the screen there, leaving only a sliver to see
+  the library through. On larger screens it still stays pinned.
+
+## [1.7.0] - 2026-09-06
+
+### Added
+
+**Share the app on your local network**
+
+- A new **Share on Local Network** switch in the desktop app's tray menu makes
+  MyFitnessPlan reachable from anything on the same Wi-Fi, so your plans,
+  library and player open on an iPhone or iPad. The tray shows the address to
+  type, and **Local Network Address...** copies it to the clipboard.
+- Sharing is off until you switch it on and is remembered between launches.
+  While it is off nothing but this computer can reach the app, exactly as
+  before. While it is on there is no password: anyone on the network who knows
+  the address can browse your library.
+- The shared address stays the same between restarts rather than changing every
+  launch, so it is worth bookmarking. In Safari, *Share -> Add to Home Screen*
+  now installs it as a standalone app with its own icon.
+
+**Direct play, with conversion only when it is actually needed**
+
+- Videos are now checked against what the device asking for them can decode.
+  Anything it can already play is served **direct** — the untouched file, with
+  byte ranges and instant seeking, no re-encoding and no quality loss. This is
+  what happens for essentially every ordinary MP4, on the desktop and on a
+  phone alike.
+- Files a device genuinely cannot open — an MKV or an AC-3 soundtrack on an
+  iPad, say — are now converted as they play instead of failing with
+  "unsupported format". Only the stream that needs it is converted: a video
+  whose picture is fine but whose audio is not keeps its original picture.
+- The player shows which of the two is happening, so a file that falls off the
+  fast path is visible rather than just feeling slow.
+
+**Export and import individual plans**
+
+- Any plan can be exported to a file from its card, and every plan at once with
+  **Back up all** — a backup you can keep, and put back later.
+- A plan made only of YouTube videos can be shared with anyone: the videos are
+  rebuilt from the file itself, so it works for them without the playlist. The
+  export says so, and says to send the playlist link along.
+- A plan using your own video files is a backup for you; the export says that
+  too, since those files won't be on anyone else's computer.
+- Importing never overwrites anything. It always creates a new plan, switched
+  off until you activate it, and a video already in your library is matched and
+  reused rather than duplicated. Before it commits, the dialog says how much of
+  the plan came across — and offers to add the YouTube playlist right there if
+  the plan is built on one.
+
+**Day Tape marks finished workouts**
+
+- A day whose workout is done now shows a green dot on the tape, in the same
+  green the day cards and badges already use — so a month can be scanned for
+  what is left without opening each day in turn.
+- In the Forest and Watermelon themes, where the accent is itself green and two
+  green dots would say nothing, the *unfinished* dot moves to orange and pink
+  respectively. Done stays green in every theme.
+
+### Fixed
+
+- **The navigation bar overflowed on tablets.** The menu only collapsed to a
+  hamburger below 900px, but the full bar needs about 1100px in English and
+  1200px in Polish - so every width in between (1024 and 1194 are iPad
+  landscape; 1024 is iPad Pro portrait) pushed the language switcher off the
+  edge and put the whole page into horizontal scroll. Between those widths the
+  bar now drops the wordmark to its icon and tightens the links, which fits
+  both languages without collapsing the menu on a screen that has room for it.
+- **The player had no way to go fullscreen on a phone or tablet.** Fullscreen
+  was reachable only by double-clicking the video, which touch devices do not
+  have, and it used only the unprefixed API - which Safari on iPadOS does not
+  implement and iPhone does not have at all. There is now a fullscreen button
+  in the player header, and it falls back through the prefixed API to the
+  iPhone's system video player. It also fills the screen with the whole
+  theater rather than the bare video, so the loop counter and rest countdown
+  stay visible while it is on.
+- Videos now carry `playsinline`, so an iPhone plays them in the app's own
+  player instead of hijacking playback into the system one the moment it starts.
+- A plan's details panel showed six identical-looking buttons in one row, two
+  of which started with the same words. They now read as what they are: the
+  slot to activate into leads, Edit follows, Duplicate and Export are icons,
+  and Delete is set apart. Delete was also drawn as the primary blue button
+  there — the most dangerous action looking like the recommended one — and is
+  now red.
+- A `/videos/...` request could previously be crafted to read files outside the
+  configured library folder. It now cannot, which matters considerably more now
+  that the server can be reached from other devices.
+
 ## [1.6.0] - 2026-08-30
 
 ### Added

@@ -12,11 +12,18 @@ existing UI. Users need no Node.js, npm, or terminal.
   Because the UI is served by the server, the frontend's relative URLs always reach
   the right port - there is no fixed port to collide with and no way to accidentally
   attach to another app on port 3000.
+- **Share on Local Network** (tray, off by default) instead binds `0.0.0.0` on a
+  fixed port (7777, or a free one if that is taken), so a phone or tablet on the
+  same Wi-Fi can open the app. The choice is remembered in `desktop-config.json`
+  next to the database, and changing it restarts the server, since the bind
+  address is fixed at start. Loopback-only remains the default and the behaviour
+  of every existing install.
 - The native `better-sqlite3` module is rebuilt for Electron's ABI at package time.
 - A static `ffmpeg` binary is bundled and put on the server's PATH, so video
   thumbnail generation works without ffmpeg installed on the user's machine.
-- The tray menu offers: Open App, Start / Stop / Restart Server, Quit. Closing the
-  window keeps the app running in the tray.
+- The tray menu offers: Open App, Import Database, Share on Local Network,
+  Local Network Address, Start / Stop / Restart Server, Check for Updates, Quit.
+  Closing the window keeps the app running in the tray.
 - A single-instance lock prevents a second copy from starting a second server.
 
 ## Requirements to build

@@ -1,0 +1,493 @@
+/**
+ * Redesign: app shell and the primitives every screen shares.
+ *
+ * Scoped under `.rx` (set on the app container) so it can be introduced one
+ * screen at a time without the old stylesheet and this one fighting. Screens
+ * still on the old design keep their styles until they are migrated.
+ */
+
+.rx {
+  /* #root is a flex container from the old stylesheet, so the shell has to
+     claim the row or it shrinks to its content width. */
+  flex: 1;
+  min-width: 0;
+  background: var(--t-page);
+  color: var(--t-ink);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+.rx a { color: var(--t-ink); }
+.rx a:hover { color: var(--t-accent); }
+/* The wordmark is always the accent, whatever the generic link colours say. */
+.rx a.rx-brand,
+.rx a.rx-brand:hover { color: var(--t-accent); }
+
+/* Content column: 1200px max, 32px page padding on desktop, 16px on mobile. */
+.rx-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
+/* The old stylesheet styles the bare `nav` element (sticky, top: 0, its own
+   background and border). Both shell navs are <nav>, so those leak in and have
+   to be undone explicitly — a `.rx nav` reset would out-specify the classes
+   below and clobber them instead. */
+.rx-nav,
+.rx-tabs {
+  position: static;
+  top: auto;
+  margin-bottom: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  /* The old rules also wrap the bar and add a 1rem gap below 900px, which put
+     the fifth tab on a second row outside the bar. */
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+/* --- Desktop nav: a floating card at the top ------------------------------- */
+.rx-nav {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-top: 20px;
+  padding: 10px 12px 10px 18px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-r-card);
+}
+
+.rx-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  color: var(--t-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rx-brand img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--t-tint);
+  display: block;
+}
+
+.rx-nav-links {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  justify-content: center;
+}
+
+.rx-nav-links a {
+  padding: 8px 14px;
+  border-radius: var(--t-r-chip);
+  font-weight: 500;
+  font-size: 15px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rx-nav-links a.active { background: var(--t-tint); }
+.rx-nav-links a:hover { color: var(--t-ink); background: var(--t-tint); }
+
+.rx-lang {
+  padding: 7px 12px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-r-chip);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* --- Tablet: the same card, tighter -------------------------------------------
+   Between the phone layout and a wide window the bar is too long for its links:
+   drop the wordmark (the logo still says whose it is) and close up the spacing. */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .rx-nav { gap: 12px; padding: 8px 8px 8px 12px; }
+  .rx-brand-text { display: none; }
+  .rx-nav-links { gap: 2px; }
+  .rx-nav-links a { padding: 8px 11px; font-size: 14px; }
+}
+
+/* --- Mobile header + bottom tab bar ---------------------------------------- */
+/* The phone header is a floating card like the desktop nav, and it follows the
+   page as you scroll. --rx-stick is how far down it reaches, for anything else
+   that sticks (the Library toolbar) to sit below it. */
+.rx { --rx-stick: 0px; }
+
+.rx-mobile-head {
+  position: sticky;
+  top: 8px;
+  z-index: 12;
+  height: 52px;
+  /* Bottom margin matches the 12px page-coloured halo below, so at the top of a
+     page the halo sits in the gap instead of over the first line of content. */
+  margin: 8px 12px 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 12px;
+  background: color-mix(in srgb, var(--t-surface) 94%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-r-card);
+  /* A page-coloured margin all round, so scrolling content never peeks out
+     around the card. */
+  box-shadow: 0 0 0 12px var(--t-page);
+}
+
+.rx-has-tabs { --rx-stick: 72px; }
+
+.rx-mobile-head .rx-brand { font-size: 15px; flex: 1; gap: 8px; }
+.rx-mobile-head .rx-brand img { width: 28px; height: 28px; }
+
+.rx-head-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--t-ink);
+  cursor: pointer;
+}
+
+.rx-tabs {
+  position: fixed;
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 8;
+  height: 72px;
+  padding-bottom: 12px;
+  box-sizing: border-box;
+  display: flex;
+  background: color-mix(in srgb, var(--t-surface) 94%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: none;
+  border-top: 1px solid var(--t-border);
+  border-radius: 0;
+}
+
+.rx-tabs a {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--t-ink-muted);
+}
+
+.rx-tabs a.active,
+.rx-tabs a.active:hover { color: var(--t-accent); }
+
+/* The bottom bar floats over the page, so the last content must clear it. */
+.rx-has-tabs { padding-bottom: 84px; }
+
+/* --- Buttons ---------------------------------------------------------------- */
+.rx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  padding: 0 20px;
+  border-radius: var(--t-r-btn);
+  border: 1px solid var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rx-btn--primary {
+  background: var(--t-btn);
+  border-color: var(--t-btn);
+  color: var(--t-on-btn);
+  font-weight: 700;
+}
+
+.rx-btn { transition: background-color 0.15s, border-color 0.15s, filter 0.15s; }
+.rx-btn:not(.rx-btn--primary):hover:not(:disabled) { border-color: var(--t-accent); background: var(--t-tint); }
+.rx-btn--primary:hover:not(:disabled) { filter: brightness(1.18); }
+.rx-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.rx-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- Cards ------------------------------------------------------------------ */
+.rx-card {
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-r-card);
+}
+
+/* --- Read-only tags ---------------------------------------------------------
+   Small uppercase labels, coloured by category. No border, no icon — that is
+   what keeps them distinct from the selectable filter chips. */
+.rx-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow: hidden;
+}
+
+/* One or two rows, then the rest are dropped whole rather than half-shown. */
+.rx-tags--1 { max-height: 22px; }
+.rx-tags--2 { max-height: 50px; }
+
+.rx-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--t-r-tag);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rx-tag--intensity { background: var(--t-tag-intensity-bg); color: var(--t-tag-intensity-ink); }
+.rx-tag--type { background: var(--t-tag-type-bg); color: var(--t-tag-type-ink); }
+.rx-tag--body { background: var(--t-tag-body-bg); color: var(--t-tag-body-ink); }
+.rx-tag--gear { background: var(--t-tag-gear-bg); color: var(--t-tag-gear-ink); }
+
+/* --- Status badges: solid fill, white uppercase ----------------------------- */
+.rx-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+
+.rx-badge--main { background: var(--t-plan-main); }
+.rx-badge--extra { background: var(--t-plan-extra); }
+
+/* --- Duration badge: always bottom-right of a thumbnail --------------------- */
+.rx-thumb { position: relative; display: block; }
+
+.rx-dur {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: var(--t-r-badge);
+  background: var(--t-video-chip);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- YouTube badge on an imported album's cover ------------------------------
+   Marks an album that streams from YouTube rather than playing from disk. Sits
+   on the cover itself, opposite the duration badge's corner. */
+.rx-yt-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--t-video-chip);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Favourite heart on a cover -----------------------------------------------
+   A small light chip in a corner of the image: ink outline when off, filled in
+   the accent when on. The parent supplies the positioning context. */
+.rx-heart {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--t-surface) 86%, transparent);
+  color: var(--t-ink);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+.rx-heart--top { top: 8px; bottom: auto; }
+.rx-heart:hover { background: var(--t-surface); }
+.rx-heart.is-on { color: var(--t-accent); }
+.rx-heart.is-on svg { fill: currentColor; }
+
+/* --- Progress bar ----------------------------------------------------------- */
+.rx-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--t-tint);
+  overflow: hidden;
+}
+
+.rx-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--t-accent);
+  transition: width 0.3s;
+}
+
+.rx-progress--paused span { background: var(--t-ink-faint); }
+
+/* --- Type helpers ----------------------------------------------------------- */
+.rx-h1 {
+  margin: 4px 0 0;
+  font-size: 44px;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+
+.rx-eyebrow {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-accent);
+  letter-spacing: 0.02em;
+}
+
+.rx-section-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.rx-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-accent);
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.rx-link:hover { text-decoration: underline; }
+
+.rx-muted { color: var(--t-ink-muted); }
+
+/* Two-line clamp, used for every card title in the design. */
+.rx-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .rx-wrap { padding-left: 16px; padding-right: 16px; }
+  .rx-h1 { font-size: 32px; }}
+
+/* --- Pop-ups: notices and background jobs ------------------------------------------
+   Dark cards that float above the page (and above the phone's tab bar), the same
+   family as Settings' unsaved-changes bar, so an error is never bare text. */
+.toaster {
+  position: fixed;
+  z-index: 3000;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: 480px;
+  max-width: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 10px 12px 16px;
+  border-radius: 16px;
+  background: var(--t-btn);
+  color: var(--t-on-btn);
+  box-shadow: 0 12px 32px rgba(40, 14, 4, 0.3);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.toast > svg { flex-shrink: 0; margin-top: 1px; color: var(--t-accent-soft); }
+.toast--error > svg { color: #FF9C8F; }
+.toast span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast button { width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 8px; background: none; color: inherit; opacity: 0.7; cursor: pointer; }
+.toast button:hover { opacity: 1; }
+
+.job,
+.job-pill {
+  position: fixed;
+  z-index: 3000;
+  right: 24px;
+  bottom: 24px;
+  background: var(--t-btn);
+  color: var(--t-on-btn);
+  box-shadow: 0 12px 32px rgba(40, 14, 4, 0.3);
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+.job { width: 340px; max-width: calc(100% - 24px); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 14px 16px; border-radius: 18px; }
+.job-head { display: flex; align-items: center; gap: 10px; }
+.job-icon { display: flex; color: var(--t-accent-soft); }
+.job.is-error .job-icon { color: #FF9C8F; }
+.job-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.job-title strong { font-size: 14px; }
+.job-title span { font-size: 12px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 8px; background: none; color: inherit; opacity: 0.7; cursor: pointer; }
+.job-btn:hover { opacity: 1; }
+.job-bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--t-on-ink) 22%, transparent); overflow: hidden; }
+.job-bar span { display: block; height: 100%; border-radius: 3px; background: var(--t-accent-soft); transition: width 0.3s; }
+.job-bar span.is-done { background: #7FD8A4; }
+.job.is-error .job-bar span { background: #FF9C8F; }
+.job-count { font-size: 13px; opacity: 0.85; }
+.job-error { padding: 8px 10px; border-radius: 10px; background: rgba(255, 156, 143, 0.16); color: #FFC4BB; font-size: 13px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.job-stop { align-self: flex-start; height: 32px; padding: 0 14px; border: none; border-radius: 10px; background: var(--t-accent-soft); color: var(--t-ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.job-pill { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border: none; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+@media (max-width: 767px) {
+  .toaster { bottom: 84px; }
+  .job { right: 12px; left: 12px; width: auto; bottom: 84px; max-width: none; }
+  .job-pill { right: 12px; bottom: 84px; }}

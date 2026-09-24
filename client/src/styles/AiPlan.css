@@ -1,447 +1,425 @@
-/*
- * Styles for the optional AI plan builder.
- *
- * Everything here is namespaced `ai-`; the modal otherwise reuses the existing
- * `wb-` workout-builder classes so it looks like the rest of the app. Imported
- * only by the AI components, so removing the feature removes the stylesheet.
- */
+/** Redesign: AI plan builder — a guided wizard (or one long page) in a modal. */
 
-.ai-modal {
-  max-width: 720px;
+.ai-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--t-overlay);
 }
+
+.ai-card {
+  width: 760px;
+  height: 720px;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--t-surface-warm);
+  color: var(--t-ink);
+  border-radius: var(--t-r-sheet);
+  box-shadow: var(--t-shadow-modal);
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+/* --- Header -------------------------------------------------------------------- */
+.ai-head { flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; padding: 24px 28px 12px; }
+.ai-head-row { display: flex; align-items: center; gap: 12px; }
+.ai-head-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--t-tint);
+  color: var(--t-accent);
+}
+.ai-head-text { flex: 1; min-width: 0; }
+.ai-head-title { font-size: 17px; font-weight: 700; }
+.ai-head-sub { font-size: 13px; color: var(--t-ink-muted); }
+.ai-close {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--t-border);
+  border-radius: 12px;
+  background: none;
+  color: var(--t-ink);
+  cursor: pointer;
+}
+.ai-close:disabled { opacity: 0.4; cursor: default; }
+
+.ai-bars { display: flex; gap: 4px; }
+.ai-bar {
+  flex: 1;
+  height: 5px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--t-border);
+  transition: background 0.2s;
+}
+.ai-bar.is-done { background: var(--t-accent); }
+.ai-bar:not(:disabled) { cursor: pointer; }
+
+/* --- Body ---------------------------------------------------------------------- */
+.ai-body { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 28px 28px; }
+.ai-body--all { display: flex; flex-direction: column; gap: 36px; }
+.ai-body--all .ai-q { font-size: 20px; }
+
+.ai-field { display: flex; flex-direction: column; gap: 14px; }
+.ai-field--wide { gap: 28px; }
+
+.ai-q { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; text-wrap: pretty; }
+.ai-optional { font-size: 15px; font-weight: 500; color: var(--t-ink-muted); }
+.ai-note { margin: 0; font-size: 13px; color: var(--t-ink-muted); }
+.ai-q + .ai-note { margin-top: 6px; }
 
 .ai-textarea {
-  resize: vertical;
-  min-height: 92px;
-  font-family: inherit;
-  line-height: 1.5;
-}
-
-.ai-number-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-}
-
-/* Session-length slider. Uses the builder's own input colours so it reads as
-   part of the same form rather than a browser default. */
-
-.ai-slider-value {
-  float: right;
-  font-weight: 400;
-  opacity: 0.85;
-}
-
-.ai-slider {
   width: 100%;
-  margin: 4px 0 2px;
-  accent-color: var(--wb-accent, var(--accent-color));
-  cursor: pointer;
-}
-
-/* Positioned on the same linear scale as the range input, so a "60" mark
-   sits under the thumb when the value is 60 — not evenly spaced by count. */
-.ai-slider-ticks {
-  position: relative;
-  height: 1.6rem;
-  margin-bottom: 6px;
-}
-
-.ai-slider-tick {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  padding: 2px 6px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: inherit;
-  opacity: 0.6;
-  font-size: 0.74rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.ai-slider-tick:first-child {
-  transform: translateX(0);
-}
-
-.ai-slider-tick:last-child {
-  transform: translateX(-100%);
-}
-
-.ai-slider-tick:hover {
-  opacity: 1;
-}
-
-.ai-slider-tick.selected {
-  opacity: 1;
-  border-color: var(--wb-selected-border, var(--accent-color));
-  background: var(--wb-selected, var(--accent-soft));
-}
-
-.ai-hint {
-  margin: 0 0 8px;
-  font-size: 0.82rem;
-  opacity: 0.7;
-}
-
-.ai-waiting {
-  margin-top: 10px;
-  text-align: center;
-}
-
-.ai-error {
-  margin: 4px 0 0;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(220, 38, 38, 0.35);
-  background: rgba(220, 38, 38, 0.12);
-  color: #dc2626;
-  font-size: 0.88rem;
-}
-
-/* Albums are picked from their cover art, the same way they're recognised on
-   the Library page. Each card cycles neutral → include → exclude, so the two
-   chosen states have to be distinguishable at a glance and not only by the
-   ✓/✕ glyph. */
-.ai-album-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-  max-height: 46vh;
-  overflow-y: auto;
-  padding: 2px;
-}
-
-.ai-album-card {
-  padding: 0;
-  border: none;
-  background: none;
-  cursor: pointer;
-  display: block;
-  width: 100%;
-  text-align: left;
-}
-
-.ai-album-cover {
-  position: relative;
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--wb-input-bg);
-  border: 2px solid var(--wb-border);
-  transition: border-color 0.2s ease, opacity 0.2s ease;
-}
-
-.ai-album-card:hover .ai-album-cover {
-  border-color: var(--accent-color);
-}
-
-.ai-album-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.ai-album-nocover {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--wb-text-dim);
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-
-/* Title sits on the cover, over a scrim, exactly as on a Library album card. */
-.ai-album-title {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 14px 10px 8px;
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: left;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.72) 65%);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* The shared badge sits bottom-left, which is where this card's title runs.
-   Move it up beside the count, so neither has to be truncated. */
-.ai-album-cover .video-source-badge {
-  left: auto;
-  right: 7px;
-  top: 7px;
-  bottom: auto;
-}
-
-.ai-album-count {
-  position: absolute;
-  left: 7px;
-  top: 7px;
-  z-index: 2;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.62);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-/* The chosen state, as a corner badge — colour alone would be easy to miss on
-   a busy photograph. */
-.ai-album-state {
-  position: absolute;
-  right: 7px;
-  bottom: 7px;
-  z-index: 3;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
-}
-
-.ai-album-include .ai-album-cover {
-  border-color: var(--accent-color);
-}
-
-.ai-album-include .ai-album-state {
-  background: var(--accent-color);
-}
-
-/* Excluded albums are dimmed as well as badged, so "left out" reads instantly
-   against a grid of included ones. */
-.ai-album-exclude .ai-album-cover {
-  border-color: #dc2626;
-  opacity: 0.45;
-}
-
-.ai-album-exclude .ai-album-state {
-  background: #dc2626;
-  opacity: 1;
-}
-
-/* Bulk clean-up progress — fixed to the corner, above page content but below
-   the workout builder's overlay so it can never cover a modal's controls. */
-
-.ai-job-panel {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 900;
-  width: 280px;
+  box-sizing: border-box;
+  min-height: 160px;
   padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid var(--glass-border);
-  background: var(--card-bg, var(--surface-hover));
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
-  color: var(--text-primary);
-  backdrop-filter: blur(8px);
+  border: 1px solid var(--t-border);
+  border-radius: 16px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
 }
+.ai-textarea::placeholder { color: var(--t-ink-faint); }
+.ai-textarea:focus { border-color: var(--t-accent); }
 
-.ai-job-head {
+/* Workout days stepper */
+.ai-stepper { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ai-stepper button {
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  border: 1px solid var(--t-border);
+  border-radius: 16px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  cursor: pointer;
 }
+.ai-stepper-value { min-width: 64px; text-align: center; font-size: 40px; font-weight: 700; letter-spacing: -0.02em; }
+.ai-stepper .ai-note { font-size: 14px; }
 
-.ai-job-title {
-  font-size: 0.9rem;
-}
-
-.ai-job-head-actions {
+/* Rhythm */
+.ai-rhythm-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ai-rhythm-title { flex: 1; font-size: 16px; font-weight: 700; white-space: nowrap; }
+.ai-rhythm { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.ai-rhythm.is-locked { opacity: 0.6; }
+.ai-rhythm-day {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 4px;
+  padding: 10px 0;
+  border: 1px solid var(--t-border);
+  border-radius: 12px;
+  background: var(--t-surface);
+  color: var(--t-ink-faint);
+  font-family: inherit;
+  cursor: pointer;
 }
+.ai-rhythm-day span { font-size: 11px; font-weight: 700; }
+.ai-rhythm-day:disabled { cursor: default; }
+.ai-rhythm-day.is-work { background: var(--t-band-even); border-color: var(--t-accent-soft); color: var(--t-ink); }
+.ai-rhythm-summary { font-size: 14px; font-weight: 700; }
 
-.ai-job-head-actions button {
-  width: 24px;
+/* Session length */
+.ai-minutes { display: flex; align-items: baseline; gap: 10px; }
+.ai-minutes-value { font-size: 44px; font-weight: 700; letter-spacing: -0.02em; }
+.ai-minutes-unit { font-size: 18px; font-weight: 600; }
+.ai-band { padding: 3px 10px; border-radius: 999px; background: var(--t-tint); font-size: 13px; font-weight: 700; }
+/* A custom range: a soft track that fills with the accent up to a round ink
+   thumb. The thumb is 24px and the browser keeps its centre 12px inside each
+   end, so the fill and the tick marks use the same inset to line up with it. */
+.ai-slider-wrap { position: relative; padding: 4px 0 30px; --thumb: 24px; }
+.ai-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
   height: 24px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.ai-slider:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 4px; border-radius: 12px; }
+
+.ai-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    var(--t-accent) calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--f)),
+    var(--t-tint) 0
+  );
+}
+.ai-slider::-moz-range-track { height: 8px; border-radius: 4px; background: var(--t-tint); }
+.ai-slider::-moz-range-progress { height: 8px; border-radius: 4px; background: var(--t-accent); }
+
+.ai-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: -8px;
+  border: 4px solid var(--t-surface-warm);
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: var(--t-btn);
+  box-shadow: 0 1px 4px rgba(40, 14, 4, 0.35);
+  transition: transform 0.12s;
+}
+.ai-slider::-moz-range-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  border: 4px solid var(--t-surface-warm);
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: var(--t-btn);
+  box-shadow: 0 1px 4px rgba(40, 14, 4, 0.35);
+}
+.ai-slider:active::-webkit-slider-thumb { transform: scale(1.1); }
+
+.ai-tick {
+  position: absolute;
+  top: 40px;
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--f));
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border: none;
   border-radius: 6px;
-  border: 1px solid var(--glass-border);
   background: transparent;
-  color: var(--text-primary);
+  color: var(--t-ink-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
-  line-height: 1;
 }
+.ai-tick:hover { color: var(--t-ink); }
+.ai-tick.is-on { background: var(--t-btn); color: var(--t-on-btn); }
 
-.ai-job-label {
-  margin: 6px 0 10px;
-  font-size: 0.8rem;
-  opacity: 0.7;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ai-job-bar {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--glass-border);
-  overflow: hidden;
-}
-
-.ai-job-bar-fill {
-  height: 100%;
-  background: var(--accent-color);
-  transition: width 300ms ease;
-}
-
-.ai-job-bar-fill.done {
-  opacity: 0.55;
-}
-
-.ai-job-count {
-  margin: 8px 0 0;
-  font-size: 0.82rem;
-}
-
-.ai-job-note {
-  margin: 4px 0 0;
-  font-size: 0.78rem;
-  opacity: 0.7;
-}
-
-.ai-job-error {
-  margin: 6px 0 0;
-  font-size: 0.78rem;
-  color: #dc2626;
-}
-
-.ai-job-stop {
-  margin-top: 10px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--glass-border);
-  background: transparent;
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 0.8rem;
-}
-
-/* Minimized state: a small pill that stays out of the way. */
-.ai-job-pill {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 900;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--glass-border);
-  background: var(--card-bg, var(--surface-hover));
-  color: var(--text-primary);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-
-/* Settings panel
- *
- * The panel reuses the workout builder's `wb-input` / `wb-chip` / `wb-label`
- * so it matches the rest of the app, but those rules read `--wb-*` variables
- * that index.css only declares on `.wb-modal`. Outside the modal they resolve
- * to nothing and the fields render with no border or background. Mapping them
- * onto the global theme variables here fixes that for every theme at once,
- * without touching the builder's own styles. */
-.ai-settings {
-  --wb-text: var(--text-primary);
-  --wb-text-dim: var(--text-secondary);
-  --wb-border: var(--glass-border);
-  --wb-input-bg: var(--surface-hover);
-  --wb-selected: var(--accent-soft);
-  --wb-selected-border: var(--accent-color);
-  --wb-accent: var(--accent-color);
-}
-
-.ai-settings-grid {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.ai-settings-row {
+/* Selectable chips (equipment, styles, focus): the same selectable-tag style as
+   the Library filters — the category's tint until picked, then its solid ink
+   with a check. Deliberately unlike the flat read-only tags on cards. */
+.ai-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-chip {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
   align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 9px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
 }
+.ai-chip svg { flex-shrink: 0; }
+.ai-chip--gear { background: var(--t-tag-gear-bg); color: var(--t-tag-gear-ink); }
+.ai-chip--type { background: var(--t-tag-type-bg); color: var(--t-tag-type-ink); }
+.ai-chip--body { background: var(--t-tag-body-bg); color: var(--t-tag-body-ink); }
+.ai-chip--gear.is-on { background: var(--t-tag-gear-ink); color: #FFFFFF; }
+.ai-chip--type.is-on { background: var(--t-tag-type-ink); color: #FFFFFF; }
+.ai-chip--body.is-on { background: var(--t-tag-body-ink); color: #FFFFFF; }
+.ai-chip-count { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--t-ink-muted); }
+.ai-chip-count strong { color: var(--t-ink); }
+.ai-chip-count button { padding: 0; border: none; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 
-/* Reads as a link, so it doesn't compete with the real buttons in the panel. */
-.ai-link-btn {
+/* Intensity */
+.ai-intensities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ai-intensity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1.5px solid var(--t-border);
+  border-radius: 16px;
+  background: var(--t-subtle);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ai-intensity svg { color: var(--t-accent); }
+.ai-intensity.is-on { background: var(--t-surface); border-color: var(--t-ink); }
+
+/* Albums */
+.ai-album-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--t-tint);
+  font-size: 14px;
+  font-weight: 600;
+}
+.ai-albums { background: var(--t-surface); border: 1px solid var(--t-border); border-radius: 16px; overflow: hidden; }
+.ai-album { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; }
+.ai-albums > * + * { border-top: 1px solid var(--t-border); }
+.ai-album.is-dim > .ai-album-cover,
+.ai-album.is-dim > .ai-album-text { opacity: 0.55; }
+.ai-album-cover { width: 72px; flex-shrink: 0; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 9px; background: var(--t-tint); }
+.ai-album-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ai-album-cover.is-empty { display: flex; align-items: center; justify-content: center; }
+.ai-album-cover.is-empty img { width: 42%; height: auto; border-radius: 50%; opacity: 0.55; }
+.ai-album-text { flex: 1; min-width: 0; }
+.ai-album-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-album-meta { font-size: 12px; color: var(--t-ink-muted); }
+.ai-album-seg button { display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: 8px; }
+.ai-album-seg.rx-seg button.is-in { background: var(--t-btn); color: var(--t-on-btn); box-shadow: none; }
+.ai-album-seg.rx-seg button.is-out { color: var(--t-danger); }
+
+/* Subfolders of an included album */
+.ai-subs { display: flex; flex-direction: column; gap: 2px; margin: 0 12px 12px; padding: 6px; border-radius: 12px; background: var(--t-page); }
+.ai-subs-title { padding: 4px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--t-ink-muted); }
+.ai-sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--t-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ai-sub:hover { background: var(--t-tint); }
+.ai-sub > svg { color: var(--t-ink-faint); flex-shrink: 0; }
+.ai-sub-box {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--t-border-dashed);
+  border-radius: 6px;
+  background: var(--t-surface);
+  color: var(--t-on-ink);
+}
+.ai-sub-box.is-on { background: var(--t-btn); border-color: var(--t-btn); }
+.ai-sub-label { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-sub-count { font-size: 12px; color: var(--t-ink-muted); }
+
+/* Generating */
+.ai-gen { min-height: 320px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; }
+.ai-spinner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 4px solid var(--t-tint);
+  border-top-color: var(--t-accent);
+  animation: ai-spin 0.9s linear infinite;
+}
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+.ai-gen-title { font-size: 18px; font-weight: 700; }
+.ai-gen-note { max-width: 320px; font-size: 14px; color: var(--t-ink-muted); }
+
+/* Draft ready */
+.ai-party { color: var(--t-accent); }
+.ai-summary { display: flex; flex-direction: column; background: var(--t-surface); border: 1px solid var(--t-border); border-radius: 16px; overflow: hidden; }
+.ai-summary-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  color: var(--t-ink);
+}
+.ai-summary-row + .ai-summary-row { border-top: 1px solid var(--t-border); }
+.ai-summary-k { width: 110px; flex-shrink: 0; font-size: 13px; color: var(--t-ink-muted); }
+.ai-summary-v { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.ai-restart {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 0;
   border: none;
   background: none;
-  color: var(--accent-color);
-  cursor: pointer;
-  font-size: 0.85rem;
-  text-decoration: underline;
-}
-
-.ai-key-state {
-  font-size: 0.85rem;
-  opacity: 0.75;
-}
-
-.ai-status-ok {
-  color: var(--accent-color);
-}
-
-.ai-status-bad {
-  color: #dc2626;
-}
-
-.ai-required {
-  color: #dc2626;
+  color: var(--t-ink-muted);
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
-/* Guided flow: one question per screen. The dots stand in for the fields the
-   user can no longer see, so the form still has a visible length. */
-.ai-step-progress {
+.ai-error { margin: 16px 0 0; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--t-danger) 10%, transparent); color: var(--t-danger); font-size: 14px; font-weight: 600; }
+
+/* --- Footer -------------------------------------------------------------------- */
+.ai-preview { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.ai-preview-head { display: flex; align-items: baseline; gap: 8px; }
+.ai-preview-head span { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.ai-preview-head em { font-style: normal; font-size: 13px; color: var(--t-ink-muted); }
+/* Sideways, so a long plan doesn't stretch the dialog; the padding keeps focus rings unclipped. */
+.ai-preview-strip { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 6px; margin: 0 -2px; scrollbar-width: thin; }
+.ai-pv { flex: 0 0 150px; display: flex; flex-direction: column; gap: 6px; }
+.ai-pv-thumb { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: var(--t-tint); }
+.ai-pv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ai-pv-badge { position: absolute; left: 6px; top: 6px; padding: 2px 7px; border-radius: 7px; background: var(--t-accent); color: #FFFFFF; font-size: 11px; font-weight: 700; }
+.ai-pv-dur { position: absolute; right: 6px; bottom: 6px; padding: 1px 6px; border-radius: 6px; background: var(--t-video-chip); color: #FFFFFF; font-size: 10px; font-weight: 700; }
+.ai-pv-count { position: absolute; left: 6px; bottom: 6px; padding: 1px 6px; border-radius: 6px; background: var(--t-video-chip); color: #FFFFFF; font-size: 10px; font-weight: 700; }
+.ai-pv-title { font-size: 12px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ai-foot { flex-shrink: 0; display: flex; gap: 10px; padding: 16px 28px 20px; border-top: 1px solid var(--t-border); background: var(--t-surface-warm); }
+.ai-foot-spacer { flex: 1; }
+.ai-back,
+.ai-next {
   display: flex;
-  gap: 6px;
-  margin-bottom: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  padding: 0 24px;
+  border-radius: 14px;
+  font-family: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  white-space: nowrap;
 }
+.ai-back:disabled { opacity: 0.5; cursor: default; }
+.ai-back { padding: 0 20px; border: 1px solid var(--t-border); background: none; color: var(--t-ink); font-weight: 600; }
+.ai-next { border: none; background: var(--t-btn); color: var(--t-on-btn); font-weight: 700; }
+.ai-next:disabled { background: var(--t-border); color: var(--t-ink-faint); cursor: default; }
 
-.ai-step-dot {
-  flex: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--glass-border);
-  transition: background 0.2s ease;
-}
-
-.ai-step-dot.done {
-  background: var(--accent-color);
-}
-
-/* Required / optional markers on the plan form's labels. */
-.ai-required {
-  color: var(--accent-color);
-  font-weight: 800;
-}
-
-.ai-optional {
-  font-weight: 500;
-  font-size: 0.85em;
-  opacity: 0.7;
+/* --- Mobile: full screen -------------------------------------------------------- */
+@media (max-width: 767px) {
+  .ai-overlay { align-items: stretch; background: var(--t-surface-warm); }
+  .ai-card { width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
+  .ai-head { padding: 14px 16px 10px; }
+  .ai-body { padding: 12px 16px 24px; }
+  .ai-q { font-size: 24px; }
+  .ai-foot { padding: 12px 16px 24px; }
+  .ai-next { flex: 1; }
+  .ai-album-cover { width: 56px; }
+  .ai-album-seg button { padding: 0 9px; }
+  .ai-album-seg button span { display: none; }
+  .ai-summary-k { width: 92px; }
 }

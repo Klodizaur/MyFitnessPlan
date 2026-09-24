@@ -172,7 +172,7 @@ export function IntensityIcon({ level }: { level: string }) {
   const bars = [4, 8, 12]; // heights offsets
   return (
     <svg width={18} height={18} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {bars.map((h, idx) => {
+      {bars.map((_, idx) => {
         const barHeight = 4 + idx * 4; // 4,8,12
         const x = 3 + idx * 6;
         const y = 18 - barHeight;

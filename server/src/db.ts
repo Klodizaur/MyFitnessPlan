@@ -206,6 +206,25 @@ db.exec(
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_videos_external ON videos(source, external_id) WHERE external_id IS NOT NULL'
 );
 
+// Codecs read out of the file, used to decide whether a client can play it as-is
+// (see playback.ts). `codec_probed` separates "probed, and the file has no audio
+// track" from "never looked", so a NULL codec is not re-probed forever. Filled in
+// lazily the first time a video is played, so no re-scan is needed.
+const codecInfo = db.pragma("table_info('videos')") as any[];
+for (const col of ['video_codec', 'audio_codec']) {
+  if (!codecInfo.some((c: any) => c.name === col)) {
+    db.exec(`ALTER TABLE videos ADD COLUMN ${col} TEXT`);
+  }
+}
+// Starred videos, gathered into a "Favourites" album in the Library. Rescans
+// update rows in place, so the flag survives them.
+if (!codecInfo.some((c: any) => c.name === 'is_favorite')) {
+  db.exec('ALTER TABLE videos ADD COLUMN is_favorite INTEGER DEFAULT 0');
+}
+if (!codecInfo.some((c: any) => c.name === 'codec_probed')) {
+  db.exec('ALTER TABLE videos ADD COLUMN codec_probed INTEGER DEFAULT 0');
+}
+
 const planInfo = db.pragma("table_info('workout_plans')") as any[];
 const hasBackgroundImage = planInfo.some(col => col.name === 'background_image');
 if (!hasBackgroundImage) {
@@ -215,6 +234,13 @@ if (!hasBackgroundImage) {
 const hasBackgroundBlur = planInfo.some(col => col.name === 'background_blur');
 if (!hasBackgroundBlur) {
   db.exec('ALTER TABLE workout_plans ADD COLUMN background_blur INTEGER DEFAULT 0');
+}
+
+// Plans the user has starred. They are gathered under a "Favourites" heading at
+// the top of the Plans page.
+const hasFavorite = planInfo.some(col => col.name === 'is_favorite');
+if (!hasFavorite) {
+  db.exec('ALTER TABLE workout_plans ADD COLUMN is_favorite INTEGER DEFAULT 0');
 }
 
 // Optional grouping label for the Plans page. Holds either a known preset key

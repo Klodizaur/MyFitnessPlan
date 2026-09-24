@@ -1,0 +1,568 @@
+/** Redesign: Plans — active slots, plan library, create + start sheets. */
+
+.pl-page { padding-bottom: 40px; }
+
+.pl-head { padding-top: 36px; }
+.pl-head-row { display: flex; align-items: flex-start; gap: 12px; }
+.pl-head-text { flex: 1; min-width: 0; }
+.pl-head h1 { margin-top: 0; font-size: 48px; }
+.pl-lede { margin: 8px 0 0; font-size: 15px; color: var(--t-ink-muted); text-wrap: pretty; }
+
+.pl-plus {
+  display: none;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 12px;
+  background: var(--t-btn);
+  color: var(--t-on-btn);
+  cursor: pointer;
+}
+
+.pl-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.pl-actions .rx-btn { height: 44px; padding: 0 16px; font-size: 14px; border-radius: 12px; }
+.pl-actions .rx-btn svg { color: var(--t-accent); }
+.pl-actions .rx-btn--primary svg { color: inherit; }
+.pl-actions-spacer { flex: 1; }
+.pl-import { position: relative; }
+.pl-actions-divider { width: 1px; height: 20px; margin: 0 4px; background: var(--t-border); }
+
+/* Occasional actions stay text-weight so the page has one loud button. */
+.pl-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  color: var(--t-ink-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pl-quiet:hover { color: var(--t-ink); }
+
+.pl-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--t-success-bg);
+  border: 1px solid var(--t-success-border);
+  color: var(--t-success);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pl-section-label {
+  margin: 24px 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-ink-muted);
+}
+
+/* --- Covers ------------------------------------------------------------------ */
+.pl-cover { position: relative; overflow: hidden; background: var(--t-tint); }
+.pl-cover > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pl-cover > img.is-blurred { filter: blur(6px); transform: scale(1.1); }
+.pl-cover--empty { display: flex; align-items: center; justify-content: center; }
+.pl-cover--empty > img.pl-cover-logo {
+  width: 34%;
+  height: auto;
+  max-width: 96px;
+  max-height: 70%;
+  border-radius: 50%;
+  object-fit: cover;
+  opacity: 0.55;
+}
+
+/* --- Active slots ------------------------------------------------------------ */
+.pl-active-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+
+.pl-active {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--t-r-band);
+  cursor: pointer;
+  text-align: left;
+}
+
+.pl-active-media { position: relative; }
+/* The card can't clip (the ⋯ menu hangs out of it), so the cover rounds itself. */
+.pl-active-cover { aspect-ratio: 16 / 6; border-radius: 21px 21px 0 0; }
+
+/* On a cover the menu button is a small chip in the card's top-right corner,
+   with a light, slightly blurred backing so it stays legible on any image. */
+.pl-menu.pl-menu--cover { position: absolute; top: 8px; right: 8px; margin: 0; }
+.pl-menu--cover .pl-menu-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--t-surface) 86%, transparent);
+  color: var(--t-ink);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.pl-menu--cover .pl-menu-btn:hover { background: var(--t-surface); }
+.pl-menu--cover .pl-menu-btn svg { width: 16px; height: 16px; }
+.pl-menu--cover .pl-menu-pop { top: calc(100% + 4px); }
+.pl-active-cover.is-frozen > img { filter: grayscale(0.7); }
+
+.pl-pills { position: absolute; left: 12px; top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+.pl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+.pl-pill--main { background: var(--t-plan-main); }
+.pl-pill--extra { background: var(--t-plan-extra); }
+.pl-pill--dark { background: var(--t-video-chip); }
+.pl-pill--frozen { background: #FFFFFF; color: var(--t-freeze); }
+
+.pl-active-body { display: flex; flex-direction: column; gap: 8px; flex: 1; padding: 14px 16px 16px; }
+.pl-active-name { font-size: 26px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; text-wrap: pretty; }
+.pl-active-meta { font-size: 14px; color: var(--t-ink-muted); }
+.pl-active-meta strong { color: var(--t-ink); font-weight: 700; }
+
+.pl-active-progress { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--t-ink-muted); white-space: nowrap; }
+.pl-active-progress .rx-progress { flex: 1; height: 6px; border-radius: 3px; }
+
+.pl-active-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 4px; }
+
+.pl-soft-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pl-soft-btn:disabled { opacity: 0.5; cursor: default; }
+.pl-soft-btn--danger { background: none; border-color: var(--t-border); color: var(--t-danger); }
+
+.pl-empty-slot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 100%;
+  min-height: 96px;
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1.5px dashed var(--t-border-dashed);
+  border-radius: var(--t-r-band);
+}
+.pl-empty-icon {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--t-tint);
+  color: var(--t-ink-faint);
+}
+.pl-empty-kind { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--t-ink-muted); }
+.pl-empty-note { margin-top: 2px; font-size: 14px; color: var(--t-ink-muted); }
+
+.pl-offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-ink-faint);
+  vertical-align: middle;
+}
+
+/* --- Library of plans -------------------------------------------------------- */
+.pl-find { display: flex; flex-direction: column; gap: 10px; margin-top: 28px; min-width: 0; }
+
+.pl-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 14px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 14px;
+  color: var(--t-ink-faint);
+}
+.pl-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  color: var(--t-ink);
+}
+.pl-search input::placeholder { color: var(--t-ink-faint); }
+.pl-search:focus-within { border-color: var(--t-accent); }
+
+/* width:0 + min-width:100% keeps the scroller's chips out of the page's intrinsic
+   width; otherwise a long row of categories widens the whole page on a phone. */
+.pl-cats { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; width: 0; min-width: 100%; }
+.pl-cats::-webkit-scrollbar { display: none; }
+.pl-cat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--t-border);
+  border-radius: 18px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pl-cat span { opacity: 0.7; font-weight: 500; }
+.pl-cat.is-on { background: var(--t-btn); border-color: var(--t-btn); color: var(--t-on-btn); }
+
+.pl-group { margin-top: 24px; }
+.pl-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-bottom: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--t-ink);
+  font-family: inherit;
+  cursor: pointer;
+}
+.pl-group-head h2 { margin: 0; font-size: 19px; font-weight: 700; }
+.pl-group-count { font-size: 14px; color: var(--t-ink-muted); }
+
+.pl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+
+.pl-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: 20px;
+  cursor: pointer;
+  text-align: left;
+}
+/* The card can't clip (the ⋯ menu hangs out of it), so the cover rounds itself. */
+.pl-card-cover { aspect-ratio: 16 / 8; flex-shrink: 0; border-radius: 19px 19px 0 0; }
+.pl-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 16px; }
+.pl-card-top { display: flex; align-items: flex-start; gap: 4px; }
+.pl-card-name { flex: 1; min-width: 0; font-size: 18px; font-weight: 700; line-height: 1.25; text-wrap: pretty; }
+.pl-card-count { font-size: 13px; font-weight: 700; line-height: 1.4; }
+.pl-card-spacer { flex: 1; }
+
+.pl-start-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 12px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pl-start-btn:hover { background: var(--t-accent-soft); }
+
+.pl-menu { position: relative; flex-shrink: 0; margin: -6px -8px 0 0; }
+.pl-menu-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--t-ink-muted);
+  cursor: pointer;
+}
+.pl-menu-btn:hover { background: var(--t-tint); }
+.pl-menu-pop {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 4;
+  width: 190px;
+  padding: 6px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(107, 36, 16, 0.16);
+}
+.pl-menu-pop button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+.pl-menu-pop button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-menu-pop button:hover { background: var(--t-tint); }
+.pl-menu-pop button.is-danger { color: var(--t-danger); }
+
+.pl-none { padding: 48px 0; text-align: center; color: var(--t-ink-muted); }
+
+/* --- Sheets ------------------------------------------------------------------ */
+.pl-backdrop { position: fixed; inset: 0; z-index: 30; background: var(--t-overlay); }
+
+.pl-sheet {
+  position: fixed;
+  z-index: 31;
+  left: calc(50% - 230px);
+  width: 460px;
+  top: 140px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--t-page);
+  color: var(--t-ink);
+  border-radius: var(--t-r-hero);
+  box-shadow: var(--t-shadow-modal);
+}
+.pl-sheet-grab { display: none; width: 40px; height: 4px; margin: 8px auto 4px; border-radius: 2px; background: var(--t-border-dashed); }
+
+.pl-sheet-head { display: flex; align-items: center; gap: 14px; padding: 20px 16px 16px 20px; }
+.pl-sheet-thumb { width: 64px; height: 64px; flex-shrink: 0; overflow: hidden; border-radius: 12px; background: var(--t-tint); }
+.pl-sheet-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pl-sheet-thumb.is-empty { display: flex; align-items: center; justify-content: center; }
+.pl-sheet-thumb.is-empty img { width: 60%; height: 60%; border-radius: 50%; opacity: 0.55; }
+.pl-sheet-title { flex: 1; min-width: 0; }
+.pl-sheet-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--t-accent); }
+.pl-sheet-name { font-size: 19px; font-weight: 700; line-height: 1.2; }
+.pl-sheet-sub { margin-top: 2px; font-size: 13px; color: var(--t-ink-muted); }
+.pl-sheet-close {
+  align-self: flex-start;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 12px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  cursor: pointer;
+}
+
+.pl-sheet-body { display: flex; flex-direction: column; gap: 18px; padding: 4px 20px 8px; }
+.pl-sheet-label { margin-bottom: 8px; font-size: 14px; font-weight: 700; }
+.pl-date {
+  width: 100%;
+  box-sizing: border-box;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--t-border);
+  border-radius: 12px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.pl-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pl-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--t-border);
+  border-radius: 14px;
+  background: none;
+  color: var(--t-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pl-kind.is-on { background: var(--t-surface); border-color: var(--t-ink); }
+.pl-kind-label { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+.pl-kind-label svg { color: var(--t-ink-faint); }
+.pl-kind.is-on .pl-kind-label svg { color: var(--t-accent); }
+.pl-kind-note { font-size: 12px; color: var(--t-ink-muted); overflow-wrap: anywhere; }
+
+.pl-sheet-foot { padding: 12px 20px 20px; }
+.pl-confirm { width: 100%; height: 50px; }
+
+/* Create sheet: phone only. */
+.pl-sheet--create { display: none; }
+.pl-create-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 14px;
+  background: none;
+  color: var(--t-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pl-create-item.has-divider { border-top: 1px solid var(--t-border); border-radius: 0 0 14px 14px; }
+.pl-create-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--t-tint);
+}
+.pl-create-icon.is-primary { background: var(--t-btn); color: var(--t-on-btn); }
+.pl-create-label { display: block; font-size: 16px; font-weight: 600; }
+.pl-create-note { display: block; font-size: 13px; color: var(--t-ink-muted); }
+
+/* --- Mobile ------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  .pl-head { padding-top: 4px; }
+  .pl-head h1 { font-size: 34px; }
+  .pl-plus { display: flex; }
+  .pl-actions { display: none; }
+
+  /* Two slots swipe sideways instead of stacking; the next one peeks in. */
+  .pl-active-grid {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin: 0 -16px;
+    padding: 0 16px;
+    scroll-padding: 0 16px;
+  }
+  .pl-active-grid::-webkit-scrollbar { display: none; }
+  .pl-active-grid > * { flex: 0 0 86%; scroll-snap-align: start; min-width: 0; }
+  .pl-active-grid > *:only-child { flex-basis: 100%; }
+  .pl-active-name { font-size: 22px; }
+
+  .pl-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .pl-card { flex-direction: row; gap: 12px; padding: 10px; border-radius: 20px; }
+  .pl-card-cover { width: 112px; aspect-ratio: 1 / 1; border-radius: 12px; }
+  .pl-card-body { padding: 2px 4px 0 0; }
+  .pl-card-name { font-size: 16px; }
+  .pl-start-btn { height: 38px; }
+
+  .pl-sheet {
+    left: 0;
+    right: 0;
+    width: auto;
+    top: auto;
+    bottom: 0;
+    border-radius: 24px 24px 0 0;
+  }
+  .pl-sheet-grab { display: block; }
+  .pl-sheet--create { display: flex; padding: 0 12px 24px; }
+}
+
+/* --- Hover and keyboard focus ------------------------------------------------------
+   Every button on this page answers the pointer and the keyboard, not just colour
+   at rest: a hover state to say "this is clickable", and a visible focus ring for
+   anyone tabbing through. */
+.pl-soft-btn,
+.pl-start-btn,
+.pl-menu-btn,
+.pl-plus,
+.pl-quiet,
+.pl-cat,
+.pl-group-head,
+.pl-kind,
+.pl-menu-pop button,
+.rx-heart {
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.pl-soft-btn:not(:disabled):hover { background: var(--t-accent-soft); }
+.pl-soft-btn--danger:not(:disabled):hover {
+  background: color-mix(in srgb, var(--t-danger) 10%, transparent);
+  border-color: var(--t-danger);
+}
+.pl-soft-btn:not(:disabled):active,
+.pl-start-btn:active { transform: translateY(1px); }
+
+.pl-plus:hover { background: color-mix(in srgb, var(--t-ink) 88%, var(--t-accent)); }
+.pl-cat:not(.is-on):hover { border-color: var(--t-accent); }
+.pl-group-head:hover h2 { color: var(--t-accent); }
+.pl-kind:not(.is-on):hover { border-color: var(--t-accent); }
+.pl-active:hover,
+.pl-card:hover { border-color: var(--t-accent-soft); }
+
+.pl-soft-btn:focus-visible,
+.pl-start-btn:focus-visible,
+.pl-menu-btn:focus-visible,
+.pl-plus:focus-visible,
+.pl-quiet:focus-visible,
+.pl-cat:focus-visible,
+.pl-group-head:focus-visible,
+.pl-kind:focus-visible,
+.pl-menu-pop button:focus-visible,
+.pl-active:focus-visible,
+.pl-card:focus-visible,
+.pl-sheet-close:focus-visible,
+.rx-heart:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+}
+
+/* The "+" sheet's rows: highlighted under the pointer and when tabbed to. */
+.pl-create-item { transition: background-color 0.15s; }
+.pl-create-item:hover { background: var(--t-tint); }
+.pl-create-item:hover .pl-create-icon:not(.is-primary) { background: var(--t-surface); }
+.pl-create-item:active { background: var(--t-accent-soft); }
+.pl-create-item:focus-visible { outline: 2px solid var(--t-accent); outline-offset: -2px; }
+.pl-import .pl-menu-pop button:focus-visible { outline-offset: -2px; }

@@ -1,0 +1,970 @@
+/** Redesign: Library — index, folder drill-down, and the filters sheet. */
+
+.lib { padding-bottom: 40px; }
+
+/* --- Page head -------------------------------------------------------------- */
+.lib-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding-top: 36px;
+  padding-bottom: 16px;
+}
+
+.lib-head h1 {
+  margin: 0;
+  font-size: 48px;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.lib-head-meta {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--t-ink-muted);
+}
+
+/* --- Sticky toolbar ---------------------------------------------------------
+   Sits under the nav and stays put while the grid scrolls, so search and the
+   view switch are always reachable in a long library. */
+.lib-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--t-page);
+  padding: 8px 0 10px;
+}
+
+.lib-toolbar-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lib-toolbar-top { display: flex; gap: 8px; }
+
+.lib-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 14px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-r-btn);
+}
+
+.lib-search-icon { color: var(--t-ink-faint); flex-shrink: 0; }
+
+.lib-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  color: var(--t-ink);
+}
+
+.lib-search input::placeholder { color: var(--t-ink-faint); }
+
+.lib-search-clear {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lib-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 16px;
+  flex-shrink: 0;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-r-btn);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lib-filter-btn.is-active { background: var(--t-tint); }
+
+.lib-filter-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--t-accent);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lib-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.lib-toolbar-row::-webkit-scrollbar { display: none; }
+.lib-toolbar-spacer { flex: 1; }
+
+/* --- Segmented control ------------------------------------------------------ */
+.rx-seg {
+  display: flex;
+  padding: 3px;
+  background: var(--t-tint);
+  border-radius: 11px;
+  flex-shrink: 0;
+}
+
+.rx-seg button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rx-seg button.is-on {
+  background: var(--t-surface);
+  box-shadow: var(--t-shadow-seg);
+}
+
+.rx-seg--icons button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rx-seg--sm { padding: 2px; border-radius: 9px; }
+.rx-seg--sm button { padding: 4px 10px; border-radius: 7px; font-size: 13px; }
+
+/* --- Sort pill ---------------------------------------------------------------
+   A styled pill with the real <select> invisible on top, so the label stays put
+   and the platform picker still opens. */
+.lib-sort {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px 0 11px;
+  box-sizing: border-box;
+  border-radius: 11px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.lib-sort-caret { color: var(--t-ink-muted); }
+
+.lib-sort select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+/* --- Length filter -------------------------------------------------------------
+   A from / up-to pair plus quick windows. The windows are chips like the tag
+   filters', but neutral: length isn't a tag category. */
+.len { display: flex; flex-direction: column; gap: 10px; }
+.len-inputs { display: flex; align-items: center; gap: 8px; }
+.len-dash { color: var(--t-ink-faint); font-weight: 700; }
+.len-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--t-border);
+  border-radius: 10px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+}
+.len-field:focus-within { border-color: var(--t-accent); }
+.len-field span { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--t-ink-muted); white-space: nowrap; }
+.len-field input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.len-field input::placeholder { color: var(--t-ink-faint); font-weight: 500; }
+.len-field input::-webkit-outer-spin-button,
+.len-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.len-field em { font-style: normal; font-size: 12px; color: var(--t-ink-muted); }
+
+.len-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 9px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.len-chip.is-on { background: var(--t-btn); color: var(--t-on-btn); }
+.pb-filters .len-chip { height: 30px; }
+
+/* --- Active filter chips ---------------------------------------------------- */
+.lib-active-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.lib-active-chips::-webkit-scrollbar { display: none; }
+
+.lib-active-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 16px;
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* Each chip keeps its category's ink, so removing one is obviously undoing the
+   filter you set in that group. */
+.lib-active-chip--intensity { background: var(--t-tag-intensity-ink); }
+.lib-active-chip--type { background: var(--t-tag-type-ink); }
+.lib-active-chip--body { background: var(--t-tag-body-ink); }
+.lib-active-chip--gear { background: var(--t-tag-gear-ink); }
+.lib-active-chip--length { background: var(--t-btn); color: var(--t-on-btn); }
+
+.lib-clear-all {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: none;
+  color: var(--t-ink-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* --- Sections ---------------------------------------------------------------- */
+.lib-body {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding-top: 6px;
+}
+
+.lib-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.lib-section-head h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.lib-section-count { font-size: 14px; color: var(--t-ink-muted); }
+.lib-section-head .lib-sort { margin-left: auto; }
+.lib-section-head .lib-sort + .lib-scope { margin-left: 0; }
+
+/* --- Folder cards ------------------------------------------------------------ */
+.lib-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px 20px;
+}
+
+/* A <button> centres its content vertically when it's taller than that
+   content, and a grid stretches every card to the tallest in its row — so a
+   card with fewer tags had its thumbnail sitting lower than its neighbours.
+   Laying the card out as a column pins the content to the top. */
+.lib-folder,
+.lib-video {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lib-folder-cover {
+  position: relative;
+  display: block;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lib-folder-cover img { transition: transform 0.35s ease; }
+
+/* Hover: the cover lifts, the picture eases in a touch, and the name warms to
+   the accent. Only where there is a real pointer — on a phone a tap would leave
+   the last card stuck in its hovered state — and never under reduced motion. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .lib-folder:hover .lib-folder-cover {
+    transform: translateY(-3px);
+    box-shadow: var(--t-shadow-lift);
+  }
+  .lib-folder:hover .lib-folder-cover img { transform: scale(1.05); }
+  .lib-folder .lib-folder-name { transition: color 0.2s ease; }
+  .lib-folder:hover .lib-folder-name { color: var(--t-accent); }
+}
+
+.lib-folder-cover img,
+.lib-folder-noimg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 16px;
+  background: var(--t-tint);
+}
+
+.lib-folder-name {
+  display: block;
+  margin-top: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-folder-count {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--t-ink-muted);
+}
+
+/* --- Folder list rows -------------------------------------------------------- */
+.lib-rows {
+  display: flex;
+  flex-direction: column;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.lib-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  min-height: 44px;
+  border: none;
+  border-top: 1px solid var(--t-border);
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lib-folder-row:first-child { border-top: none; }
+.lib-folder-row:hover { background: var(--t-subtle); }
+
+.lib-folder-row-thumb {
+  width: 72px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+  flex-shrink: 0;
+  background: var(--t-tint);
+}
+
+.lib-folder-row-text { flex: 1; min-width: 0; }
+.lib-folder-row-text .lib-folder-name { margin-top: 0; }
+
+.lib-folder-row-yt { color: var(--t-ink-faint); display: flex; }
+.lib-chevron { color: var(--t-ink-faint); flex-shrink: 0; }
+
+/* --- Add from YouTube -------------------------------------------------------- */
+.lib-add-yt-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--t-accent-soft);
+  border-radius: 16px;
+  background: var(--t-band-even);
+  color: var(--t-accent);
+}
+
+.lib-folder:hover .lib-add-yt-cover { background: var(--t-band-odd); }
+
+.lib-add-yt-row-thumb {
+  width: 72px;
+  height: 46px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--t-border-dashed);
+  border-radius: 10px;
+  background: var(--t-subtle);
+  color: var(--t-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Video cards -------------------------------------------------------------- */
+.lib-video-thumb img,
+.lib-video-noimg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 14px;
+  background: var(--t-tint);
+}
+
+.lib-video-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.lib-video-meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--t-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-tags { gap: 4px; margin-top: 6px; }
+
+/* Hover, matching the folders: the thumbnail lifts, the picture eases in, a play
+   button fades up over it and the title warms to the accent. */
+.lib-video-thumb { border-radius: 14px; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.lib-video-row-thumb { border-radius: 10px; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.lib-video-thumb img, .lib-video-row-thumb img { transition: transform 0.35s ease; }
+.lib-video-item, .lib-video-row { position: relative; }
+/* Sits exactly over the thumbnail (16:9, from the card's top / the row's padding). */
+.lib-hover-actions { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: 16 / 9; pointer-events: none; z-index: 2; }
+.lib-video-row .lib-hover-actions { top: 8px; width: 180px; }
+.lib-hover-actions { transition: transform 0.2s ease; }
+.lib-hover-actions button {
+  position: absolute;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+  border: none; border-radius: 50%;
+  background: rgba(255, 251, 247, 0.95); color: #2A211C;
+  box-shadow: 0 6px 18px rgba(20, 8, 3, 0.35);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.15s;
+  cursor: pointer;
+}
+.lib-hover-play { left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; padding-left: 2px !important; transform: scale(0.8); }
+.lib-video-row .lib-hover-play { width: 36px; height: 36px; margin: -18px 0 0 -18px; }
+.lib-hover-info { left: 8px; top: 8px; width: 28px; height: 28px; transform: scale(0.8); }
+.lib-hover-actions button:hover { background: #FFFFFF; }
+.lib-hover-play:hover { transform: scale(1.1) !important; }
+.lib-video-title { transition: color 0.2s ease; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .lib-video-item:hover .lib-hover-actions,
+  .lib-video-row:hover .lib-hover-actions { transform: translateY(-3px); }
+  .lib-video-item:hover .lib-video-thumb,
+  .lib-video-row:hover .lib-video-row-thumb { transform: translateY(-3px); box-shadow: var(--t-shadow-lift); }
+  .lib-video-item:hover img, .lib-video-row:hover .lib-video-row-thumb img { transform: scale(1.05); }
+  .lib-video-item:hover .lib-video-title, .lib-video-row:hover .lib-video-title { color: var(--t-accent); }
+}
+@media (hover: hover) {
+  .lib-video-item:hover .lib-hover-actions button,
+  .lib-video-row:hover .lib-hover-actions button,
+  .lib-hover-actions button:focus-visible { opacity: 1; pointer-events: auto; transform: none; }
+}
+
+/* --- Video list rows ---------------------------------------------------------- */
+.lib-video-rows { display: flex; flex-direction: column; gap: 2px; }
+
+.lib-video-row { display: flex; align-items: flex-start; }
+
+.lib-video-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lib-video-row-thumb { flex-shrink: 0; width: 180px; }
+
+/* The wrapper sets the row thumbnail's width; the image has to fill it, or it
+   renders at its natural size and swamps the row. */
+.lib-video-row-thumb img,
+.lib-video-row-thumb .lib-video-noimg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--t-tint);
+}
+
+.lib-video-row-text { flex: 1; min-width: 0; padding-top: 2px; }
+.lib-video-row-text .lib-video-title { margin-top: 0; font-size: 15px; }
+.lib-video-row-text .lib-video-meta { margin-top: 4px; font-size: 13px; }
+
+.lib-video-row-menu {
+  width: 36px;
+  height: 36px;
+  margin-top: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--t-ink-faint);
+  cursor: pointer;
+}
+
+.lib-video-row-menu:hover { color: var(--t-ink); }
+.lib-video-row-fav.is-on { color: var(--t-accent); }
+.lib-video-row-fav.is-on svg { fill: currentColor; }
+
+/* Grid card wrapper: lets the heart sit over the thumbnail beside the card button. */
+.lib-video-item { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.lib-video-item > .lib-video { flex: 1; }
+
+/* The Favourites album's badge is a heart, not a source mark. */
+.lib-fav-badge { pointer-events: none; }
+.lib-fav-row { color: var(--t-accent); }
+
+/* --- Empty state and paging ---------------------------------------------------- */
+.lib-empty {
+  padding: 40px 20px;
+  text-align: center;
+  border: 1px dashed var(--t-border);
+  border-radius: 16px;
+  color: var(--t-ink-muted);
+}
+
+.lib-empty-title { font-weight: 600; color: var(--t-ink); font-size: 16px; }
+.lib-empty-hint { margin-top: 4px; font-size: 14px; }
+
+.lib-more {
+  margin-top: 16px;
+  width: 100%;
+  height: 46px;
+  border-radius: var(--t-r-btn);
+  border: 1px solid var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* --- Folder view: breadcrumbs and hero ---------------------------------------- */
+.lib-folder-head { padding-top: 32px; padding-bottom: 16px; }
+
+.lib-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--t-ink-muted);
+  margin-bottom: 12px;
+}
+
+.lib-crumb { display: flex; align-items: center; gap: 6px; }
+
+.lib-crumb button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--t-ink-muted);
+  cursor: pointer;
+}
+
+.lib-crumb button.is-current { color: var(--t-ink); font-weight: 600; }
+.lib-crumb button:hover { color: var(--t-accent); }
+.lib-crumb svg { opacity: 0.6; }
+
+.lib-folder-hero { display: flex; align-items: center; gap: 16px; }
+
+/* The back arrow is the mobile header's; on desktop the breadcrumbs do the job. */
+.lib-folder-back {
+  display: none;
+  width: 44px;
+  height: 44px;
+  margin-left: -10px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--t-ink);
+  cursor: pointer;
+}
+
+.lib-folder-hero-img {
+  width: 150px;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 14px;
+  flex-shrink: 0;
+  display: block;
+  background: var(--t-tint);
+}
+
+.lib-folder-hero-text { flex: 1; min-width: 0; }
+
+.lib-folder-hero-text h1 {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+
+.lib-folder-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.lib-folder-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.lib-folder-action:hover { border-color: var(--t-accent); }
+.lib-action-icon { color: var(--t-accent); }
+
+.lib-icon-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  cursor: pointer;
+}
+
+.lib-icon-btn:hover { border-color: var(--t-accent); }
+.lib-icon-btn--danger:hover { border-color: var(--t-danger); color: var(--t-danger); }
+
+/* Subfolders as a strip on a phone, so a folder full of folders doesn't push
+   its own videos off the screen. */
+.lib-sub-strip {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 0 16px;
+  scroll-snap-type: x mandatory;
+  /* Snap to the padded edge, or the first card is pulled flush with the screen. */
+  scroll-padding: 0 16px;
+}
+
+.lib-sub-strip::-webkit-scrollbar { display: none; }
+.lib-sub-strip .lib-folder { width: 176px; flex-shrink: 0; scroll-snap-align: start; }
+
+/* --- Include subfolders toggle -------------------------------------------------- */
+.lib-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.lib-scope-track {
+  position: relative;
+  width: 36px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--t-border-dashed);
+  transition: background 0.15s;
+}
+
+.lib-scope-track.is-on { background: var(--t-btn); }
+
+.lib-scope-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: left 0.15s;
+}
+
+.lib-scope-track.is-on .lib-scope-knob { left: 16px; }
+
+/* --- Filters sheet --------------------------------------------------------------
+   A right-hand panel on desktop, a bottom sheet on a phone. */
+.lib-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--t-overlay);
+}
+
+.lib-sheet {
+  position: fixed;
+  z-index: 31;
+  right: 0;
+  bottom: 0;
+  top: 0;
+  left: calc(100% - 420px);
+  display: flex;
+  flex-direction: column;
+  background: var(--t-page);
+  border-radius: 20px 0 0 20px;
+  box-shadow: var(--t-shadow-modal);
+}
+
+.lib-sheet-head {
+  display: flex;
+  align-items: center;
+  padding: 14px 12px 10px 20px;
+  border-bottom: 1px solid var(--t-border);
+}
+
+.lib-sheet-title { flex: 1; font-size: 19px; font-weight: 700; }
+
+.lib-sheet-clear {
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  color: var(--t-ink-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lib-sheet-close {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--t-ink);
+  cursor: pointer;
+}
+
+.lib-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.lib-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 10px;
+}
+
+.lib-group-title { flex: 1; font-size: 15px; font-weight: 700; }
+.lib-group-match-label { font-size: 13px; color: var(--t-ink-muted); }
+
+.lib-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Selectable chips: the category's tint until picked, then its solid ink with
+   a check — deliberately unlike the flat read-only tags on the cards. */
+.lib-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 9px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lib-chip--intensity { background: var(--t-tag-intensity-bg); color: var(--t-tag-intensity-ink); }
+.lib-chip--type { background: var(--t-tag-type-bg); color: var(--t-tag-type-ink); }
+.lib-chip--body { background: var(--t-tag-body-bg); color: var(--t-tag-body-ink); }
+.lib-chip--gear { background: var(--t-tag-gear-bg); color: var(--t-tag-gear-ink); }
+
+.lib-chip--intensity.is-on { background: var(--t-tag-intensity-ink); color: #FFFFFF; }
+.lib-chip--type.is-on { background: var(--t-tag-type-ink); color: #FFFFFF; }
+.lib-chip--body.is-on { background: var(--t-tag-body-ink); color: #FFFFFF; }
+.lib-chip--gear.is-on { background: var(--t-tag-gear-ink); color: #FFFFFF; }
+
+.lib-sheet-foot {
+  padding: 12px 20px 20px;
+  border-top: 1px solid var(--t-border);
+}
+
+.lib-sheet-apply { width: 100%; }
+
+/* --- Mobile ------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  .lib-head { padding-top: 8px; }
+  .lib-head h1 { font-size: 34px; }
+
+  .lib-toolbar { top: var(--rx-stick); }
+  .lib-filter-btn { padding: 0 13px; }
+  /* The button is icon-plus-count on a phone; the word doesn't fit next to the
+     search field and the icon is unambiguous. */
+  .lib-filter-label { display: none; }
+
+  .rx-seg button { padding: 6px 8px; font-size: 13px; }
+
+  .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+
+  .lib-video-row-thumb { width: 132px; }
+  /* Sort stays on the heading's row, in the corner; the toggle drops to its own line. */
+  .lib-section-head .lib-sort { margin-left: auto; }
+  .lib-section-head .lib-sort + .lib-scope { flex-basis: 100%; margin-left: 0; }
+  .lib-video-row .lib-hover-actions { width: 132px; }
+
+  .lib-folder-head { padding-top: 8px; }
+  .lib-folder-back { display: flex; }
+  .lib-folder-hero-img { width: 96px; }
+  .lib-folder-hero-text h1 { font-size: 28px; }
+  /* The header actions move below the title rather than squeezing it. */
+  .lib-folder-hero { flex-wrap: wrap; }
+  .lib-folder-actions { width: 100%; }
+  .lib-video-row-text .lib-video-title { font-size: 14px; }
+
+  .lib-sheet {
+    left: 0;
+    top: 12%;
+    border-radius: 24px 24px 0 0;
+  }
+}

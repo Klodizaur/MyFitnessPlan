@@ -228,6 +228,7 @@ export default async function (fastify: FastifyInstance) {
             : '',
         includeAlbums: strings(body?.includeAlbums),
         excludeAlbums: strings(body?.excludeAlbums),
+        excludeFolders: strings(body?.excludeFolders),
       });
       return reply.send(plan);
     } catch (err) {

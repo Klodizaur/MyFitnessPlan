@@ -16,6 +16,8 @@ const DAY_NAMES = new Set([
 ]);
 
 import { matchVideo, rematchPlanWorkouts, rematchAllPlans } from '../matcher.js';
+import { analyzeImport, exportPlans, importPlans, validateExportFile } from '../planTransfer.js';
+import { appVersion } from '../version.js';
 
 function isSkip(cell: string): boolean {
   const t = cell.trim();
@@ -260,7 +262,7 @@ export default async function (fastify: FastifyInstance) {
 
   fastify.put('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as { name?: string; startDate?: string; category?: string; description?: string; workoutPattern?: number[]; days?: Array<{ name: string; videoIds: string[] }> };
+    const body = request.body as { name?: string; startDate?: string; category?: string; description?: string; workoutPattern?: number[]; days?: Array<{ name: string; videoIds: string[]; workoutId?: string }> };
     const days = Array.isArray(body.days) ? body.days.filter(day => Array.isArray(day.videoIds) && day.videoIds.length > 0) : [];
     if (!days.length) {
       return reply.code(400).send({ error: 'No workouts provided' });
@@ -278,21 +280,105 @@ export default async function (fastify: FastifyInstance) {
         'UPDATE workout_plans SET name = ?, start_date = ?, category = ?, description = ?, workout_pattern = ? WHERE id = ?'
       ).run(planName, startDate, category, description, pattern, id);
       
-      // Delete history first (it references workouts via a foreign key).
-      // Without this, deleting workouts that have completion marks fails
-      // with "FOREIGN KEY constraint failed".
-      db.prepare('DELETE FROM history WHERE workout_id IN (SELECT id FROM workouts WHERE plan_id = ?)').run(id);
+      // Update days in place rather than deleting and rebuilding them.
+      //
+      // Completion ticks (`history`) hang off the workout row's id, so the old
+      // delete-and-reinsert wiped every tick on every save — add one video to
+      // an active plan and it forgot everything you'd done. Now a day the
+      // builder loaded comes back with its `workoutId` and keeps its row.
+      //
+      // The rule is deliberately one line: anything you've already ticked
+      // stays ticked; an edit only changes what's left to do.
+      //   - A day that was finished stays finished, even if its videos change
+      //     afterwards. You did that workout; editing the plan doesn't undo it.
+      //     (What you actually watched is still in the workout log, which this
+      //     never touches.)
+      //   - A day in progress keeps the ticks on videos still in it; anything
+      //     new starts unticked.
+      //   - New days start unticked; days that are gone take their ticks.
+      const existing = db.prepare(
+        'SELECT id, video_ids FROM workouts WHERE plan_id = ?'
+      ).all(id) as { id: string; video_ids: string | null }[];
+      const existingById = new Map(existing.map(w => [w.id, w]));
 
-      // Delete existing workouts for this plan
-      db.prepare('DELETE FROM workouts WHERE plan_id = ?').run(id);
-      
-      // Insert new workouts
-      const insertStmt = db.prepare(
+      const marks = db.prepare(
+        'SELECT workout_id, video_id FROM history WHERE workout_id IN (SELECT id FROM workouts WHERE plan_id = ?)'
+      ).all(id) as { workout_id: string; video_id: string | null }[];
+      const dayMarked = new Set(marks.filter(m => !m.video_id).map(m => m.workout_id));
+      const videoMarked = new Set(marks.filter(m => m.video_id).map(m => `${m.workout_id}:${m.video_id}`));
+
+      const parseIds = (raw: string | null): string[] => {
+        try {
+          const parsed = JSON.parse(raw || '[]');
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      };
+      // Mirrors how the schedule decides a day is done (schedule.ts): a
+      // whole-day mark, or every one of its videos ticked.
+      const wasFinished = (w: { id: string; video_ids: string | null }) => {
+        if (dayMarked.has(w.id)) return true;
+        const ids = parseIds(w.video_ids);
+        return ids.length > 0 && ids.every(v => videoMarked.has(`${w.id}:${v}`));
+      };
+
+      const updateWorkout = db.prepare(
+        'UPDATE workouts SET name = ?, sequence_order = ?, video_ids = ? WHERE id = ?'
+      );
+      const insertWorkout = db.prepare(
         'INSERT INTO workouts (id, plan_id, name, sequence_order, video_ids) VALUES (?, ?, ?, ?, ?)'
       );
+      const addDayMark = db.prepare(
+        'INSERT INTO history (id, workout_id, video_id) VALUES (?, ?, NULL)'
+      );
+      const dropVideoMark = db.prepare(
+        'DELETE FROM history WHERE workout_id = ? AND video_id = ?'
+      );
+
+      const kept = new Set<string>();
       days.forEach((day, index) => {
-        insertStmt.run(nanoid(), id, day.name || `Day ${index + 1}`, index, JSON.stringify(day.videoIds));
+        const name = day.name || `Day ${index + 1}`;
+        const videoIds = JSON.stringify(day.videoIds);
+        const previous = day.workoutId ? existingById.get(day.workoutId) : undefined;
+
+        // A fresh day, or an id that isn't this plan's (or was already used by
+        // an earlier day in this save): a new row with no progress.
+        if (!previous || kept.has(previous.id)) {
+          insertWorkout.run(nanoid(), id, name, index, videoIds);
+          return;
+        }
+
+        kept.add(previous.id);
+
+        // Finished before the edit, and the new contents wouldn't read as
+        // finished on their own (a video was swapped or added): pin it with a
+        // whole-day mark so it stays done.
+        if (wasFinished(previous) && !dayMarked.has(previous.id)) {
+          addDayMark.run(nanoid(), previous.id);
+        }
+
+        // Ticks on videos no longer in this day would otherwise linger and
+        // silently reappear if that video were ever added back.
+        const stillThere = new Set(day.videoIds);
+        for (const v of parseIds(previous.video_ids)) {
+          if (!stillThere.has(v) && videoMarked.has(`${previous.id}:${v}`)) {
+            dropVideoMark.run(previous.id, v);
+          }
+        }
+
+        updateWorkout.run(name, index, videoIds, previous.id);
       });
+
+      // Days that didn't come back were removed in the builder. Their ticks go
+      // with them (history references workouts, so it has to be first).
+      const removed = existing.filter(w => !kept.has(w.id)).map(w => w.id);
+      const deleteHistory = db.prepare('DELETE FROM history WHERE workout_id = ?');
+      const deleteWorkout = db.prepare('DELETE FROM workouts WHERE id = ?');
+      for (const workoutId of removed) {
+        deleteHistory.run(workoutId);
+        deleteWorkout.run(workoutId);
+      }
     })();
 
     return reply.send({ success: true, planId: id, workoutCount: days.length });
@@ -596,11 +682,64 @@ export default async function (fastify: FastifyInstance) {
     return reply.send({ success: true, backgroundBlur: value });
   });
 
+  // Star or un-star a plan.
+  fastify.put('/:id/favorite', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { favorite } = request.body as { favorite?: boolean };
+    const plan = db.prepare('SELECT id FROM workout_plans WHERE id = ?').get(id);
+    if (!plan) return reply.code(404).send({ error: 'Plan not found' });
+
+    const value = favorite ? 1 : 0;
+    db.prepare('UPDATE workout_plans SET is_favorite = ? WHERE id = ?').run(value, id);
+    return reply.send({ success: true, isFavorite: value });
+  });
+
   fastify.post('/rematch-all', async (request, reply) => {
     const plans = db.prepare('SELECT id FROM workout_plans').all() as { id: string }[];
     for (const plan of plans) {
       rematchPlanWorkouts(plan.id);
     }
     return reply.send({ success: true, count: plans.length });
+  });
+
+  // --- Export / import -------------------------------------------------------
+  // `/export` is registered as a static path, which find-my-way prefers over the
+  // `/:id` route above, so there is no ambiguity between them.
+
+  /** One plan (`?ids=a,b`) or, with no ids, every plan as a backup. */
+  fastify.get('/export', async (request, reply) => {
+    const { ids } = request.query as { ids?: string };
+    const planIds = typeof ids === 'string' && ids.trim()
+      ? ids.split(',').map(v => v.trim()).filter(Boolean)
+      : null;
+
+    const file = exportPlans(planIds, appVersion);
+    if (file.plans.length === 0) return reply.code(404).send({ error: 'No plans to export' });
+
+    return reply.type('application/json').send(file);
+  });
+
+  /**
+   * Create plans from an exported file.
+   *
+   * `dryRun` answers "what would this do" without doing any of it, which is what
+   * the import dialog shows before the user commits — including whether adding
+   * the playlist first would bring more of the plan across.
+   */
+  // Fastify's 1MB default is too small for a whole-library backup: a few hundred
+  // plans' worth of titles, descriptions and tags runs past it easily.
+  fastify.post('/import', { bodyLimit: 20 * 1024 * 1024 }, async (request, reply) => {
+    const body = request.body as { file?: unknown; dryRun?: boolean } | null;
+    const validated = validateExportFile(body?.file);
+    if (!validated.ok) {
+      return reply.code(400).send({ error: validated.error, code: validated.error });
+    }
+
+    if (body?.dryRun) {
+      return reply.send({ dryRun: true, reports: analyzeImport(validated.file) });
+    }
+
+    const { reports, planIds } = importPlans(validated.file);
+    return reply.send({ success: true, reports, planIds });
   });
 }

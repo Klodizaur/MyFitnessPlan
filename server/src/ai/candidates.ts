@@ -21,6 +21,12 @@ export interface CandidateFilter {
   includeAlbums: string[];
   /** Album keys to leave out, applied after `includeAlbums`. */
   excludeAlbums: string[];
+  /**
+   * Subfolders to leave out of an included album, as `Album/Sub` — or `Album/`
+   * for the videos sitting directly in the album. Optional so older callers
+   * that only know about whole albums keep working.
+   */
+  excludeFolders?: string[];
   /** Longest single video, in minutes. 0 or absent means no cap. */
   maxMinutes: number;
   /** Soft preferences — used for ranking here, and given to the model. */
@@ -67,6 +73,19 @@ function albumKeyForVideo(video: {
   return parts.length > 1 ? parts[0] : '.';
 }
 
+/**
+ * The subfolder a local video sits in, one level below its album: `Album/Sub`,
+ * or `Album/` for a video directly in the album. Null for imports and for
+ * videos at the library root, which have no folder to exclude.
+ * Mirrors the key the client builds in AiPlanModal.
+ */
+function folderKeyForVideo(video: { source: string; relative_path: string }): string | null {
+  if ((video.source || 'local') !== 'local') return null;
+  const parts = (video.relative_path || '').split('/').filter(Boolean);
+  if (parts.length < 2) return null;
+  return parts.length > 2 ? `${parts[0]}/${parts[1]}` : `${parts[0]}/`;
+}
+
 /** Display-only: the extension is noise in a prompt. */
 function stripExt(filename: string): string {
   return filename.replace(/\.[^/.]+$/, '');
@@ -79,12 +98,17 @@ export function selectCandidates(filter: CandidateFilter): CandidateSet {
   const owned = new Set(filter.equipment);
   const include = new Set(filter.includeAlbums);
   const exclude = new Set(filter.excludeAlbums);
+  const excludeFolders = new Set(filter.excludeFolders ?? []);
   const maxSeconds = filter.maxMinutes > 0 ? filter.maxMinutes * 60 : 0;
 
   const matched = videos.filter(video => {
     const album = albumKeyForVideo(video);
     if (include.size > 0 && !include.has(album)) return false;
     if (exclude.has(album)) return false;
+    if (excludeFolders.size > 0) {
+      const folder = folderKeyForVideo(video);
+      if (folder && excludeFolders.has(folder)) return false;
+    }
 
     // Only a hard filter when the user actually told us what they own —
     // otherwise an untagged library would filter down to nothing.

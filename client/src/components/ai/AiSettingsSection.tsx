@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import '../../styles/AiPlan.css';
+import { KeyRound, PlugZap, ShieldCheck } from 'lucide-react';
 
 type Provider = 'anthropic' | 'openai';
 
@@ -201,64 +201,65 @@ export default function AiSettingsSection() {
     setTesting(false);
   };
 
+  const needsUrl = provider === 'openai' && !baseUrl.trim();
+
   return (
-    <div className="ai-settings" style={{ marginBottom: '2rem' }}>
-      <h2>{t('ai.settings_title')}</h2>
-      <p style={{ marginBottom: '1rem' }}>{t('ai.settings_msg')}</p>
+    <div className="st-stack">
+      <section className="st-card st-card--gap">
+        <header className="st-head-row">
+          <div>
+            <h2>{t('ai.settings_title')}</h2>
+            <p>{t('ai.settings_msg')}</p>
+          </div>
+          <span className={`st-status${config?.available ? ' is-ready' : ''}`}>
+            <i />
+            {config?.available ? t('ai.state_ready') : t('ai.state_not_configured')}
+          </span>
+        </header>
 
-      <div className="ai-settings-row" style={{ marginBottom: '1rem' }}>
-        <button
-          className={`btn ${provider === 'anthropic' ? '' : 'btn-secondary'}`}
-          onClick={() => handleProvider('anthropic')}
-        >
-          {t('ai.provider_anthropic')}
-        </button>
-        <button
-          className={`btn ${provider === 'openai' ? '' : 'btn-secondary'}`}
-          onClick={() => handleProvider('openai')}
-        >
-          {t('ai.provider_openai')}
-        </button>
-      </div>
+        <div className="rx-seg st-seg-full">
+          <button type="button" className={provider === 'anthropic' ? 'is-on' : ''} onClick={() => handleProvider('anthropic')}>
+            {t('ai.provider_anthropic')}
+          </button>
+          <button type="button" className={provider === 'openai' ? 'is-on' : ''} onClick={() => handleProvider('openai')}>
+            {t('ai.provider_openai')}
+          </button>
+        </div>
 
-      <div className="ai-settings-grid">
         {/* Only worth showing where it means something. On Anthropic the URL
             is always the same and the field is just a way to break things, so
             it hides behind a disclosure for the proxy case. On an
             OpenAI-compatible endpoint the URL *is* the choice of service, so it
             leads, with the common ones one click away. */}
         {provider === 'anthropic' ? (
-          <div>
+          <div className="st-field-group">
             {showAdvanced ? (
               <>
-                <label className="wb-label">{t('ai.base_url_label')}</label>
+                <label className="st-label">{t('ai.base_url_label')}</label>
                 <input
-                  className="wb-input"
+                  className="st-input st-input--mono"
                   value={baseUrl}
                   onChange={e => setBaseUrl(e.target.value)}
                   placeholder="https://api.anthropic.com"
                   spellCheck={false}
                 />
-                <p className="ai-hint" style={{ marginTop: 6 }}>{t('ai.base_url_proxy_hint')}</p>
+                <p className="st-help">{t('ai.base_url_proxy_hint')}</p>
               </>
             ) : (
-              <button type="button" className="ai-link-btn" onClick={() => setShowAdvanced(true)}>
+              <button type="button" className="st-link" onClick={() => setShowAdvanced(true)}>
                 {t('ai.base_url_advanced')}
               </button>
             )}
           </div>
         ) : (
-          <div>
-            <label className="wb-label">
-              {t('ai.base_url_label')}
-              <span className="ai-required" aria-hidden="true"> *</span>
-            </label>
-            <div className="wb-chip-row" style={{ marginBottom: 8 }}>
+          <div className="st-field-group">
+            <label className="st-label">{t('ai.base_url_label')} <span className="st-req" aria-hidden="true">*</span></label>
+            <div className="st-presets">
               {OPENAI_PRESETS.map(preset => (
                 <button
                   type="button"
                   key={preset.url}
-                  className={`wb-chip${baseUrl === preset.url ? ' selected' : ''}`}
+                  className={baseUrl === preset.url ? 'is-on' : ''}
                   onClick={() => setBaseUrl(preset.url)}
                 >
                   {preset.name}
@@ -266,7 +267,7 @@ export default function AiSettingsSection() {
               ))}
             </div>
             <input
-              className="wb-input"
+              className="st-input st-input--mono"
               value={baseUrl}
               onChange={e => setBaseUrl(e.target.value)}
               placeholder="https://api.openai.com"
@@ -274,184 +275,146 @@ export default function AiSettingsSection() {
               required
               aria-required="true"
             />
-            <p className="ai-hint" style={{ marginTop: 6 }}>{t('ai.base_url_openai_hint')}</p>
+            <p className="st-help">{t('ai.base_url_openai_hint')}</p>
           </div>
         )}
 
         {/* The key comes before the model on purpose: the model list is fetched
             using it, so asking for a model first is asking for something that
             cannot be answered yet. */}
-        <div>
-          <label className="wb-label">{t('ai.key_label')}</label>
-          <input
-            className="wb-input"
-            type="password"
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            placeholder={config?.hasKey ? t('ai.key_stored') : t('ai.key_placeholder')}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <p className="ai-hint" style={{ marginTop: 6 }}>{t('ai.key_hint')}</p>
-        </div>
-
-        <div>
-          <label className="wb-label">{t('ai.model_label')}</label>
-
-          {/* Model ids are exact and case-sensitive, so pick from the list the
-              endpoint reports rather than typing one. The text field stays
-              available for endpoints that don't publish a list. */}
-          {modelOptions.length > 0 && !typingModel ? (
-            <>
-              <select
-                className="wb-input"
-                value={model}
-                onChange={e => {
-                  if (e.target.value === CUSTOM_MODEL) {
-                    setTypingModel(true);
-                    return;
-                  }
-                  setModel(e.target.value);
-                }}
-              >
-                {/* Always selectable, so picking it is how a model — including
-                    a stale hand-typed one — gets cleared. */}
-                <option value="">{t('ai.model_choose')}</option>
-                {modelOptions.map(choice => (
-                  <option key={choice.id} value={choice.id}>
-                    {choice.unlisted
-                      ? `${choice.id} — ${t('ai.model_unlisted')}`
-                      : choice.label === choice.id
-                        ? choice.id
-                        : `${choice.label} (${choice.id})`}
-                  </option>
-                ))}
-                <option value={CUSTOM_MODEL}>{t('ai.model_custom')}</option>
-              </select>
-              <p className="ai-hint" style={{ marginTop: 6 }}>
-                {loadingModels ? t('ai.model_loading') : t('ai.model_from_provider')}
-              </p>
-            </>
-          ) : (
-            <>
-              <input
-                className="wb-input"
-                value={model}
-                onChange={e => setModel(e.target.value)}
-                // Provider-specific: showing a Claude model name to someone on
-                // OpenAI reads as a hardcoded value they can't change, not as
-                // an example of what to type.
-                placeholder={provider === 'anthropic' ? 'claude-opus-5' : t('ai.model_placeholder')}
-                spellCheck={false}
-              />
-              <p className="ai-hint" style={{ marginTop: 6 }}>
-                {loadingModels
-                  ? t('ai.model_loading')
-                  : modelOptions.length > 0
-                    ? t('ai.model_typing')
-                    : t('ai.model_hint')}
-              </p>
-              {/* Without this the hint asks for a save that lives in another
-                  part of the panel, so the list never appears for someone who
-                  has just pasted a key. */}
-              {modelOptions.length === 0 && !loadingModels && (
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ marginTop: 8 }}
-                  onClick={() => save()}
-                  disabled={
-                    (provider === 'openai' && !baseUrl.trim()) ||
-                    (!apiKey && !config?.hasKey && !(provider === 'openai' && isLikelyLocalUrl(baseUrl)))
-                  }
-                >
-                  {t('ai.model_load')}
-                </button>
-              )}
-              {modelOptions.length > 0 && (
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ marginTop: 8 }}
-                  onClick={() => setTypingModel(false)}
-                >
-                  {t('ai.model_back_to_list')}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-
-        <div>
-          <label className="wb-label">{t('ai.language_label')}</label>
-          <select
-            className="wb-input"
-            value={language}
-            onChange={e => setLanguage(e.target.value as DescriptionLanguage)}
-          >
-            <option value="">{t('ai.language_original')}</option>
-            <option value="en">English</option>
-            <option value="pl">Polski</option>
-          </select>
-          <p className="ai-hint" style={{ marginTop: 6 }}>
-            {language ? t('ai.language_translate_warning') : t('ai.language_hint')}
-          </p>
-        </div>
-
-        <div>
-          <label className="wb-label">{t('ai.flow_label')}</label>
-          <div className="wb-chip-row">
-            <button
-              type="button"
-              className={`wb-chip${planFlow === 'all' ? ' selected' : ''}`}
-              onClick={() => setPlanFlow('all')}
-            >
-              {t('ai.flow_all')}
-            </button>
-            <button
-              type="button"
-              className={`wb-chip${planFlow === 'guided' ? ' selected' : ''}`}
-              onClick={() => setPlanFlow('guided')}
-            >
-              {t('ai.flow_guided')}
-            </button>
+        <div className="st-field-group">
+          <label className="st-label">{t('ai.key_label')}</label>
+          <div className="st-field st-field--key">
+            <KeyRound size={16} />
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder={config?.hasKey ? t('ai.key_stored') : t('ai.key_placeholder')}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {config?.hasKey && (
+              <button type="button" className="st-key-remove" onClick={clearKey}>{t('ai.clear_key')}</button>
+            )}
           </div>
-          <p className="ai-hint" style={{ marginTop: 6 }}>
-            {planFlow === 'guided' ? t('ai.flow_guided_hint') : t('ai.flow_all_hint')}
-          </p>
+          <p className="st-help">{t('ai.key_hint')}</p>
         </div>
+
+        <div className="st-two">
+          <div className="st-field-group">
+            <label className="st-label">{t('ai.model_label')}</label>
+
+            {/* Model ids are exact and case-sensitive, so pick from the list the
+                endpoint reports rather than typing one. The text field stays
+                available for endpoints that don't publish a list. */}
+            {modelOptions.length > 0 && !typingModel ? (
+              <>
+                <select
+                  className="st-input"
+                  value={model}
+                  onChange={e => {
+                    if (e.target.value === CUSTOM_MODEL) {
+                      setTypingModel(true);
+                      return;
+                    }
+                    setModel(e.target.value);
+                  }}
+                >
+                  {/* Always selectable, so picking it is how a model — including
+                      a stale hand-typed one — gets cleared. */}
+                  <option value="">{t('ai.model_choose')}</option>
+                  {modelOptions.map(choice => (
+                    <option key={choice.id} value={choice.id}>
+                      {choice.unlisted
+                        ? `${choice.id} — ${t('ai.model_unlisted')}`
+                        : choice.label === choice.id
+                          ? choice.id
+                          : `${choice.label} (${choice.id})`}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_MODEL}>{t('ai.model_custom')}</option>
+                </select>
+                <p className="st-help">{loadingModels ? t('ai.model_loading') : t('ai.model_from_provider')}</p>
+              </>
+            ) : (
+              <>
+                <input
+                  className="st-input"
+                  value={model}
+                  onChange={e => setModel(e.target.value)}
+                  // Provider-specific: showing a Claude model name to someone on
+                  // OpenAI reads as a hardcoded value they can't change, not as
+                  // an example of what to type.
+                  placeholder={provider === 'anthropic' ? 'claude-opus-5' : t('ai.model_placeholder')}
+                  spellCheck={false}
+                />
+                <p className="st-help">
+                  {loadingModels
+                    ? t('ai.model_loading')
+                    : modelOptions.length > 0
+                      ? t('ai.model_typing')
+                      : t('ai.model_hint')}
+                </p>
+                {/* Without this the hint asks for a save that lives in another
+                    part of the panel, so the list never appears for someone who
+                    has just pasted a key. */}
+                {modelOptions.length === 0 && !loadingModels && (
+                  <button
+                    type="button"
+                    className="st-btn st-btn--small"
+                    onClick={() => save()}
+                    disabled={
+                      (provider === 'openai' && !baseUrl.trim()) ||
+                      (!apiKey && !config?.hasKey && !(provider === 'openai' && isLikelyLocalUrl(baseUrl)))
+                    }
+                  >
+                    {t('ai.model_load')}
+                  </button>
+                )}
+                {modelOptions.length > 0 && (
+                  <button type="button" className="st-link" onClick={() => setTypingModel(false)}>
+                    {t('ai.model_back_to_list')}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="st-field-group">
+            <label className="st-label">{t('ai.language_label')}</label>
+            <select className="st-input" value={language} onChange={e => setLanguage(e.target.value as DescriptionLanguage)}>
+              <option value="">{t('ai.language_original')}</option>
+              <option value="en">English</option>
+              <option value="pl">Polski</option>
+            </select>
+            <p className="st-help">{language ? t('ai.language_translate_warning') : t('ai.language_hint')}</p>
+          </div>
+        </div>
+
+        <div className="st-field-group">
+          <label className="st-label">{t('ai.flow_label')}</label>
+          <div className="rx-seg st-seg-start">
+            <button type="button" className={planFlow === 'all' ? 'is-on' : ''} onClick={() => setPlanFlow('all')}>{t('ai.flow_all')}</button>
+            <button type="button" className={planFlow === 'guided' ? 'is-on' : ''} onClick={() => setPlanFlow('guided')}>{t('ai.flow_guided')}</button>
+          </div>
+          <p className="st-help">{planFlow === 'guided' ? t('ai.flow_guided_hint') : t('ai.flow_all_hint')}</p>
+        </div>
+
+        <div className="st-ai-foot">
+          <button type="button" className="st-btn st-btn--primary" onClick={() => save()} disabled={needsUrl}>{t('ai.save')}</button>
+          <button type="button" className="st-btn" onClick={test} disabled={testing || needsUrl}>
+            <PlugZap size={16} />
+            {testing ? t('ai.testing') : t('ai.test')}
+          </button>
+          {status && <span className={`st-ai-status ${statusOk ? 'is-ok' : 'is-bad'}`}>{status}</span>}
+        </div>
+      </section>
+
+      <div className="st-privacy">
+        <ShieldCheck size={18} />
+        <p>{t('ai.privacy_note')}</p>
       </div>
-
-      <div className="ai-settings-row">
-        <button
-          className="btn"
-          onClick={() => save()}
-          disabled={provider === 'openai' && !baseUrl.trim()}
-        >
-          {t('ai.save')}
-        </button>
-        <button
-          className="btn btn-secondary"
-          onClick={test}
-          disabled={testing || (provider === 'openai' && !baseUrl.trim())}
-        >
-          {testing ? t('ai.testing') : t('ai.test')}
-        </button>
-        {config?.hasKey && (
-          <button className="btn btn-secondary" onClick={clearKey}>{t('ai.clear_key')}</button>
-        )}
-        <span className="ai-key-state">
-          {config?.available ? t('ai.state_ready') : t('ai.state_not_configured')}
-        </span>
-      </div>
-
-      {status && (
-        <p className={`ai-key-state ${statusOk ? 'ai-status-ok' : 'ai-status-bad'}`} style={{ marginTop: 12 }}>
-          {status}
-        </p>
-      )}
-
-      <p className="ai-hint" style={{ marginTop: 12 }}>{t('ai.privacy_note')}</p>
     </div>
   );
 }

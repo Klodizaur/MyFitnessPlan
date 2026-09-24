@@ -8,3 +8,6 @@ server/data
 .DS_Store
 .env
 .env.*
+
+# Design references for the redesign (17MB of prototypes + image crops).
+redesign_handoff_myfitnessplan/
