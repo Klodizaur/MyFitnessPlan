@@ -27,6 +27,14 @@
 .pv-theater .player-youtube { position: absolute; inset: 0; }
 .pv-hit { position: absolute; inset: 0; cursor: pointer; }
 
+/* Fullscreen, pointer still: the controls fade out and the cursor goes with them. */
+.pv-top, .pv-bar, .pv-upnext { transition: opacity 0.25s ease; }
+.pv-theater.is-idle { cursor: none; }
+.pv-theater.is-idle .pv-hit { cursor: none; }
+.pv-theater.is-idle .pv-top,
+.pv-theater.is-idle .pv-bar,
+.pv-theater.is-idle .pv-upnext { opacity: 0; pointer-events: none; }
+
 .pv-top {
   position: absolute;
   left: 0; right: 0; top: 0;

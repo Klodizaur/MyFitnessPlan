@@ -46,11 +46,11 @@ A ground-up redesign of the whole app. Your plans, videos, log and settings carr
 
 **Log**
 
-- History and Breakdown are tabs on a phone, and future months can't be opened. Each logged workout has a ⋯ menu (note, date, edit video, remove), and the breakdown chart takes its colours from the theme.
+- History and Breakdown are tabs on a phone or tablet, and future months can't be opened. Each logged workout has a ⋯ menu (note, date, edit video, remove), and the breakdown chart takes its colours from the theme.
 
 **Player**
 
-- New controls: a scrubber, skip back and forward, speed and fullscreen. Loop is a labelled control with a rest countdown between plays, an "Up next" card follows, and a "Today" strip lists the workout's videos. One button marks a part done and undoes it again.
+- New controls: a scrubber, skip back and forward, speed and fullscreen. Loop is a labelled control with a rest countdown between plays, an "Up next" card follows, and a "Today" strip lists the workout's videos. One button marks a part done and undoes it again. In fullscreen the controls fade away while you watch and return when you move.
 
 **Settings**
 

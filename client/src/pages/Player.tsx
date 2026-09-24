@@ -296,6 +296,41 @@ export default function Player() {
   // to reach fullscreen on a phone or tablet at all.
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
 
+  // Fullscreen is for watching, so the controls step aside a moment after the pointer
+  // stops moving and come back on any movement, tap or key. They stay put while paused,
+  // resting, with the loop panel open, or with the pointer over them. A YouTube video
+  // is left alone: its frame swallows the pointer events we'd need to wake up again.
+  const [idle, setIdle] = useState(false);
+  const idleTimer = useRef<number | undefined>(undefined);
+  const idleRef = useRef(false);
+  const wasIdleOnPress = useRef(false);
+  const overControls = useRef(false);
+  const restingRef = useRef(false);
+  restingRef.current = restLeft !== null;
+  const showIdle = (value: boolean) => { idleRef.current = value; setIdle(value); };
+  const wake = () => {
+    showIdle(false);
+    window.clearTimeout(idleTimer.current);
+    if (!isFullscreen || isExternal) return;
+    idleTimer.current = window.setTimeout(() => {
+      if (overControls.current || restingRef.current || videoRef.current?.paused) return;
+      if (theaterRef.current?.querySelector('.pv-loop-panel')) return;
+      showIdle(true);
+    }, 2800);
+  };
+  // Re-arm (or clear) when going in and out of fullscreen and when play state changes.
+  useEffect(() => {
+    wake();
+    return () => window.clearTimeout(idleTimer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen, isExternal, playing, restLeft]);
+  useEffect(() => {
+    const onKey = () => wake();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen, isExternal]);
+
   useEffect(() => {
     const sync = () => setIsFullscreen(Boolean(fullscreenElement()));
     sync();
@@ -496,7 +531,14 @@ export default function Player() {
   return (
     <div className="pv-page">
       <div className="pv-stage">
-        <div className={`pv-theater${isYouTube ? ' is-embed' : ''}`} ref={theaterRef} onDoubleClick={toggleFullscreen}>
+        <div
+          className={`pv-theater${isYouTube ? ' is-embed' : ''}${idle ? ' is-idle' : ''}`}
+          ref={theaterRef}
+          onDoubleClick={toggleFullscreen}
+          onPointerDownCapture={() => { wasIdleOnPress.current = idleRef.current; }}
+          onPointerMove={wake}
+          onPointerDown={wake}
+        >
           {isExternal ? (
             externalId ? (
               <YouTubeEmbed
@@ -529,9 +571,18 @@ export default function Player() {
               onError={() => setError('Could not play this video. The file may be missing or use an unsupported format.')}
             />
           )}
-          {!isYouTube && <div className="pv-hit" onClick={togglePlay} />}
+          {!isYouTube && (
+            <div
+              className="pv-hit"
+              onClick={() => {
+                // A tap that only woke the controls shouldn't also pause the video.
+                if (wasIdleOnPress.current) { wasIdleOnPress.current = false; return; }
+                togglePlay();
+              }}
+            />
+          )}
 
-          <div className="pv-top">
+          <div className="pv-top" onPointerEnter={() => { overControls.current = true; }} onPointerLeave={() => { overControls.current = false; }}>
             <button type="button" className="pv-round" onClick={() => navigate(-1)} aria-label={t('player.close')} title={t('player.close')}>
               <X size={18} />
             </button>
@@ -609,7 +660,7 @@ export default function Player() {
           )}
 
           {!isYouTube && (
-            <div className="pv-bar" data-player-ui>
+            <div className="pv-bar" data-player-ui onPointerEnter={() => { overControls.current = true; }} onPointerLeave={() => { overControls.current = false; }}>
               <div
                 className="pv-scrub"
                 role="slider"
