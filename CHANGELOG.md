@@ -50,7 +50,7 @@ A ground-up redesign of the whole app. Your plans, videos, log and settings carr
 
 **Player**
 
-- New controls: a scrubber, skip back and forward, speed and fullscreen. Loop is a labelled control with a rest countdown between plays, an "Up next" card follows, and a "Today" strip lists the workout's videos. One button marks a part done and undoes it again. In fullscreen the controls fade away while you watch and return when you move.
+- New controls: a scrubber, skip back and forward, speed, a volume slider and fullscreen. Loop is a labelled control with a rest countdown between plays, an "Up next" card follows, and a "Today" strip lists the workout's videos. One button marks a part done and undoes it again. In fullscreen the controls fade away while you watch and return when you move.
 
 **Settings**
 
