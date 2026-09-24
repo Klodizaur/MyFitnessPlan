@@ -23,7 +23,7 @@ Easily import your entire workout library using simple TSV or CSV spreadsheet fi
 ### Manage & Build Multiple Plans
 ![Managing and building workout plans, with a video picker for each day](./screenshots/2.%20manage%20and%20build%20workout%20plans.jpg)
 
-Upload a plan, or build one from scratch day by day, week by week, straight from your video library. Keep several plans around and switch between them, or run two at once—a **main plan** alongside an **extra plan** (a short mobility or core block, for example) without one replacing the other.
+Upload a plan, or build one from scratch day by day, week by week, straight from your video library—or describe what you want and let the optional **AI builder** draft one from your own videos, which you can save as it is or open in the builder first. Keep several plans around and switch between them, or run two at once—a **main plan** alongside an **extra plan** (a short mobility or core block, for example) without one replacing the other. Star your favourites, and open any plan for a week-by-week preview before you start it.
 
 ### Flexible Custom Patterns
 ![Workout schedule pattern editor, toggling days between Workout and Rest](./screenshots/7.%20workout%20pattern.jpg)
@@ -33,17 +33,17 @@ No hard-coded weekdays. Define your own workout pattern—3 days on/1 day off, 5
 ### Calendar Views
 ![Weekly calendar cards showing completed workouts and their videos](./screenshots/3.%20workout%20calendar.jpg)
 
-Browse your schedule as a classic card list, a slider, or the newer **Day Tape** view—a horizontal strip of days grouped by week with a dot marking workout days, expanding into a full detail view with thumbnail, duration, and tags. Need a break? Freeze a day, or a whole stretch, without losing any workouts—frozen days show the reason instead of a workout, and everything else shifts forward to make room.
+Browse your schedule as the **Day Tape**—a horizontal strip of days grouped by week with a dot marking workout days, expanding into a full detail view with thumbnail, duration, and tags—or as a **Week** or **Grid** view. Your choice is remembered. Need a break? Freeze a day, or a whole stretch, without losing any workouts—frozen days show the reason instead of a workout, and everything else shifts forward to make room.
 
 ### Built-in Player with Loop & Rest
 ![Built-in video player showing workout details, equipment, and intensity](./screenshots/4.%20built%20in%20player.jpg)
 
-Play your videos without leaving the app, with the workout's focus, equipment, training type, and intensity right alongside it. The player can loop a video for a set number of passes with a rest between each one, plus a separate, usually longer rest before the next video in the plan begins—no more reaching for the seek bar between rounds.
+Play your videos without leaving the app, with the workout's focus, equipment, training type, and intensity right alongside it, and the rest of the day's videos in a strip underneath. The player can loop a video for a set number of passes with a rest between each one, plus a separate, usually longer rest before the next video in the plan begins—no more reaching for the seek bar between rounds.
 
 ### Local Video Library & Filtering
 ![Video library grouped by folder, with equipment, training type, and body part filters](./screenshots/6.%20library%20search%20%26%20filtering.jpg)
 
-Point MyFitnessPlan at your local video folders and it scans and organizes them for you. Search, and filter by equipment, training type, body part, or intensity to find exactly the workout you're after—all without uploading a single file anywhere.
+Point MyFitnessPlan at your local video folders and it scans and organizes them for you. Search, and filter by equipment, training type, body part, intensity, or length to find exactly the workout you're after—star the ones you come back to and they collect in a Favourites album—all without uploading a single file anywhere.
 
 ### Watch on Your Phone or Tablet
 
@@ -61,7 +61,7 @@ See workouts done, active days, and a monthly activity calendar at a glance. Mar
 ### Personalization & Themes
 ![The same dashboard shown in three different color themes](./screenshots/9.%20themes.jpg)
 
-Make the app truly yours with several built-in color themes—from Midnight and Forest to Pastel Pink and Sky Blue—plus language and calendar-layout preferences, all from Settings.
+Make the app truly yours with seven built-in color themes—Midnight, Sunset, Forest, Pastel Orange, Pastel Pink, Sky Blue and Watermelon—plus language and calendar-layout preferences, all from Settings.
 
 ### Additional Features
 - **Freeze plans without losing progress**: pause a day or a whole stretch (sick day, time off, whatever) and every workout that would have landed there just moves to the next open day
@@ -185,8 +185,9 @@ You must source your own workout videos. Only use content you have the right to 
 WorkoutPlanner/
 ├── client/          # React/TypeScript frontend
 │   ├── src/
-│   │   ├── components/
+│   │   ├── components/  # shared dialogs (modal/), plans/, library/, calendar/, log/, ai/, builder/
 │   │   ├── pages/
+│   │   ├── styles/      # tokens.css (themes) + one stylesheet per screen
 │   │   └── locales/
 │   └── package.json
 ├── server/          # Node.js backend

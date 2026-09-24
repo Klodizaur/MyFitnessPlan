@@ -23,7 +23,7 @@ MyFitnessPlan to osobiste narzędzie do planowania treningów stworzone z myśl�
 ### Zarządzanie i tworzenie wielu planów
 ![Zarządzanie i budowanie planów treningowych z wyborem wideo dla każdego dnia](./screenshots/2.%20manage%20and%20build%20workout%20plans.jpg)
 
-Wgraj gotowy plan albo zbuduj go od zera, dzień po dniu, tydzień po tygodniu, bezpośrednio z biblioteki wideo. Trzymaj kilka planów naraz i przełączaj się między nimi — albo uruchom dwa jednocześnie: **plan główny** razem z **planem dodatkowym** (np. krótki blok mobility lub core), bez zastępowania jednego drugim.
+Wgraj gotowy plan albo zbuduj go od zera, dzień po dniu, tydzień po tygodniu, bezpośrednio z biblioteki wideo — albo opisz, czego chcesz, i pozwól opcjonalnemu **kreatorowi AI** przygotować szkic z Twoich własnych filmów, który możesz od razu zapisać albo najpierw otworzyć w kreatorze. Oznaczaj ulubione gwiazdką i otwieraj dowolny plan, żeby zobaczyć go tydzień po tygodniu, zanim go rozpoczniesz. Trzymaj kilka planów naraz i przełączaj się między nimi — albo uruchom dwa jednocześnie: **plan główny** razem z **planem dodatkowym** (np. krótki blok mobility lub core), bez zastępowania jednego drugim.
 
 ### Elastyczne, własne schematy
 ![Edytor schematu treningowego, przełączanie dni między Trening a Odpoczynek](./screenshots/7.%20workout%20pattern.jpg)
@@ -33,17 +33,17 @@ Brak sztywno zakodowanych dni tygodnia. Zdefiniuj własny schemat treningowy —
 ### Widoki kalendarza
 ![Karty tygodniowego kalendarza z ukończonymi treningami i ich filmami](./screenshots/3.%20workout%20calendar.jpg)
 
-Przeglądaj harmonogram jako klasyczną listę kart, suwak lub nowszy widok **Day Tape** — poziomy pasek dni pogrupowanych tygodniami, z kropką oznaczającą dni treningowe, rozwijający się w pełny widok szczegółów z miniaturką, czasem trwania i tagami. Potrzebujesz przerwy? Zamroź jeden dzień lub cały odcinek bez utraty żadnego treningu — zamrożone dni pokazują powód zamiast treningu, a reszta planu przesuwa się dalej, robiąc na to miejsce.
+Przeglądaj harmonogram jako **Day Tape** — poziomy pasek dni pogrupowanych tygodniami, z kropką oznaczającą dni treningowe, rozwijający się w pełny widok szczegółów z miniaturką, czasem trwania i tagami — albo jako widok **Tygodnia** lub **Siatki**. Twój wybór jest zapamiętywany. Potrzebujesz przerwy? Zamroź jeden dzień lub cały odcinek bez utraty żadnego treningu — zamrożone dni pokazują powód zamiast treningu, a reszta planu przesuwa się dalej, robiąc na to miejsce.
 
 ### Wbudowany odtwarzacz z zapętlaniem i odpoczynkiem
 ![Wbudowany odtwarzacz wideo pokazujący szczegóły treningu, sprzęt i intensywność](./screenshots/4.%20built%20in%20player.jpg)
 
-Odtwarzaj filmy bez wychodzenia z aplikacji — obok nich widzisz cel treningu, potrzebny sprzęt, typ i intensywność. Odtwarzacz może zapętlić film na ustaloną liczbę powtórzeń z odpoczynkiem między każdym z nich, a także osobny, zwykle dłuższy odpoczynek przed kolejnym filmem w planie — koniec z sięganiem po pasek przewijania między rundami.
+Odtwarzaj filmy bez wychodzenia z aplikacji — obok nich widzisz cel treningu, potrzebny sprzęt, typ i intensywność, a pod spodem pozostałe filmy danego dnia. Odtwarzacz może zapętlić film na ustaloną liczbę powtórzeń z odpoczynkiem między każdym z nich, a także osobny, zwykle dłuższy odpoczynek przed kolejnym filmem w planie — koniec z sięganiem po pasek przewijania między rundami.
 
 ### Lokalna biblioteka wideo i filtrowanie
 ![Biblioteka wideo pogrupowana według folderów, z filtrami sprzętu, typu treningu i partii ciała](./screenshots/6.%20library%20search%20%26%20filtering.jpg)
 
-Wskaż MyFitnessPlan swoje lokalne foldery wideo, a aplikacja sama je zeskanuje i uporządkuje. Szukaj i filtruj według sprzętu, typu treningu, partii ciała lub intensywności, żeby znaleźć dokładnie to, czego potrzebujesz — bez przesyłania jakiegokolwiek pliku gdziekolwiek.
+Wskaż MyFitnessPlan swoje lokalne foldery wideo, a aplikacja sama je zeskanuje i uporządkuje. Szukaj i filtruj według sprzętu, typu treningu, partii ciała, intensywności lub długości, żeby znaleźć dokładnie to, czego potrzebujesz — oznacz gwiazdką te, do których wracasz, a trafią do albumu Ulubione — bez przesyłania jakiegokolwiek pliku gdziekolwiek.
 
 ### Oglądanie na telefonie lub tablecie
 
@@ -61,7 +61,7 @@ Zobacz liczbę ukończonych treningów, aktywne dni i miesięczny kalendarz akty
 ### Personalizacja i motywy
 ![Ten sam panel pokazany w trzech różnych motywach kolorystycznych](./screenshots/9.%20themes.jpg)
 
-Dostosuj aplikację do siebie dzięki kilku wbudowanym motywom kolorystycznym — od Midnight i Forest po Pastel Pink i Sky Blue — a także preferencjom języka i układu kalendarza, wszystko w Ustawieniach.
+Dostosuj aplikację do siebie dzięki siedmiu wbudowanym motywom kolorystycznym — Midnight, Sunset, Forest, Pastel Orange, Pastel Pink, Sky Blue i Watermelon — a także preferencjom języka i układu kalendarza, wszystko w Ustawieniach.
 
 ### Dodatkowe funkcje
 - **Zamrażanie planów bez utraty postępów**: zatrzymaj jeden dzień lub cały odcinek (choroba, wyjazd, cokolwiek) i każdy trening, który miał tam wypaść, po prostu przesuwa się na najbliższy wolny dzień
@@ -185,8 +185,9 @@ Musisz samodzielnie pozyskiwać własne materiały treningowe. Używaj wyłączn
 WorkoutPlanner/
 ├── client/          # Frontend React/TypeScript
 │   ├── src/
-│   │   ├── components/
+│   │   ├── components/  # wspólne okna (modal/), plans/, library/, calendar/, log/, ai/, builder/
 │   │   ├── pages/
+│   │   ├── styles/      # tokens.css (motywy) + osobny arkusz dla każdego ekranu
 │   │   └── locales/
 │   └── package.json
 ├── server/          # Backend Node.js

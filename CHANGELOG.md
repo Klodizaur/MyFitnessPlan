@@ -5,6 +5,63 @@ All notable changes to MyFitnessPlan are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-09-24
+
+A ground-up redesign of the whole app. Your plans, videos, log and settings carry over untouched; what changed is how everything looks and feels.
+
+### Changed
+
+**A new look, everywhere**
+
+- Every screen has been redesigned: Dashboard, Library and folders, Plans, the plan builder, the AI plan builder, Calendar, Log, Settings and the Player. It's built on shared colours and components, so all seven themes (Midnight, Sunset, Forest, Pastel Orange, Pastel Pink, Sky Blue and Watermelon) carry the new design, and Settings applies a theme as soon as you pick it.
+- On a phone the header floats and follows you as you scroll, with a bottom tab bar; on a tablet the top bar tightens up so every link fits.
+- Dialogs share one style: a centred card on desktop and a bottom sheet on a phone. Errors and notices appear as pop-ups instead of bare text, and deleting a plan asks you first.
+- Buttons and cards react when you hover or focus them, throughout the app.
+
+**Dashboard**
+
+- Today's workout, your upcoming days and the plans you're running, in the new style. When two plans are active you page between them.
+
+**Library**
+
+- Folders and videos as grids or lists, with hover animations. Hover a video for a play button and an info button; a click opens its details.
+- The folder page sorts subfolders (A → Z, Z → A, most or fewest videos) and videos (A → Z, Z → A, longest or shortest first) separately.
+- Video details, the details editor and the YouTube import each have their own redesigned dialog; the description clean-up button appears only on albums imported from YouTube.
+
+**Plans**
+
+- "Build your own plan" leads the page, and importing is grouped in one menu: from a CSV/TSV sheet, or a plan file exported from the app.
+- Each plan card has a ⋯ menu (edit, change cover, back up, duplicate, delete), and running plans scroll sideways when there's more than one.
+- A new start-plan sheet asks for the start date and whether it's your main or extra plan. The plan preview shows a plan week by week, with grid and list views, and Change plan cover is a dialog of its own.
+
+**Plan builder and AI plan builder**
+
+- Days show their rest days according to the rhythm, the rhythm's length can be changed, and the videos re-deal when it does. Videos on a day show thumbnails and lengths, and a custom category becomes a chip once you press Enter.
+- The AI plan builder is a step-by-step flow (or one page, as before), lets you include or skip subfolders, and shows the drafted days in a sideways preview. You can save the draft straight away or open it in the builder first.
+
+**Calendar**
+
+- Tape, Week and Grid views were rebuilt. The Tape has a switcher for days with several videos, the Week and Grid show rest days clearly, and the view you choose is remembered.
+- The Freeze sheet shows the last frozen day and the day workouts resume.
+
+**Log**
+
+- History and Breakdown are tabs on a phone, and future months can't be opened. Each logged workout has a ⋯ menu (note, date, edit video, remove), and the breakdown chart takes its colours from the theme.
+
+**Player**
+
+- New controls: a scrubber, skip back and forward, speed and fullscreen. Loop is a labelled control with a rest countdown between plays, an "Up next" card follows, and a "Today" strip lists the workout's videos. One button marks a part done and undoes it again.
+
+**Settings**
+
+- Reorganised into sections with a bar that appears when you have unsaved changes.
+
+### Added
+
+- **Favourites.** Star plans and videos; they gather into a Favourites category on Plans and a Favourites album in the Library.
+- **Length filter** (from / up to, with quick ranges) wherever you filter videos, and **Shortest first** alongside Longest first, including in the plan builder.
+- The AI plan builder can leave chosen subfolders out.
+
 ## [1.8.0] - 2026-09-22
 
 ### Added
