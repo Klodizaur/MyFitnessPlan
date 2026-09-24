@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Check, HardDrive, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipForward, Volume2, VolumeX, X } from 'lucide-react';
+import { Check, HardDrive, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipForward, Volume1, Volume2, VolumeX, X } from 'lucide-react';
 import { useMetaLabels } from '../lib/labels';
 import { formatDuration, stripVideoExt, useVideoTags } from '../lib/videoTags';
 import type { Video } from '../types/video';
@@ -47,6 +47,15 @@ export default function Player() {
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
   const [muted, setMuted] = useState(false);
+  // 0-1, kept between videos and visits.
+  const [volume, setVolumeState] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem('playerVolume'));
+      return Number.isFinite(saved) && saved >= 0 && saved <= 1 && localStorage.getItem('playerVolume') !== null ? saved : 1;
+    } catch {
+      return 1;
+    }
+  });
   const [error, setError] = useState<string | null>(null);
   // External videos have no relative_path, so "has a path" can't double as
   // "finished loading" any more.
@@ -466,9 +475,28 @@ export default function Player() {
     if (videoRef.current) videoRef.current.playbackRate = next;
   };
   const toggleMute = () => {
+    // Parked at zero, the speaker means "let me hear it", not "mute".
+    if (volume === 0) {
+      changeVolume(0.5);
+      setMuted(false);
+      if (videoRef.current) videoRef.current.muted = false;
+      return;
+    }
     setMuted(m => !m);
     if (videoRef.current) videoRef.current.muted = !muted;
   };
+  const changeVolume = (value: number) => {
+    const v = Math.min(1, Math.max(0, value));
+    setVolumeState(v);
+    if (videoRef.current) videoRef.current.volume = v;
+    // Dragging the slider up is asking to hear it.
+    if (v > 0 && muted) {
+      setMuted(false);
+      if (videoRef.current) videoRef.current.muted = false;
+    }
+    try { localStorage.setItem('playerVolume', String(v)); } catch { /* not remembered */ }
+  };
+  const silent = muted || volume === 0;
   const onScrub = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     seekTo(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * duration);
@@ -566,6 +594,7 @@ export default function Player() {
                 setDuration(e.currentTarget.duration || 0);
                 // A new source resets the speed, so the chosen one is put back.
                 e.currentTarget.playbackRate = rate;
+                e.currentTarget.volume = volume;
               }}
               onEnded={handleEnded}
               onError={() => setError('Could not play this video. The file may be missing or use an unsupported format.')}
@@ -690,9 +719,22 @@ export default function Player() {
                 <span className="pv-clock">{clock(time)} / {clock(duration)}</span>
                 <span className="pv-grow" />
                 <button type="button" className="pv-speed" onClick={cycleSpeed} aria-label={t('player.speed')}>{rate}×</button>
-                <button type="button" className="pv-desk" onClick={toggleMute} aria-label={t(muted ? 'player.unmute' : 'player.mute')}>
-                  {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                </button>
+                <div className="pv-vol pv-desk">
+                  <button type="button" onClick={toggleMute} aria-label={t(silent ? 'player.unmute' : 'player.mute')}>
+                    {silent ? <VolumeX size={18} /> : volume < 0.5 ? <Volume1 size={18} /> : <Volume2 size={18} />}
+                  </button>
+                  <input
+                    type="range"
+                    className="pv-vol-slider"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={muted ? 0 : volume}
+                    aria-label={t('player.volume')}
+                    style={{ ['--pv-fill' as string]: `${(muted ? 0 : volume) * 100}%` }}
+                    onChange={e => changeVolume(Number(e.target.value))}
+                  />
+                </div>
                 {fullscreenAvailable && (
                   <button type="button" onClick={toggleFullscreen} aria-label={t(isFullscreen ? 'player.fullscreen_exit' : 'player.fullscreen_enter')}>
                     {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}

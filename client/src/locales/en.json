@@ -655,7 +655,8 @@
     "back": "Back",
     "loading": "Loading…",
     "dismiss": "Dismiss",
-    "part_done": "Part done"
+    "part_done": "Part done",
+    "volume": "Volume"
   },
   "import": {
     "btn": "Add from YouTube",

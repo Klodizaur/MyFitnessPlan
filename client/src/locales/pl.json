@@ -730,7 +730,8 @@
     "back": "Wróć",
     "loading": "Wczytywanie…",
     "dismiss": "Zamknij",
-    "part_done": "Część zrobiona"
+    "part_done": "Część zrobiona",
+    "volume": "Głośność"
   },
   "import": {
     "btn": "Dodaj z YouTube",

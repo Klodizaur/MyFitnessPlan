@@ -122,6 +122,22 @@
 .pv-ctrls button:hover { background: rgba(255, 255, 255, 0.16); }
 .pv-ctrls button:first-child { width: 40px; height: 40px; }
 .pv-ctrls .pv-speed { width: auto; height: 28px; padding: 0 9px; border-radius: 8px; background: rgba(255, 255, 255, 0.16); font-family: inherit; font-size: 12px; font-weight: 700; }
+.pv-vol { display: flex; align-items: center; }
+.pv-ctrls .pv-vol button { width: 36px; height: 36px; }
+/* The slider opens out when you point at the speaker or tab to it. */
+.pv-vol-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 0; height: 16px; margin: 0; padding: 0; opacity: 0;
+  background: transparent; cursor: pointer;
+  transition: width 0.2s ease, opacity 0.2s ease, margin 0.2s ease;
+}
+.pv-vol:hover .pv-vol-slider, .pv-vol:focus-within .pv-vol-slider { width: 84px; opacity: 1; margin: 0 8px 0 2px; }
+.pv-vol-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--t-accent) var(--pv-fill, 100%), rgba(255, 255, 255, 0.28) var(--pv-fill, 100%)); }
+.pv-vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.pv-vol-slider::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.28); }
+.pv-vol-slider::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--t-accent); }
+.pv-vol-slider::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #FFFFFF; }
+.pv-vol-slider:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 4px; border-radius: 4px; }
 .pv-clock { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pv-grow { flex: 1; }
 
