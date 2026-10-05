@@ -191,6 +191,10 @@
 /* --- Phone ------------------------------------------------------------------------------------- */
 @media (max-width: 767px) {
   .lg-page { padding-top: 4px; gap: 20px; }
+  /* The range goes on its own line under the heading, where a long custom range fits. */
+  .lg-mix-head { flex-wrap: wrap; align-items: center; }
+  .lg-mix-head h2 { flex-basis: 100%; }
+  .lg-range { white-space: nowrap; }
   .lg-mtabs.rx-seg { margin-top: -8px; }
   .lg-stat { padding: 18px 16px; }
   .lg-stat-value { font-size: 28px; }

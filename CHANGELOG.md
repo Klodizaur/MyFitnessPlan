@@ -5,6 +5,67 @@ All notable changes to MyFitnessPlan are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-10-05
+
+Profiles, so everyone in the house can train with their own plans and progress, an app for Android TV and Fire TV, and plans whose rhythm can change from week to week.
+
+### Added
+
+**Profiles**
+
+- A "Who's training?" screen lets several people share one MyFitnessPlan, each with their own plans, Log, progress, favourites, folders and settings. Tap your avatar in the header to switch.
+- When you update, everything you already have becomes your profile. A short welcome lets you name it, pick a picture or upload your own photo, set a PIN, and choose the language and colour theme. Nothing is moved or changed.
+- Add someone from the "Who's training?" screen: copy your setup (videos folder, favourites and settings, but not your YouTube albums or AI settings) or start from scratch, and choose which of your plans they get a copy of.
+- Each profile can scan its own videos folder, so people can keep their workouts in different places.
+- An optional four-digit PIN keeps a profile to yourself. It never locks anyone out: "Forgot PIN?" on the computer running MyFitnessPlan removes it.
+- Six illustrated avatars (llama, cat, panda, koala, giraffe and deer), or your own photo, automatically cropped and shrunk.
+- AI plan building is set up per profile and starts switched off for new profiles.
+- Settings › My profile: your name, picture and PIN, your backups, and deleting your own profile (you have to type "confirm" first).
+
+**Backups**
+
+- Back up just your own profile: plans, progress, Log, favourites and settings. Your AI key is never included.
+- Automatic backups every day, every 3, 7 or 14 days, into a folder you choose, keeping the newest 5, 10 or 30. Settings shows how many backups are in the folder and how much space they take, opens the folder for you, and warns you if a scheduled backup didn't happen.
+- Restore a backup into your profile, or, from "Add profile", as a new profile, which is how you move to a new computer or start over.
+- On a phone or tablet you can download a backup to the device as well.
+- "Back Up Everything..." in the menu bar/tray icon copies the whole app (every profile, thumbnails, plan covers and photos) into a dated folder.
+
+**Android TV and Fire TV**
+
+- A separate TV app (version 1.0.0) finds MyFitnessPlan on your computer over the home network and shows it on the TV, driven entirely by the remote: arrow keys, OK and Back.
+- A full-screen player built for the remote, with next and previous video, loop and rest, and the remote's media buttons. YouTube videos play inside the app too.
+- Pick your profile and enter your PIN with the remote. Building and editing plans, folder settings and adding profiles stay on the computer.
+- Settings › Devices (desktop app): share MyFitnessPlan on your home network with one switch, and open it on a phone or tablet by scanning a QR code.
+
+**Plans**
+
+- **Week-by-week rhythms.** Besides one repeating cycle (now up to 28 days), a plan's rhythm can be set week by week, for up to 12 weeks, in both the plan builder and the AI plan builder. The builder and the plan preview lay the plan out week by week to match.
+- Plan cards show how many times you've finished a plan, and their ⋯ menu has "View plan". Every run of a plan counts, so a plan you repeat is counted each time.
+
+**Library and Dashboard**
+
+- **Recently added** videos on the Dashboard and the Library page, with the date each one was added.
+- **Newest** and **Oldest** sorting in the Library, in folders and in the plan builder.
+- Videos show how many times you've completed them.
+- A "Show all videos" switch on the Library page lists every video in one place, each with its folder and the date it was added. "Include subfolders" in a folder shows which subfolder each video comes from.
+
+**Log**
+
+- A **tag cloud** in Breakdown: workout types, body parts, equipment and folders, sized by how often you trained them.
+- Pick any **custom date range** on a calendar, or use the quick ranges (last 7 or 30 days, this month, last month, this year).
+
+### Changed
+
+- The Breakdown totals (workouts done, active days, total time, plans finished) now follow the period you choose instead of always showing all time.
+- On a phone, the settings gear opens Settings over the page you're on; tap it again, or the logo, to return exactly where you were. The Settings tabs show an icon with a small label so they all fit.
+- Older Log entries are matched to their videos even after the library was rebuilt, so Breakdown counts all of them.
+
+### Fixed
+
+- On a tablet, the plan builder's filters scroll on their own instead of scrolling the page behind them.
+- Unticking a finished plan no longer removes a finish recorded earlier.
+- The header no longer shifts sideways when you move between pages.
+
 ## [2.0.0] - 2026-09-24
 
 A ground-up redesign of the whole app. Your plans, videos, log and settings carry over untouched; what changed is how everything looks and feels.
