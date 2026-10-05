@@ -80,7 +80,7 @@
 .pb-mobile-tabs .pb-summary { flex: none; text-align: center; font-size: 12px; }
 
 /* --- Details tab -------------------------------------------------------------- */
-.pb-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.pb-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 .pb-details {
   max-width: 720px;
@@ -192,6 +192,14 @@
 }
 
 .pb-rhythm-n { font-size: 11px; font-weight: 700; }
+.pb-rhythm-mode { margin-bottom: 12px; }
+.pb-rhythm-weeks { display: flex; flex-direction: column; gap: 12px; }
+.pb-rhythm-week-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+.pb-rhythm-week-count { color: var(--t-ink-soft, inherit); font-weight: 500; opacity: 0.75; }
+.pb-rhythm-week-remove { margin-left: auto; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 10px; background: transparent; color: var(--t-ink); cursor: pointer; }
+.pb-rhythm-week-remove:disabled { opacity: 0.3; cursor: default; }
+.pb-add-rhythm-week { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: none; border-radius: 12px; background: var(--t-tint); color: var(--t-ink); font-size: 14px; font-weight: 700; cursor: pointer; }
+.pb-add-rhythm-week:disabled { opacity: 0.4; cursor: default; }
 .pb-cycle { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; font-size: 14px; font-weight: 700; }
 .pb-stepper { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 12px; background: var(--t-tint); }
 .pb-stepper button { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 10px; background: transparent; color: var(--t-ink); cursor: pointer; }
@@ -226,6 +234,7 @@
   background: var(--t-side, transparent);
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-right: 1px solid var(--t-border);
   padding: 18px 20px 40px;
 }
@@ -609,6 +618,14 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* The filters sit above the results, outside their scroll area. On a tablet
+     or a phone held sideways they can be taller than the room left, so they
+     scroll on their own instead of running off the bottom of the screen. */
+  flex-shrink: 0;
+  max-height: min(420px, 45vh);
+  max-height: min(420px, 45dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: 16px;
   background: var(--t-surface);
   border: 1px solid var(--t-border);
@@ -670,7 +687,7 @@
   color: var(--t-on-btn);
 }
 
-.pb-pick-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 24px 24px; }
+.pb-pick-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 24px 24px; }
 
 .pb-pick-grid {
   display: grid;

@@ -1,4 +1,5 @@
 import db from './db.js';
+import { PROFILE_VIDEOS } from './profiles.js';
 
 const STOPWORDS = new Set([
   'min', 'max', 'sec', 'the', 'and', 'for', 'with', 'bez',
@@ -61,14 +62,21 @@ export function matchVideo(name: string, videos: { id: string; filename: string 
   return bestId;
 }
 
+/** Re-link a plan's days to videos in its owner's library. */
 export function rematchPlanWorkouts(planId: string) {
+  const owner = (db.prepare('SELECT profile_id FROM workout_plans WHERE id = ?').get(planId) as { profile_id?: string } | undefined)?.profile_id;
+  if (!owner) return;
   const workouts = db.prepare('SELECT id, name, video_ids FROM workouts WHERE plan_id = ?').all(planId) as
     { id: string; name: string; video_ids: string | null }[];
 
   // Match against local videos only. External videos are bound by explicit ID at
   // import time, never by filename, so letting them into the candidate pool
   // would only create opportunities to mis-bind.
-  const videos = db.prepare("SELECT id, filename FROM videos WHERE source = 'local'").all() as { id: string; filename: string }[];
+  // And only against the owner's own library: another profile's videos aren't
+  // theirs to play.
+  const videos = db.prepare(
+    `SELECT id, filename FROM ${PROFILE_VIDEOS} AS videos WHERE source = 'local'`
+  ).all(owner) as { id: string; filename: string }[];
 
   const externalIds = new Set(
     (db.prepare("SELECT id FROM videos WHERE source <> 'local'").all() as { id: string }[]).map(v => v.id)
@@ -101,8 +109,9 @@ export function rematchPlanWorkouts(planId: string) {
   })();
 }
 
-export function rematchAllPlans() {
-  const plans = db.prepare('SELECT id FROM workout_plans').all() as { id: string }[];
+/** Re-link every plan of one profile (after that profile's library changed). */
+export function rematchAllPlans(profileId: string) {
+  const plans = db.prepare('SELECT id FROM workout_plans WHERE profile_id = ?').all(profileId) as { id: string }[];
   for (const plan of plans) {
     rematchPlanWorkouts(plan.id);
   }

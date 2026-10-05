@@ -1,5 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import db from '../db.js';
+import { logVideoResolver } from './library.js';
+import { ownsWorkout, profileHook, PROFILE_VIDEOS } from '../profiles.js';
 
 function parseJsonArray(value: unknown): string[] {
   if (typeof value !== 'string' || !value) return [];
@@ -11,12 +13,40 @@ function parseJsonArray(value: unknown): string[] {
   }
 }
 
+function folderName(row: { relative_path?: string | null; source?: string | null; external_playlist_title?: string | null }): string | null {
+  if ((row.source || 'local') !== 'local') return row.external_playlist_title || null;
+  const parts = (row.relative_path || '').split(/[\\/]/).filter(Boolean);
+  return parts.length > 1 ? parts[0] : null;
+}
+
 export default async function (fastify: FastifyInstance) {
+  // The Log is one person's: every route here reads and writes only theirs.
+  fastify.addHook('preHandler', profileHook);
+
   // Persistent workout history for the Profile page.
   // workout_log rows are denormalized snapshots (so names survive plan edits/deletes),
   // while metadata tags (training type, body parts, intensity, equipment) are joined
   // LIVE from the videos table so the activity summary reflects the latest tagging.
-  fastify.get('/history', async (_request, reply) => {
+  fastify.get('/history', async (request, reply) => {
+    const profileId = request.profileId;
+    // Which video each entry is about, including entries logged before the
+    // library was rebuilt under new IDs — those are matched by filename, so
+    // their tags and folder still count towards the breakdown.
+    const resolve = logVideoResolver(
+      db.prepare(`SELECT id, filename FROM ${PROFILE_VIDEOS} AS videos`).all(profileId) as { id: string; filename: string }[]
+    );
+    const logRefs = db.prepare('SELECT id, video_id, video_filename FROM workout_log WHERE profile_id = ?').all(profileId) as
+      { id: string; video_id: string | null; video_filename: string | null }[];
+    db.exec('CREATE TEMP TABLE IF NOT EXISTS video_match (log_id TEXT PRIMARY KEY, video_id TEXT)');
+    db.exec('DELETE FROM temp.video_match');
+    const addMatch = db.prepare('INSERT INTO temp.video_match (log_id, video_id) VALUES (?, ?)');
+    db.transaction(() => {
+      for (const ref of logRefs) {
+        const id = resolve(ref.video_id, ref.video_filename);
+        if (id) addMatch.run(ref.id, id);
+      }
+    })();
+
     const rows = db.prepare(`
       SELECT
         l.id,
@@ -32,14 +62,20 @@ export default async function (fastify: FastifyInstance) {
         l.notes,
         l.loop_count,
         v.duration_seconds,
+        COALESCE(pv.relative_path, v.relative_path) AS relative_path,
+        v.source,
+        v.external_playlist_title,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.training_type ELSE v.training_type END AS training_type,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.body_parts    ELSE v.body_parts    END AS body_parts,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.intensity     ELSE v.intensity     END AS intensity,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.equipment     ELSE v.equipment     END AS equipment
       FROM workout_log l
-      LEFT JOIN videos v ON v.id = l.video_id
+      LEFT JOIN video_match m ON m.log_id = l.id
+      LEFT JOIN videos v ON v.id = m.video_id
+      LEFT JOIN profile_videos pv ON pv.video_id = v.id AND pv.profile_id = l.profile_id
+      WHERE l.profile_id = ?
       ORDER BY l.completed_date DESC, l.completed_at DESC
-    `).all() as any[];
+    `).all(profileId) as any[];
 
     const entries = rows.map(r => ({
       id: r.id,
@@ -63,6 +99,9 @@ export default async function (fastify: FastifyInstance) {
       bodyParts: parseJsonArray(r.body_parts),
       intensity: r.intensity || null,
       equipment: parseJsonArray(r.equipment),
+      // The Library folder the video lives in: a playlist's name for an import,
+      // else the top-level folder. Null for loose videos and manual entries.
+      folder: folderName(r),
     }));
 
     return reply.send({ entries });
@@ -90,11 +129,11 @@ export default async function (fastify: FastifyInstance) {
       return reply.code(400).send({ error: 'completedDate is not a valid calendar date' });
     }
 
-    const update = db.prepare('UPDATE workout_log SET completed_date = ? WHERE id = ?');
+    const update = db.prepare('UPDATE workout_log SET completed_date = ? WHERE id = ? AND profile_id = ?');
     const applyUpdates = db.transaction((entryIds: string[]) => {
       let updated = 0;
       for (const id of entryIds) {
-        updated += update.run(completedDate, id).changes;
+        updated += update.run(completedDate, id, request.profileId).changes;
       }
       return updated;
     });
@@ -117,11 +156,11 @@ export default async function (fastify: FastifyInstance) {
     }
     const value = notes.trim().slice(0, 2000) || null;
 
-    const update = db.prepare('UPDATE workout_log SET notes = ? WHERE id = ?');
+    const update = db.prepare('UPDATE workout_log SET notes = ? WHERE id = ? AND profile_id = ?');
     const applyUpdates = db.transaction((entryIds: string[]) => {
       let updated = 0;
       for (const id of entryIds) {
-        updated += update.run(value, id).changes;
+        updated += update.run(value, id, request.profileId).changes;
       }
       return updated;
     });
@@ -207,9 +246,9 @@ export default async function (fastify: FastifyInstance) {
 
     const insert = db.prepare(`
       INSERT INTO workout_log
-        (id, workout_id, video_id, plan_name, workout_name, video_filename, thumbnail_path,
+        (profile_id, id, workout_id, video_id, plan_name, workout_name, video_filename, thumbnail_path,
          completed_date, is_manual, training_type, body_parts, intensity, equipment, loop_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
     `);
 
     const workoutIds: string[] = [];
@@ -220,7 +259,7 @@ export default async function (fastify: FastifyInstance) {
       for (const v of videos) {
         const wid = `manual-${nanoid()}`;
         workoutIds.push(wid);
-        insert.run(nanoid(), wid, v.id, null,
+        insert.run(request.profileId, nanoid(), wid, v.id, null,
           v.filename ? stripExt(v.filename) : (name || null),
           v.filename, v.thumbnail_path, completedDate,
           null, null, null, null, loopCount);
@@ -229,7 +268,7 @@ export default async function (fastify: FastifyInstance) {
       if (name) {
         const wid = `manual-${nanoid()}`;
         workoutIds.push(wid);
-        insert.run(nanoid(), wid, null, null, name, null, null, completedDate,
+        insert.run(request.profileId, nanoid(), wid, null, null, name, null, null, completedDate,
           JSON.stringify(trainingType), JSON.stringify(bodyParts), intensity, JSON.stringify(equipment), null);
       }
     });
@@ -247,12 +286,18 @@ export default async function (fastify: FastifyInstance) {
    * completion history by design, and deleting one takes its history with it,
    * so this is "plans in the app you've finished", not an all-time tally.
    */
-  fastify.get('/plan-progress', async (_request, reply) => {
+  fastify.get('/plan-progress', async (request, reply) => {
+    const profileId = request.profileId;
     const plans = db.prepare(
-      'SELECT id, name, is_active, category FROM workout_plans ORDER BY uploaded_at DESC'
-    ).all() as any[];
-    const workouts = db.prepare('SELECT id, plan_id, video_ids FROM workouts').all() as any[];
-    const history = db.prepare('SELECT workout_id, video_id FROM history').all() as any[];
+      'SELECT id, name, is_active, category FROM workout_plans WHERE profile_id = ? ORDER BY uploaded_at DESC'
+    ).all(profileId) as any[];
+    const workouts = db.prepare(
+      'SELECT id, plan_id, video_ids FROM workouts WHERE plan_id IN (SELECT id FROM workout_plans WHERE profile_id = ?)'
+    ).all(profileId) as any[];
+    const history = db.prepare(`
+      SELECT workout_id, video_id FROM history
+      WHERE workout_id IN (SELECT w.id FROM workouts w JOIN workout_plans p ON p.id = w.plan_id WHERE p.profile_id = ?)
+    `).all(profileId) as any[];
 
     const doneWorkouts = new Set(history.filter(h => !h.video_id).map(h => h.workout_id));
     const doneVideos = new Set(history.filter(h => h.video_id).map(h => `${h.workout_id}:${h.video_id}`));
@@ -285,8 +330,9 @@ export default async function (fastify: FastifyInstance) {
     const finished = db.prepare(`
       SELECT id, plan_id, plan_name, workout_count, started_on, finished_on, days_taken
       FROM plan_completions
+      WHERE profile_id = ?
       ORDER BY finished_on DESC, finished_at DESC
-    `).all() as any[];
+    `).all(profileId) as any[];
 
     return reply.send({
       plans: progress,
@@ -309,7 +355,7 @@ export default async function (fastify: FastifyInstance) {
   fastify.delete('/plan-completions/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     if (!id) return reply.code(400).send({ error: 'id is required' });
-    const result = db.prepare('DELETE FROM plan_completions WHERE id = ?').run(id);
+    const result = db.prepare('DELETE FROM plan_completions WHERE id = ? AND profile_id = ?').run(id, request.profileId);
     return reply.send({ success: true, deleted: result.changes });
   });
 
@@ -331,8 +377,11 @@ export default async function (fastify: FastifyInstance) {
     let deleted = 0;
     let unmarked = 0;
     db.transaction(() => {
-      deleted = db.prepare('DELETE FROM workout_log WHERE workout_id = ?').run(workoutId).changes;
-      unmarked = db.prepare('DELETE FROM history WHERE workout_id = ?').run(workoutId).changes;
+      deleted = db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND profile_id = ?').run(workoutId, request.profileId).changes;
+      // The calendar tick goes too — but only on a plan that's yours.
+      if (ownsWorkout(request.profileId, workoutId)) {
+        unmarked = db.prepare('DELETE FROM history WHERE workout_id = ?').run(workoutId).changes;
+      }
     })();
 
     return reply.send({ success: true, deleted, unmarked });

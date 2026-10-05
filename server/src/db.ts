@@ -225,6 +225,44 @@ if (!codecInfo.some((c: any) => c.name === 'codec_probed')) {
   db.exec('ALTER TABLE videos ADD COLUMN codec_probed INTEGER DEFAULT 0');
 }
 
+// When a local file appeared on this computer (its creation date), for the
+// dashboard's "Recently added". `added_at` can't do that job: it's when the scan
+// first saw the file, and a first scan stamps the whole library with the same
+// minute. Set by the scan; existing rows are filled in from disk just below.
+if (!codecInfo.some((c: any) => c.name === 'file_created_at')) {
+  db.exec('ALTER TABLE videos ADD COLUMN file_created_at TEXT');
+}
+
+/**
+ * A file's creation date as ISO text, or null when it can't be read (the file
+ * moved, or its drive is unplugged). Filesystems that don't record one report
+ * 0, so the last-modified time stands in there.
+ */
+export function fileCreatedAt(filepath: string): string | null {
+  try {
+    const stat = fs.statSync(filepath);
+    const ms = stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs;
+    return new Date(ms).toISOString();
+  } catch {
+    return null;
+  }
+}
+
+// Backfill once per start for files the scan hasn't dated yet. Only stats files,
+// so it's quick, and anything unreachable is just left for the next scan.
+{
+  const undated = db.prepare(
+    "SELECT id, filepath FROM videos WHERE file_created_at IS NULL AND (source IS NULL OR source = 'local')"
+  ).all() as { id: string; filepath: string }[];
+  const setDate = db.prepare('UPDATE videos SET file_created_at = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const row of undated) {
+      const created = fileCreatedAt(row.filepath);
+      if (created) setDate.run(created, row.id);
+    }
+  })();
+}
+
 const planInfo = db.pragma("table_info('workout_plans')") as any[];
 const hasBackgroundImage = planInfo.some(col => col.name === 'background_image');
 if (!hasBackgroundImage) {
@@ -388,5 +426,181 @@ db.exec(`
     UNIQUE(plan_id, date)
   );
 `);
+
+// --- Profiles ---------------------------------------------------------------
+//
+// Several people can share one install, each with their own plans, progress,
+// log, favourites, settings and library folder. The video files themselves —
+// and their tags, descriptions and thumbnails — are shared: a video is the same
+// video whoever watches it.
+//
+// Upgrading an install that predates profiles must not lose anything, so this
+// only ever adds: a full copy of the database is saved first, then every
+// existing row is labelled as belonging to the first profile. Nothing is moved
+// or deleted. Tables that hang off a plan (workouts, history, plan_freezes)
+// belong to whoever owns the plan and need no column of their own.
+
+/** Settings each profile keeps for itself; everything else in `settings` is shared. */
+export const PER_PROFILE_SETTINGS = [
+  'workout_pattern', 'theme', 'calendar_view', 'video_directory', 'exclude_paths', 'start_date',
+] as const;
+
+export const BACKUP_DIR = path.join(dataDir, 'backups');
+
+/** A consistent, standalone copy of the whole database (WAL included). */
+export function backupDatabase(reason: string): string {
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupPath = path.join(BACKUP_DIR, `workout-planner-${reason}-${stamp}.db`);
+  db.prepare('VACUUM INTO ?').run(backupPath);
+  console.log(`[Backup] Saved ${backupPath}`);
+  return backupPath;
+}
+
+const hasProfilesTable = Boolean(
+  db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'profiles'").get()
+);
+if (!hasProfilesTable) {
+  const hasData = Boolean(db.prepare('SELECT 1 FROM videos LIMIT 1').get())
+    || Boolean(db.prepare('SELECT 1 FROM workout_plans LIMIT 1').get())
+    || Boolean(db.prepare('SELECT 1 FROM workout_log LIMIT 1').get());
+  if (hasData) backupDatabase('before-profiles');
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS profiles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',
+    avatar TEXT NOT NULL DEFAULT 'avatar-1',
+    pin_hash TEXT,
+    -- Bumped whenever the PIN changes, which signs every device out of it.
+    token_version INTEGER NOT NULL DEFAULT 0,
+    -- 0 until the welcome wizard has given the profile a name.
+    setup_done INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS profile_settings (
+    profile_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT,
+    PRIMARY KEY (profile_id, key)
+  );
+
+  -- Which videos are in each profile's library. The path is relative to that
+  -- profile's own library folder, since two profiles' folders can differ (or
+  -- one can sit inside the other); the favourite star is per person too.
+  CREATE TABLE IF NOT EXISTS profile_videos (
+    profile_id TEXT NOT NULL,
+    video_id TEXT NOT NULL,
+    relative_path TEXT NOT NULL DEFAULT '',
+    is_favorite INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (profile_id, video_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_profile_videos_video ON profile_videos(video_id);
+`);
+
+// 0 for a video that's only there because one of the profile's plans uses it:
+// playable in that plan, but not part of the library they browse.
+if (!(db.pragma("table_info('profile_videos')") as any[]).some((c: any) => c.name === 'in_library')) {
+  db.exec('ALTER TABLE profile_videos ADD COLUMN in_library INTEGER NOT NULL DEFAULT 1');
+}
+
+for (const table of ['workout_plans', 'workout_log', 'plan_completions']) {
+  const cols = db.pragma(`table_info('${table}')`) as any[];
+  if (!cols.some((c: any) => c.name === 'profile_id')) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN profile_id TEXT`);
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_${table}_profile ON ${table}(profile_id)`);
+}
+
+/** The first profile: the one an upgraded install's existing data belongs to. */
+export const FIRST_PROFILE_ID = 'p1';
+
+db.transaction(() => {
+  const anyProfile = db.prepare('SELECT id FROM profiles LIMIT 1').get();
+  if (!anyProfile) {
+    db.prepare('INSERT INTO profiles (id) VALUES (?)').run(FIRST_PROFILE_ID);
+    // Its settings start as whatever the install had.
+    const copySetting = db.prepare(
+      'INSERT OR IGNORE INTO profile_settings (profile_id, key, value) SELECT ?, key, value FROM settings WHERE key = ?'
+    );
+    for (const key of PER_PROFILE_SETTINGS) copySetting.run(FIRST_PROFILE_ID, key);
+    // And its library is everything already in the app, favourites included.
+    db.prepare(`
+      INSERT OR IGNORE INTO profile_videos (profile_id, video_id, relative_path, is_favorite)
+      SELECT ?, id, COALESCE(relative_path, ''), COALESCE(is_favorite, 0) FROM videos
+    `).run(FIRST_PROFILE_ID);
+  }
+
+  // Anything still unlabelled — on the upgrade, all of it — belongs to the
+  // oldest profile. Idempotent, so it costs nothing on later starts.
+  const owner = (db.prepare('SELECT id FROM profiles ORDER BY created_at ASC, rowid ASC LIMIT 1').get() as { id: string }).id;
+  for (const table of ['workout_plans', 'workout_log', 'plan_completions']) {
+    db.prepare(`UPDATE ${table} SET profile_id = ? WHERE profile_id IS NULL`).run(owner);
+  }
+})();
+
+/**
+ * Make sure every video a plan uses is in its owner's library — a plan copied
+ * to someone whose own folder doesn't hold those videos would otherwise open
+ * empty. The path comes from whoever already has the video (it's only used to
+ * group it into a folder; playback goes by the file itself). Pass a plan id to
+ * do just that plan; with none it repairs every plan, which runs on each start.
+ */
+export function ensurePlanVideosInLibrary(planId?: string): number {
+  return db.prepare(`
+    INSERT OR IGNORE INTO profile_videos (profile_id, video_id, relative_path, in_library)
+    SELECT DISTINCT p.profile_id, v.id,
+      COALESCE((SELECT x.relative_path FROM profile_videos x WHERE x.video_id = v.id LIMIT 1), v.relative_path, ''),
+      0
+    FROM workout_plans p
+    JOIN workouts w ON w.plan_id = p.id, json_each(CASE WHEN json_valid(w.video_ids) THEN w.video_ids ELSE '[]' END) j
+    JOIN videos v ON v.id = j.value
+    WHERE p.profile_id IS NOT NULL ${planId ? 'AND p.id = ?' : ''}
+  `).run(...(planId ? [planId] : [])).changes;
+}
+
+// AI settings (provider, model, API key…) became per profile: whoever set them
+// up before profiles existed keeps them, on the first profile. Copied once,
+// marked so it never repeats; the old shared rows are left where they were.
+db.transaction(() => {
+  if (db.prepare("SELECT 1 FROM settings WHERE key = 'profiles_ai_moved'").get()) return;
+  const owner = (db.prepare('SELECT id FROM profiles ORDER BY created_at ASC, rowid ASC LIMIT 1').get() as { id: string }).id;
+  db.prepare(`
+    INSERT OR IGNORE INTO profile_settings (profile_id, key, value)
+    SELECT ?, key, value FROM settings WHERE substr(key, 1, 3) = 'ai_'
+  `).run(owner);
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('profiles_ai_moved', '1')").run();
+})();
+
+const repaired = ensurePlanVideosInLibrary();
+if (repaired) console.log(`[Profiles] Added ${repaired} plan video(s) to their owners' libraries`);
+
+/**
+ * Which local videos a profile browses: exactly the ones under its own library
+ * folder. Anything else it has (a copied plan's videos from someone else's
+ * folder) stays for the plan but out of the Library. Re-derived on each start,
+ * so it also tidies profiles from before the flag existed.
+ */
+export function syncLibraryFlags(profileId?: string): void {
+  const profiles = (profileId
+    ? [{ id: profileId }]
+    : db.prepare('SELECT id FROM profiles').all()) as { id: string }[];
+  const dirOf = db.prepare("SELECT value FROM profile_settings WHERE profile_id = ? AND key = 'video_directory'");
+  const update = db.prepare(`
+    UPDATE profile_videos SET in_library = CASE
+      WHEN ? <> '' AND (SELECT substr(v.filepath, 1, ?) FROM videos v WHERE v.id = profile_videos.video_id) = ? THEN 1 ELSE 0 END
+    WHERE profile_id = ? AND video_id IN (SELECT id FROM videos WHERE source = 'local')
+  `);
+  db.transaction(() => {
+    for (const { id } of profiles) {
+      const dir = ((dirOf.get(id) as { value: string | null } | undefined)?.value || '').replace(/[\\/]+$/, '');
+      const prefix = dir ? dir + path.sep : '';
+      update.run(prefix, prefix.length, prefix, id);
+    }
+  })();
+}
+syncLibraryFlags();
 
 export default db;

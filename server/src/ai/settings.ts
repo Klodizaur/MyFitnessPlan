@@ -8,6 +8,7 @@
  * client through it.
  */
 import db from '../db.js';
+import { AsyncLocalStorage } from 'async_hooks';
 
 /** Every settings key this module owns. Used to hide them from /api/settings. */
 export const AI_SETTINGS_PREFIX = 'ai_';
@@ -72,19 +73,33 @@ const DEFAULT_MODEL: Record<AiProvider, string> = {
   openai: '',
 };
 
-const readStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
-const writeStmt = db.prepare(
-  'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
-);
+/**
+ * Whose AI settings are in play. Each profile has its own — above all its own
+ * API key, which nobody else on the install should be spending — so every AI
+ * request runs inside `aiProfile.run(profileId, …)` (see routes/ai.ts), and
+ * anything it starts, like the background description clean-up, carries that
+ * profile along. Outside a profile there are no settings: AI is simply off.
+ */
+export const aiProfile = new AsyncLocalStorage<string>();
+
+const readStmt = db.prepare('SELECT value FROM profile_settings WHERE profile_id = ? AND key = ?');
+const writeStmt = db.prepare(`
+  INSERT INTO profile_settings (profile_id, key, value) VALUES (?, ?, ?)
+  ON CONFLICT(profile_id, key) DO UPDATE SET value = excluded.value
+`);
 
 function read(key: string): string {
-  const row = readStmt.get(`${AI_SETTINGS_PREFIX}${key}`) as { value?: string } | undefined;
+  const profileId = aiProfile.getStore();
+  if (!profileId) return '';
+  const row = readStmt.get(profileId, `${AI_SETTINGS_PREFIX}${key}`) as { value?: string | null } | undefined;
   return (row?.value ?? '').trim();
 }
 
 /** Named so the (key, value) order can't be flipped at the call site. */
 function write(key: string, value: string): void {
-  writeStmt.run(`${AI_SETTINGS_PREFIX}${key}`, value);
+  const profileId = aiProfile.getStore();
+  if (!profileId) throw new Error('AI settings saved outside a profile');
+  writeStmt.run(profileId, `${AI_SETTINGS_PREFIX}${key}`, value);
 }
 
 export function getAiSettings(): AiSettings {

@@ -20,6 +20,7 @@
  * particular the tagging on it — is reused as-is and never written to.
  */
 import db from './db.js';
+import { PROFILE_VIDEOS } from './profiles.js';
 import { nanoid } from 'nanoid';
 
 export const PLAN_EXPORT_FORMAT = 'myfitnessplan.plan';
@@ -110,15 +111,25 @@ function toExportedVideo(row: any): ExportedVideo {
   };
 }
 
-/** Export every plan, or just the ones named. */
-export function exportPlans(planIds: string[] | null, appVersion: string): PlanExportFile {
+/** Export every one of a profile's plans, or just the ones named. */
+export function exportPlans(profileId: string, planIds: string[] | null, appVersion: string): PlanExportFile {
   const plans = (planIds && planIds.length
     ? planIds
-        .map(id => db.prepare('SELECT * FROM workout_plans WHERE id = ?').get(id))
+        .map(id => db.prepare('SELECT * FROM workout_plans WHERE id = ? AND profile_id = ?').get(id, profileId))
         .filter(Boolean)
-    : db.prepare('SELECT * FROM workout_plans ORDER BY uploaded_at ASC').all()) as any[];
+    : db.prepare('SELECT * FROM workout_plans WHERE profile_id = ? ORDER BY uploaded_at ASC').all(profileId)) as any[];
 
-  const videoStmt = db.prepare('SELECT * FROM videos WHERE id = ?');
+  // The path written out is the one from this profile's own library folder.
+  const rowStmt = db.prepare('SELECT * FROM videos WHERE id = ?');
+  const pathStmt = db.prepare('SELECT relative_path FROM profile_videos WHERE profile_id = ? AND video_id = ?');
+  const videoStmt = {
+    get(id: string) {
+      const row = rowStmt.get(id) as any;
+      if (!row) return undefined;
+      const own = pathStmt.get(profileId, id) as { relative_path: string } | undefined;
+      return own ? { ...row, relative_path: own.relative_path } : row;
+    },
+  };
 
   return {
     format: PLAN_EXPORT_FORMAT,
@@ -175,7 +186,7 @@ export interface ResolvedVideo {
  * would quietly put a video you never chose into a plan someone sent you. An
  * empty slot is honest; the Plans page can rematch on request afterwards.
  */
-export function resolveVideo(ref: ExportedVideo): ResolvedVideo {
+export function resolveVideo(profileId: string, ref: ExportedVideo): ResolvedVideo {
   if ((ref.source || 'local') !== 'local') {
     if (!ref.externalId) return { existingId: null, creatable: false, ref };
     const existing = db
@@ -187,14 +198,15 @@ export function resolveVideo(ref: ExportedVideo): ResolvedVideo {
     return { existingId: existing?.id || null, creatable: true, ref };
   }
 
+  // Local files only count when they're in this profile's own library.
   const byPath = ref.relativePath
-    ? (db.prepare("SELECT id FROM videos WHERE source = 'local' AND relative_path = ?").get(ref.relativePath) as { id: string } | undefined)
+    ? (db.prepare(`SELECT id FROM ${PROFILE_VIDEOS} AS videos WHERE source = 'local' AND relative_path = ?`).get(profileId, ref.relativePath) as { id: string } | undefined)
     : undefined;
   if (byPath) return { existingId: byPath.id, creatable: false, ref };
 
   const byName = db
-    .prepare("SELECT id FROM videos WHERE source = 'local' AND filename = ?")
-    .get(ref.title) as { id: string } | undefined;
+    .prepare(`SELECT id FROM ${PROFILE_VIDEOS} AS videos WHERE source = 'local' AND filename = ?`)
+    .get(profileId, ref.title) as { id: string } | undefined;
   if (byName) return { existingId: byName.id, creatable: false, ref };
 
   // A local file this machine hasn't got cannot be conjured from a name.
@@ -245,11 +257,11 @@ export function validateExportFile(data: any): { ok: true; file: PlanExportFile 
  * A name nothing else is using. Imports never overwrite a plan, so a repeat
  * import lands beside the first rather than on top of it.
  */
-function uniquePlanName(name: string, alsoTaken: Set<string>): string {
+function uniquePlanName(profileId: string, name: string, alsoTaken: Set<string>): string {
   const base = (name || 'Imported plan').slice(0, 200);
   const taken = (suffix: string) =>
     alsoTaken.has(suffix) ||
-    Boolean(db.prepare('SELECT id FROM workout_plans WHERE name = ?').get(suffix));
+    Boolean(db.prepare('SELECT id FROM workout_plans WHERE name = ? AND profile_id = ?').get(suffix, profileId));
 
   if (!taken(base)) return base;
   for (let n = 2; n < 1000; n++) {
@@ -260,7 +272,7 @@ function uniquePlanName(name: string, alsoTaken: Set<string>): string {
 }
 
 /** What an import would do, without doing any of it. */
-export function analyzeImport(file: PlanExportFile): PlanImportReport[] {
+export function analyzeImport(profileId: string, file: PlanExportFile): PlanImportReport[] {
   const namesTaken = new Set<string>();
 
   return file.plans.map(plan => {
@@ -275,7 +287,7 @@ export function analyzeImport(file: PlanExportFile): PlanImportReport[] {
       for (const ref of workout.videos) {
         videoCount++;
         if (ref.externalPlaylistId) playlists.set(ref.externalPlaylistId, ref.externalPlaylistTitle ?? null);
-        const resolved = resolveVideo(ref);
+        const resolved = resolveVideo(profileId, ref);
         if (resolved.existingId) matched++;
         else if (resolved.creatable) willCreate++;
         else {
@@ -285,7 +297,7 @@ export function analyzeImport(file: PlanExportFile): PlanImportReport[] {
       }
     }
 
-    const importedAs = uniquePlanName(plan.name, namesTaken);
+    const importedAs = uniquePlanName(profileId, plan.name, namesTaken);
     namesTaken.add(importedAs);
 
     return {
@@ -307,8 +319,8 @@ export function analyzeImport(file: PlanExportFile): PlanImportReport[] {
  * new video rows only for external references nothing already covers. No
  * existing row is updated, so tagging you have already corrected stays yours.
  */
-export function importPlans(file: PlanExportFile): { reports: PlanImportReport[]; planIds: string[] } {
-  const reports = analyzeImport(file);
+export function importPlans(profileId: string, file: PlanExportFile): { reports: PlanImportReport[]; planIds: string[] } {
+  const reports = analyzeImport(profileId, file);
   const planIds: string[] = [];
   const today = new Date().toISOString().split('T')[0];
 
@@ -321,9 +333,14 @@ export function importPlans(file: PlanExportFile): { reports: PlanImportReport[]
   `);
   const insertPlan = db.prepare(`
     INSERT INTO workout_plans
-      (id, name, is_active, start_date, category, description, background_blur, workout_pattern)
-    VALUES (?, ?, 0, ?, ?, ?, ?, ?)
+      (id, profile_id, name, is_active, start_date, category, description, background_blur, workout_pattern)
+    VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?)
   `);
+  // An imported YouTube video joins the importer's library.
+  const addToLibrary = db.prepare(
+    `INSERT INTO profile_videos (profile_id, video_id, relative_path, in_library) VALUES (?, ?, '', 1)
+     ON CONFLICT(profile_id, video_id) DO UPDATE SET in_library = 1`
+  );
   const insertWorkout = db.prepare(
     'INSERT INTO workouts (id, plan_id, name, sequence_order, video_ids) VALUES (?, ?, ?, ?, ?)'
   );
@@ -334,6 +351,7 @@ export function importPlans(file: PlanExportFile): { reports: PlanImportReport[]
       planIds.push(planId);
       insertPlan.run(
         planId,
+        profileId,
         reports[planIndex].importedAs,
         // An imported plan starts today and inactive: it is something to look
         // at and activate deliberately, not something that silently takes over
@@ -348,9 +366,10 @@ export function importPlans(file: PlanExportFile): { reports: PlanImportReport[]
       plan.workouts.forEach((workout, index) => {
         const ids: string[] = [];
         for (const ref of workout.videos) {
-          const resolved = resolveVideo(ref);
+          const resolved = resolveVideo(profileId, ref);
           if (resolved.existingId) {
             ids.push(resolved.existingId);
+            if ((ref.source || 'local') !== 'local') addToLibrary.run(profileId, resolved.existingId);
             continue;
           }
           if (!resolved.creatable) continue; // a local file this machine hasn't got
@@ -371,6 +390,7 @@ export function importPlans(file: PlanExportFile): { reports: PlanImportReport[]
             ref.externalPlaylistId ?? null,
             ref.externalPlaylistTitle ?? null
           );
+          addToLibrary.run(profileId, videoId);
           ids.push(videoId);
         }
         insertWorkout.run(

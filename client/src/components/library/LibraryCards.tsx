@@ -1,8 +1,24 @@
-import { ChevronRight, Heart, Info, MoreVertical, Play, Plus } from 'lucide-react';
+import { Check, ChevronRight, Folder, Heart, Info, MoreVertical, Play, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import YouTubeGlyph from '../icons/YouTubeGlyph';
 import { VideoTag, formatDuration, stripVideoExt, useVideoTags } from '../../lib/videoTags';
 import { Video } from '../../types/video';
+
+/**
+ * "✓ 3" on a video's thumbnail: how many times it's been done. Nothing for a
+ * video never completed, so the badge reads as an achievement, not a zero.
+ */
+export function CompletedBadge({ count, labelKey = 'library.completed_times' }: { count?: number; labelKey?: string }) {
+  const { t } = useTranslation();
+  if (!count) return null;
+  const label = t(labelKey, { count });
+  return (
+    <span className="rx-done-badge" title={label} aria-label={label}>
+      <Check size={12} strokeWidth={3} />
+      {count}
+    </span>
+  );
+}
 
 /** Read-only tag row. Capped to one or two rows; extra tags drop out whole. */
 export function TagRow({ tags, rows = 1 }: { tags: VideoTag[]; rows?: 1 | 2 }) {
@@ -116,6 +132,8 @@ interface VideoItemProps {
   video: Video;
   /** Folder path shown under the title, relative to where you are. */
   meta?: string;
+  /** Any other line under the title, shown plainly (e.g. "2 days ago"). */
+  note?: string;
   onOpen: () => void;
   onMenu?: () => void;
   /** Plays the video. With `onInfo`, the pair shows over the thumbnail on hover. */
@@ -124,6 +142,23 @@ interface VideoItemProps {
   onInfo?: () => void;
   /** Toggles the star. Omit to hide the heart. */
   onFavorite?: () => void;
+}
+
+/**
+ * The line under a video's title: its folder and/or a note such as when it was
+ * added ("📁 Hantle · 2 months ago"). The folder gets a folder icon, so it
+ * doesn't read as a tag that lost its colours.
+ */
+function VideoMeta({ folder, note }: { folder?: string; note?: string }) {
+  if (!folder && !note) return null;
+  return (
+    <span className="lib-video-meta lib-video-meta--line" title={[folder, note].filter(Boolean).join(' · ')}>
+      {folder && <Folder size={12} aria-hidden="true" />}
+      {folder && <span className="lib-video-meta-folder">{folder}</span>}
+      {folder && note && <span aria-hidden="true">·</span>}
+      {note && <span className="lib-video-meta-note">{note}</span>}
+    </span>
+  );
 }
 
 /** Play and info, over a thumbnail, on hover. Siblings of the card's own button —
@@ -149,7 +184,7 @@ function HoverActions({ onPlay, onInfo }: { onPlay?: () => void; onInfo?: () => 
 }
 
 /** A video as a grid card: thumbnail, duration, 2-line title, path, one tag row. */
-export function VideoGridCard({ video, meta, onOpen, onPlay, onInfo, onFavorite }: VideoItemProps) {
+export function VideoGridCard({ video, meta, note, onOpen, onPlay, onInfo, onFavorite }: VideoItemProps) {
   const { t } = useTranslation();
   const tagsFor = useVideoTags();
   const duration = formatDuration(video.duration_seconds);
@@ -163,9 +198,10 @@ export function VideoGridCard({ video, meta, onOpen, onPlay, onInfo, onFavorite 
           ? <img src={`/thumbnails/${video.thumbnail_path}`} alt="" loading="lazy" />
           : <span className="lib-video-noimg" />}
         {duration && <span className="rx-dur">{duration}</span>}
+        <CompletedBadge count={video.completed_count} />
       </span>
       <span className="lib-video-title rx-clamp-2">{stripVideoExt(video.filename)}</span>
-      {meta && <span className="lib-video-meta">{meta}</span>}
+      <VideoMeta folder={meta} note={note} />
       <TagRow tags={tagsFor(video)} rows={1} />
     </button>
     <HoverActions onPlay={onPlay} onInfo={onInfo} />
@@ -186,7 +222,7 @@ export function VideoGridCard({ video, meta, onOpen, onPlay, onInfo, onFavorite 
 }
 
 /** The same video as a list row: bigger thumbnail, up to two tag rows. */
-export function VideoListRow({ video, meta, onOpen, onMenu, onPlay, onInfo, onFavorite }: VideoItemProps) {
+export function VideoListRow({ video, meta, note, onOpen, onMenu, onPlay, onInfo, onFavorite }: VideoItemProps) {
   const { t } = useTranslation();
   const tagsFor = useVideoTags();
   const duration = formatDuration(video.duration_seconds);
@@ -199,10 +235,11 @@ export function VideoListRow({ video, meta, onOpen, onMenu, onPlay, onInfo, onFa
             ? <img src={`/thumbnails/${video.thumbnail_path}`} alt="" loading="lazy" />
             : <span className="lib-video-noimg" />}
           {duration && <span className="rx-dur">{duration}</span>}
+          <CompletedBadge count={video.completed_count} />
         </span>
         <span className="lib-video-row-text">
           <span className="lib-video-title rx-clamp-2">{stripVideoExt(video.filename)}</span>
-          {meta && <span className="lib-video-meta">{meta}</span>}
+          <VideoMeta folder={meta} note={note} />
           <TagRow tags={tagsFor(video)} rows={2} />
         </span>
       </button>

@@ -20,6 +20,8 @@ export type LogEntry = {
   bodyParts: string[];
   intensity: string | null;
   equipment: string[];
+  /** The Library folder (or imported playlist) the video lives in; null when there's none. */
+  folder: string | null;
 };
 
 /** A plan carried to the end. Kept even after the plan is edited or deleted. */

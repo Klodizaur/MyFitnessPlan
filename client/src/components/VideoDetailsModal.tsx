@@ -11,6 +11,7 @@ import YouTubeGlyph from './icons/YouTubeGlyph';
 import Modal, { CloseButton } from './modal/Modal';
 import { TagRow } from './library/LibraryCards';
 import { VideoEditForm } from './VideoMetadataEditor';
+import { useRootFolderName } from '../lib/rootFolder';
 
 type Props = {
   video: Video;
@@ -27,6 +28,7 @@ type Props = {
  */
 export default function VideoDetailsModal({ video: initial, onClose, onSaved, onRequestEdit }: Props) {
   const { t } = useTranslation();
+  const rootName = useRootFolderName();
   const navigate = useNavigate();
   const tagsFor = useVideoTags();
   // Kept locally so the details show what was just saved without waiting for the parent.
@@ -87,7 +89,7 @@ export default function VideoDetailsModal({ video: initial, onClose, onSaved, on
               ? video.external_playlist_title || t('library.untitled_playlist')
               : dirs.length > 0
                 ? dirs.map((d, i) => <span key={i} style={{ display: 'contents' }}>{i > 0 && <ChevronRight size={13} />}{d}</span>)
-                : t('library.root_folder')}
+                : rootName}
             {ext && <em>· {ext}</em>}
           </div>
 

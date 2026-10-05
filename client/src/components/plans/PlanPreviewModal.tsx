@@ -5,6 +5,7 @@ import { isTv } from '../../lib/tv';
 import Modal from '../modal/Modal';
 import { TagRow } from '../library/LibraryCards';
 import { formatDuration, stripVideoExt, useVideoTags } from '../../lib/videoTags';
+import { groupBySlots } from '../../lib/builderModel';
 import type { Video } from '../../types/video';
 import type { Slot } from './StartPlanSheet';
 import '../../styles/planpreview.css';
@@ -30,8 +31,8 @@ interface Props {
   done: number;
   days: PreviewDay[];
   loading: boolean;
-  /** Workout days per week, so the days can be laid out week by week. */
-  perWeek: number;
+  /** The plan's rhythm, so the days can be laid out week by week. */
+  pattern: number[];
   /** Set when the plan has videos that stream rather than play offline. */
   needsInternet: boolean;
   defaultDate: string;
@@ -103,18 +104,16 @@ function DayMedia({ day, index, done, list }: { day: PreviewDay; index: number; 
 
 /** A plan opened for a look: what's in it, week by week, and everything you can do with it. */
 export default function PlanPreviewModal(props: Props) {
-  const { name, slot, categoryLabel, cover, description, equipment, startDate, done, days, loading, perWeek, needsInternet, defaultDate, onClose } = props;
+  const { name, slot, categoryLabel, cover, description, equipment, startDate, done, days, loading, pattern, needsInternet, defaultDate, onClose } = props;
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<'grid' | 'list'>(() => (window.matchMedia('(max-width: 767px)').matches ? 'list' : 'grid'));
   const [pickSlot, setPickSlot] = useState<Slot>('main');
   const [date, setDate] = useState(defaultDate);
 
-  const weeks = useMemo(() => {
-    const size = Math.max(1, perWeek);
-    const out: { start: number; days: PreviewDay[] }[] = [];
-    for (let i = 0; i < days.length; i += size) out.push({ start: i, days: days.slice(i, i + size) });
-    return out;
-  }, [days, perWeek]);
+  const weeks = useMemo(
+    () => groupBySlots(days.length, pattern).map(({ start, size }) => ({ start, days: days.slice(start, start + size) })),
+    [days, pattern]
+  );
 
   const hours = (ds: PreviewDay[]) => {
     const secs = ds.reduce((sum, d) => sum + d.videos.reduce((s, v) => s + (v.duration_seconds || 0), 0), 0);

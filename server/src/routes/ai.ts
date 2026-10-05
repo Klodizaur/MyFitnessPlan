@@ -7,7 +7,7 @@
  * in index.ts removes the feature without touching a plan, a video, or the
  * schema.
  */
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import db from '../db.js';
 import { AiError, callModel, listModels } from '../ai/provider.js';
 import { generatePlan } from '../ai/planBuilder.js';
@@ -20,6 +20,7 @@ import {
 } from '../ai/descriptionCleaner.js';
 import {
   AiProvider,
+  aiProfile,
   getAiSettings,
   isAiConfigured,
   isLocalBaseUrl,
@@ -31,6 +32,7 @@ import {
   VALID_INTENSITIES,
   VALID_TRAINING_TYPES,
 } from './library.js';
+import { getProfileSetting, profileHook, requireProfile } from '../profiles.js';
 
 /** Keep list inputs to values the library actually uses. */
 function whitelist(value: unknown, allowed: readonly string[]): string[] {
@@ -44,6 +46,16 @@ function strings(value: unknown, limit = 200): string[] {
 }
 
 export default async function (fastify: FastifyInstance) {
+  // AI settings (and the key) are per profile: every route here needs one, and
+  // runs as it — including whatever it starts in the background.
+  fastify.addHook('preHandler', profileHook);
+  fastify.addHook('onRoute', route => {
+    const handler = route.handler as (this: unknown, request: FastifyRequest, reply: FastifyReply) => unknown;
+    route.handler = function (this: unknown, request: FastifyRequest, reply: FastifyReply) {
+      return aiProfile.run(request.profileId, () => handler.call(this, request, reply));
+    } as typeof route.handler;
+  });
+
   /**
    * Whether the AI entry points should appear at all. The client checks this
    * before rendering anything, so an install with no key configured looks
@@ -204,10 +216,13 @@ export default async function (fastify: FastifyInstance) {
    * workout builder; nothing is saved until the user saves it there.
    */
   fastify.post('/generate-plan', async (request, reply) => {
+    const profileId = requireProfile(request, reply);
+    if (!profileId) return;
     const body = request.body as any;
 
     try {
       const plan = await generatePlan({
+        profileId,
         description: typeof body?.description === 'string' ? body.description : '',
         // The user picks a number of workout days, not weeks: empty AI day slots
         // are discarded on save, so a week count promised a length the saved
@@ -216,7 +231,7 @@ export default async function (fastify: FastifyInstance) {
         // Pacing only — how often this person trains, so the model can space
         // hard sessions out. Taken from the rhythm the new plan will actually
         // use (sent by the builder), falling back to the global default.
-        daysPerWeek: trainingDaysFromWorkoutPattern(body?.workoutPattern),
+        daysPerWeek: trainingDaysFromWorkoutPattern(profileId, body?.workoutPattern),
         maxMinutes: Number(body?.maxMinutes) || 0,
         equipment: whitelist(body?.equipment, VALID_EQUIPMENT),
         trainingTypes: whitelist(body?.trainingTypes, VALID_TRAINING_TYPES),
@@ -253,21 +268,20 @@ function sendAiError(reply: any, err: unknown) {
  * plan's own rhythm decides it when the builder sends one; otherwise the global
  * pattern from Settings stands in, and 3 covers a missing or unusable pattern.
  */
-function trainingDaysFromWorkoutPattern(requested?: unknown): number {
+function trainingDaysFromWorkoutPattern(profileId: string, requested?: unknown): number {
+  // Workouts per seven days, whatever the cycle's length: a four-week rhythm
+  // with 20 workouts is five a week, not twenty.
   const countWorkouts = (pattern: unknown): number | null => {
     if (!Array.isArray(pattern) || pattern.length === 0) return null;
     const workouts = pattern.filter(day => Boolean(day)).length;
-    return workouts > 0 ? Math.min(7, workouts) : null;
+    return workouts > 0 ? Math.min(7, Math.max(1, Math.round((workouts * 7) / pattern.length))) : null;
   };
 
   const fromRequest = countWorkouts(requested);
   if (fromRequest) return fromRequest;
 
-  const row = db.prepare("SELECT value FROM settings WHERE key = 'workout_pattern'").get() as
-    | { value?: string }
-    | undefined;
   try {
-    return countWorkouts(JSON.parse(row?.value || '[]')) ?? 3;
+    return countWorkouts(JSON.parse(getProfileSetting(profileId, 'workout_pattern') || '[]')) ?? 3;
   } catch {
     return 3;
   }

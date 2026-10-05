@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowRight, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, Dumbbell, GripVertical, Minus, Moon,
+  ArrowRight, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, GripVertical, Moon,
   MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, X,
 } from 'lucide-react';
-import { BuilderWeek, createWeek, relayoutWeeks, workoutSlots } from '../../lib/builderModel';
+import { BuilderWeek, builderRhythms, createWeek, DAYS_PER_WEEK, relayoutWeeks, slotsForWeek } from '../../lib/builderModel';
+import RhythmEditor from './RhythmEditor';
 import { EMPTY_LENGTH, isLengthActive, LengthRange, matchesLength, matchesQuery, matchesTags } from '../../lib/filters';
 import LengthFilter from '../library/LengthFilter';
 import { useMetaLabels } from '../../lib/labels';
@@ -15,10 +16,12 @@ import { albumKeyForVideo, isExternalAlbumKey } from '../../lib/paths';
 import { useIsMobile } from '../../lib/useIsMobile';
 import { formatDuration, stripVideoExt, useVideoTags } from '../../lib/videoTags';
 import YouTubeGlyph from '../icons/YouTubeGlyph';
-import { TagRow } from '../library/LibraryCards';
+import { CompletedBadge, TagRow } from '../library/LibraryCards';
 import type { LibrarySort } from '../library/LibraryToolbar';
-import { Video } from '../../types/video';
+import { sortVideos } from '../../lib/videoSort';
+import { inLibrary, Video } from '../../types/video';
 import '../../styles/builder.css';
+import { useRootFolderName } from '../../lib/rootFolder';
 
 export interface PlanBuilderScreenProps {
   editing: boolean;
@@ -37,6 +40,9 @@ export interface PlanBuilderScreenProps {
   /** false = follow the global pattern from Settings. */
   patternCustom: boolean;
   onPatternCustom: (value: boolean) => void;
+  /** Edit the plan's rhythm as whole weeks that can each differ. */
+  patternByWeek: boolean;
+  onPatternByWeek: (value: boolean) => void;
   pattern: number[];
   onPattern: (next: number[]) => void;
 
@@ -71,6 +77,7 @@ type Tab = 'details' | 'schedule';
 export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
   const { t } = useTranslation();
   const labels = useMetaLabels();
+  const rootName = useRootFolderName();
   const isMobile = useIsMobile();
   const tagsFor = useVideoTags();
 
@@ -93,6 +100,18 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
   const toastTimer = useRef<number | null>(null);
   const dragFrom = useRef<number | null>(null);
 
+  // The builder covers the Plans page but doesn't stop it scrolling: a swipe on
+  // anything that can't scroll itself (or past the end of something that can)
+  // would scroll the page underneath instead. Lock it while the builder is open.
+  // Both elements: the page scrolls on <html>, and iPad Safari only honours the
+  // lock there.
+  useEffect(() => {
+    const targets = [document.documentElement, document.body];
+    const previous = targets.map(el => el.style.overflow);
+    targets.forEach(el => { el.style.overflow = 'hidden'; });
+    return () => targets.forEach((el, i) => { el.style.overflow = previous[i]; });
+  }, []);
+
   const flash = (message: string) => {
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     setToast(message);
@@ -101,12 +120,17 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
 
   // A week is one turn of the rhythm: its workout days are the slots, and the rest
   // days come from the rhythm between them. Slots per week follow the rhythm, so
-  // changing it re-deals the workouts into weeks of the new size.
-  const slots = workoutSlots(props.pattern);
+  // changing it re-deals the workouts into weeks of the new size. A week-by-week
+  // rhythm gives each builder week its own turn, so the sizes can differ.
+  const byWeek = props.patternCustom && props.patternByWeek;
+  const rhythms = builderRhythms(props.pattern, byWeek);
+  const slotsFor = (index: number) => slotsForWeek(rhythms, index);
+  const rhythmKey = `${byWeek ? 'w' : 'c'}${props.pattern.join('')}`;
+  const slots = slotsFor(props.currentWeek);
   const cycle: ({ kind: 'work'; slot: number } | { kind: 'rest'; n: number })[] = (() => {
     const out: ({ kind: 'work'; slot: number } | { kind: 'rest'; n: number })[] = [];
     let slot = 0;
-    props.pattern.forEach((isWork, i) => {
+    rhythms[props.currentWeek % rhythms.length].forEach((isWork, i) => {
       if (isWork === 1) out.push({ kind: 'work', slot: slot++ });
       else out.push({ kind: 'rest', n: i + 1 });
     });
@@ -115,13 +139,14 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
   })();
 
   useEffect(() => {
-    if (!props.weeks.some(w => w.days.length !== slots)) return;
-    const next = relayoutWeeks(props.weeks, slots);
+    if (!props.weeks.some((w, i) => w.days.length !== slotsFor(i))) return;
+    const next = relayoutWeeks(props.weeks, slotsFor);
     props.onWeeks(next);
-    if (props.currentWeek >= next.length) props.onCurrentWeek(next.length - 1);
-    if (props.currentDay >= slots) props.onCurrentDay(slots - 1);
+    const weekIndex = Math.min(props.currentWeek, next.length - 1);
+    if (weekIndex !== props.currentWeek) props.onCurrentWeek(weekIndex);
+    if (props.currentDay >= slotsFor(weekIndex)) props.onCurrentDay(slotsFor(weekIndex) - 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slots, props.weeks]);
+  }, [rhythmKey, props.weeks]);
 
   const week = props.weeks[props.currentWeek];
   const day = week?.days[props.currentDay];
@@ -136,11 +161,11 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
   /** Folder chips: the album each video belongs to, most-used first. */
   const folders = useMemo(() => {
     const counts = new Map<string, { label: string; count: number }>();
-    for (const video of props.videos) {
+    for (const video of props.videos.filter(inLibrary)) {
       const key = albumKeyForVideo(video);
       const label = isExternalAlbumKey(key)
         ? (video.external_playlist_title || t('library.untitled_playlist'))
-        : key === '.' ? t('library.root_folder') : key;
+        : key === '.' ? rootName : key;
       const entry = counts.get(key) || { label, count: 0 };
       entry.count += 1;
       counts.set(key, entry);
@@ -148,12 +173,14 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
     return [...counts.entries()]
       .sort((a, b) => b[1].count - a[1].count)
       .map(([key, v]) => ({ key, label: v.label }));
-  }, [props.videos, t]);
+  }, [props.videos, t, rootName]);
 
   const filterCount = equipment.length + trainingType.length + bodyParts.length + intensity.length + (isLengthActive(length) ? 1 : 0);
 
   const pickable = useMemo(() => {
-    const found = props.videos.filter(video => {
+    // Pick from your library; videos that are only here for a plan still show
+    // in that plan's days (props.videos has them all), but aren't offered.
+    const found = props.videos.filter(inLibrary).filter(video => {
     if (folder && albumKeyForVideo(video) !== folder) return false;
     if (!matchesQuery([video.filename, video.description], query)) return false;
     // OR inside a group, AND across groups.
@@ -164,13 +191,7 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
     if (!matchesLength(video.duration_seconds, length)) return false;
     return true;
     });
-    const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-    const sorted = [...found];
-    if (sort === 'size') sorted.sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0));
-    else if (sort === 'small') sorted.sort((a, b) => (a.duration_seconds || 0) - (b.duration_seconds || 0));
-    else sorted.sort((a, b) => naturalCompare(a.filename, b.filename));
-    if (sort === 'za') sorted.reverse();
-    return sorted;
+    return sortVideos(found, sort);
   }, [props.videos, folder, query, equipment, trainingType, bodyParts, intensity, length, sort]);
 
   const setDayVideos = (next: string[]) => {
@@ -200,7 +221,7 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
   };
 
   const addWeek = () => {
-    props.onWeeks([...props.weeks, createWeek(props.weeks.length + 1, slots)]);
+    props.onWeeks([...props.weeks, createWeek(props.weeks.length + 1, slotsFor(props.weeks.length))]);
     props.onCurrentWeek(props.weeks.length);
     props.onCurrentDay(0);
     setWeekMenu(false);
@@ -213,8 +234,6 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
     props.onCurrentDay(0);
     setWeekMenu(false);
   };
-
-  const workoutDays = props.pattern.filter(Boolean).length;
 
   // --- Pieces shared by the desktop panel and the mobile sheet ---------------
 
@@ -246,6 +265,8 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
             <option value="za">{t('library.sort_za')}</option>
             <option value="size">{t('library.sort_longest')}</option>
             <option value="small">{t('library.sort_shortest')}</option>
+            <option value="newest">{t('library.sort_newest')}</option>
+            <option value="oldest">{t('library.sort_oldest')}</option>
           </select>
         </div>
       </div>
@@ -332,6 +353,7 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
                 : <span className="pb-pick-noimg" />}
               <span className="pb-pick-mark">{inDay ? <Check size={16} /> : <Plus size={16} />}</span>
               {duration && <span className="rx-dur">{duration}</span>}
+              <CompletedBadge count={video.completed_count} />
             </span>
             <span className="pb-pick-title rx-clamp-2">{stripVideoExt(video.filename)}</span>
             <TagRow tags={tagsFor(video)} rows={1} />
@@ -543,63 +565,14 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
               )}
             </div>
 
-            <div>
-              <div className="pb-rhythm-head">
-                <div className="pb-label pb-label--flush">{t('plans.builder_rhythm')}</div>
-                <div className="rx-seg rx-seg--sm">
-                  <button type="button" className={!props.patternCustom ? 'is-on' : ''} onClick={() => props.onPatternCustom(false)}>
-                    {t('plans.pattern_use_default')}
-                  </button>
-                  <button type="button" className={props.patternCustom ? 'is-on' : ''} onClick={() => props.onPatternCustom(true)}>
-                    {t('plans.pattern_set_for_plan')}
-                  </button>
-                </div>
-              </div>
-
-              <div className={`pb-rhythm${props.patternCustom ? '' : ' is-locked'}`}>
-                {props.pattern.map((value, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    className={`pb-rhythm-day${value ? ' is-work' : ''}`}
-                    disabled={!props.patternCustom}
-                    onClick={() => props.onPattern(props.pattern.map((v, i) => i === index ? (v ? 0 : 1) : v))}
-                  >
-                    <span className="pb-rhythm-n">{index + 1}</span>
-                    {value ? <Dumbbell size={18} /> : <Moon size={18} />}
-                  </button>
-                ))}
-              </div>
-
-              {/* The cycle itself can grow or shrink, so a plan isn't stuck with a
-                  seven-day week: "5 workout days in every [− 7 +] days". */}
-              <div className="pb-cycle">
-                <span>{t('settings.workout_days_in_every', { count: workoutDays })}</span>
-                <div className="pb-stepper">
-                  <button
-                    type="button"
-                    aria-label={t('settings.remove_day')}
-                    disabled={!props.patternCustom || props.pattern.length <= 1 || !props.pattern.slice(0, -1).some(v => v === 1)}
-                    onClick={() => props.onPattern(props.pattern.slice(0, -1))}
-                  >
-                    <Minus size={15} />
-                  </button>
-                  <span>{props.pattern.length}</span>
-                  <button
-                    type="button"
-                    aria-label={t('settings.add_day')}
-                    disabled={!props.patternCustom || props.pattern.length >= 14}
-                    onClick={() => props.onPattern([...props.pattern, 1])}
-                  >
-                    <Plus size={15} />
-                  </button>
-                </div>
-                <span>{t('settings.days_unit')}</span>
-              </div>
-              {!props.patternCustom && (
-                <div className="pb-hint">{t('plans.pattern_follows_settings')}</div>
-              )}
-            </div>
+            <RhythmEditor
+              custom={props.patternCustom}
+              onCustom={props.onPatternCustom}
+              byWeek={props.patternByWeek}
+              onByWeek={props.onPatternByWeek}
+              pattern={props.pattern}
+              onPattern={props.onPattern}
+            />
 
             <div>
               <div className="pb-label">{t('plans.builder_description')}</div>
@@ -631,7 +604,7 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
                 >
                   {t('plans.builder_week_n', { n: i + 1 })}
                   <span className="pb-week-count">
-                    {w.days.filter(d => d.videoIds.length > 0).length}/{slots}
+                    {w.days.filter(d => d.videoIds.length > 0).length}/{slotsFor(i)}
                   </span>
                 </button>
               ))}
@@ -669,7 +642,7 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
             <p className="pb-note">{t('plans.builder_empty_days_note')}</p>
 
             {isMobile && (
-              <div className="pb-day-pills" style={{ ['--n' as string]: cycle.length }}>
+              <div className="pb-day-pills" style={{ ['--n' as string]: Math.min(cycle.length, DAYS_PER_WEEK) }}>
                 {cycle.map((c, k) => c.kind === 'rest' ? (
                   <span key={`r${k}`} className="pb-day-pill is-rest" aria-label={t('plans.builder_rest_day')}>
                     <Moon size={15} />

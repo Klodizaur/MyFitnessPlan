@@ -270,3 +270,9 @@
   .cv-current img { width: 88px; }
   .cv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* "Type confirm to delete": the word to type, and the box to type it in. */
+.md-confirm-word { display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: var(--t-ink-muted); }
+.md-confirm-input { height: 46px; padding: 0 14px; border: 1.5px solid var(--t-border); border-radius: 12px; background: var(--t-surface); color: var(--t-ink); font-family: inherit; font-size: 16px; }
+.md-confirm-input:focus { outline: none; border-color: var(--t-danger); }
+.md-btn:disabled { opacity: 0.45; cursor: default; }

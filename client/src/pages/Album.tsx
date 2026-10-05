@@ -16,11 +16,12 @@ import { toggleVideoFavorite } from '../lib/favorites';
 import { notify } from '../lib/notify';
 import { confirmDialog } from '../lib/confirm';
 import { useAiAvailable } from '../lib/useAiAvailable';
-import { Video } from '../types/video';
+import { inLibrary, Video } from '../types/video';
+import { naturalCompare, sortVideos } from '../lib/videoSort';
+import { timeAgo } from '../lib/dates';
+import { useRootFolderName } from '../lib/rootFolder';
 
 const PAGE = 24;
-
-const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
 export default function Album() {
   const { albumId } = useParams();
@@ -50,7 +51,8 @@ export default function Album() {
   const location = useLocation();
   const [matchMode, setMatchMode] = useFilterMatchMode();
   const labels = useMetaLabels();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const rootName = useRootFolderName();
   // Optional AI description clean-up for the whole album.
   const aiAvailable = useAiAvailable();
 
@@ -60,7 +62,7 @@ export default function Album() {
     setCustomImage(localStorage.getItem(`albumImage:${key}`));
     fetch('/api/library/videos')
       .then(r => r.json())
-      .then((data: Video[]) => setVideos(data || []))
+      .then((data: Video[]) => setVideos((data || []).filter(inLibrary)))
       .catch(err => console.error('Failed to load library videos:', err));
   }, [albumId]);
 
@@ -72,9 +74,11 @@ export default function Album() {
   // Determine base prefix for this view (main album or a deeper nested folder)
   const basePrefix = currentSub ? (albumKey === '.' ? currentSub : `${albumKey}/${currentSub}`) : (albumKey === '.' ? '' : albumKey);
 
+  // The library folder itself (no prefix) holds everything in it: its own
+  // videos plus every subfolder's, which "Include subfolders" then shows.
   const isUnderBase = (rel: string) => {
     const posix = toPosixPath(rel);
-    if (!basePrefix) return !posix.includes('/');
+    if (!basePrefix) return true;
     return posix.startsWith(basePrefix + '/');
   };
 
@@ -147,11 +151,7 @@ export default function Album() {
     if (!matchesLength(v.duration_seconds, selectedLength)) return false;
     return true;
   });
-  const sorted = [...filtered];
-  if (sortMode === 'size') sorted.sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0));
-  else if (sortMode === 'small') sorted.sort((a, b) => (a.duration_seconds || 0) - (b.duration_seconds || 0));
-  else sorted.sort((a, b) => naturalCompare(a.filename, b.filename));
-  if (sortMode === 'za') sorted.reverse();
+  const sorted = sortVideos(filtered, sortMode);
 
   // Held in state, not read from localStorage during render: writing to storage
   // alone doesn't re-render, so a newly picked cover wouldn't appear until the
@@ -291,13 +291,13 @@ export default function Album() {
     ? t('library.favorites')
     : isExternalAlbum
     ? playlistTitle
-    : (currentSub ? currentSub.split('/').slice(-1)[0] : albumKey === '.' ? t('library.root_folder') : albumKey);
+    : (currentSub ? currentSub.split('/').slice(-1)[0] : albumKey === '.' ? rootName : albumKey);
 
   /** Library › album › each nested folder, each one navigable. */
   const crumbs = [
     { label: t('nav.library'), go: () => navigate('/library') },
     ...(isFlatAlbum ? [] : [{
-      label: albumKey === '.' ? t('library.root_folder') : albumKey,
+      label: albumKey === '.' ? rootName : albumKey,
       go: () => navigate(`/library/${encodeURIComponent(toAlbumRouteParam(albumKey))}`),
     }]),
     ...(currentSub ? currentSub.split('/').map((part, i, all) => ({
@@ -330,7 +330,7 @@ export default function Album() {
     if (isFavoritesAlbum) {
       if (isExternalVideo(video)) return video.external_playlist_title || undefined;
       const dirs = toPosixPath(video.relative_path || '').split('/').slice(0, -1);
-      return dirs.length ? dirs.join(' / ') : t('library.root_folder');
+      return dirs.length ? dirs.join(' / ') : rootName;
     }
     if (isExternalAlbum) return undefined;
     const rel = toPosixPath(video.relative_path || '');
@@ -476,6 +476,8 @@ export default function Album() {
                 { value: 'za', label: t('library.sort_za') },
                 { value: 'size', label: t('library.sort_longest') },
                 { value: 'small', label: t('library.sort_shortest') },
+                { value: 'newest', label: t('library.sort_newest') },
+                { value: 'oldest', label: t('library.sort_oldest') },
               ]}
             />
 
@@ -510,6 +512,7 @@ export default function Album() {
                   key={video.id}
                   video={video}
                   meta={relMeta(video)}
+                  note={video.added_at ? timeAgo(video.added_at, i18n.language) : undefined}
                   onOpen={() => setDetailsVideo(video)}
                   onPlay={() => navigate(`/player/${video.id}`)}
                   onInfo={() => setDetailsVideo(video)}
@@ -524,6 +527,7 @@ export default function Album() {
                   key={video.id}
                   video={video}
                   meta={relMeta(video)}
+                  note={video.added_at ? timeAgo(video.added_at, i18n.language) : undefined}
                   onOpen={() => setDetailsVideo(video)}
                   onMenu={() => setDetailsVideo(video)}
                   onPlay={() => navigate(`/player/${video.id}`)}

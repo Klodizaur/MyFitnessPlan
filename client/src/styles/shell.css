@@ -206,6 +206,26 @@
 /* The bottom bar floats over the page, so the last content must clear it. */
 .rx-has-tabs { padding-bottom: 84px; }
 
+/* Settings over the current page on mobile, between the header and the tab bar.
+   The header (z 12) stays on top so its gear can close it again. */
+.rx-settings-layer {
+  position: fixed;
+  inset: 0 0 72px 0;
+  z-index: 11;
+  padding-top: 72px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--t-page);
+  /* Sticky bits inside (the Settings tabs) measure from this layer's padding,
+     which already clears the header — so they need no extra offset. */
+  --rx-stick: 0px;
+}
+/* With Settings open, a swipe on the header or tab bar must not scroll the page
+   underneath, or it wouldn't be where you left it. */
+.rx-settings-open .rx-mobile-head,
+.rx-settings-open .rx-tabs { touch-action: none; }
+.rx-head-icon.is-on { border-radius: 12px; background: var(--t-tint); color: var(--t-accent); }
+
 /* --- Buttons ---------------------------------------------------------------- */
 .rx-btn {
   display: inline-flex;
@@ -316,6 +336,22 @@
 /* --- YouTube badge on an imported album's cover ------------------------------
    Marks an album that streams from YouTube rather than playing from disk. Sits
    on the cover itself, opposite the duration badge's corner. */
+.rx-done-badge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: var(--t-r-badge);
+  background: var(--t-video-chip);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .rx-yt-badge {
   position: absolute;
   top: 8px;

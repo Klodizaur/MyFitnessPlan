@@ -10,6 +10,7 @@ import Library from './pages/Library';
 import Album from './pages/Album';
 import AiCleanupProgress from './components/ai/AiCleanupProgress';
 import AppShell from './components/AppShell';
+import ProfileGate from './components/profiles/ProfileGate';
 import TvRouteSync from './components/TvRouteSync';
 import { isTv } from './lib/tv';
 import './styles/tokens.css';
@@ -29,30 +30,33 @@ function App() {
       .catch(err => console.error('Failed to fetch theme:', err));
   }, []);
 
+  // Who's using this device decides everything below it: see ProfileGate.
   return (
-    <AppShell>
-      <main className="animate-fade-in">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          {/* Not yet redesigned: still wrapped in the old page container so
-              their existing layout holds until each one is migrated. */}
-          <Route path="/plans" element={<Plans />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/library/:albumId" element={<Album />} />
-          <Route path="/library/:albumId/:subId" element={<Album />} />
-          <Route path="/player/:videoId/:workoutId" element={<Player />} />
-          <Route path="/player/:videoId" element={<Player />} />
-        </Routes>
-      </main>
+    <ProfileGate>
+      <AppShell>
+        <main className="animate-fade-in">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            {/* Not yet redesigned: still wrapped in the old page container so
+                their existing layout holds until each one is migrated. */}
+            <Route path="/plans" element={<Plans />} />
+            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/library" element={<Library />} />
+            <Route path="/library/:albumId" element={<Album />} />
+            <Route path="/library/:albumId/:subId" element={<Album />} />
+            <Route path="/player/:videoId/:workoutId" element={<Player />} />
+            <Route path="/player/:videoId" element={<Player />} />
+          </Routes>
+        </main>
 
-      {/* Renders nothing unless a bulk description clean-up is running, so a
-          run started on an album keeps reporting across navigation. */}
-      <AiCleanupProgress />
-      {isTv && <TvRouteSync />}
-    </AppShell>
+        {/* Renders nothing unless a bulk description clean-up is running, so a
+            run started on an album keeps reporting across navigation. */}
+        <AiCleanupProgress />
+        {isTv && <TvRouteSync />}
+      </AppShell>
+    </ProfileGate>
   );
 }
 

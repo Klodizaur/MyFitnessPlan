@@ -5,6 +5,10 @@ import App from './App';
 import './index.css';
 import './i18n';
 import { isTv } from './lib/tv';
+import { installProfileGuard } from './lib/profiles';
+
+// Any API call can learn this device has to pick a profile; see lib/profiles.
+installProfileGuard();
 
 const render = () =>
   createRoot(document.getElementById('root')!).render(
