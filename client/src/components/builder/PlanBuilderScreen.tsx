@@ -19,8 +19,9 @@ import YouTubeGlyph from '../icons/YouTubeGlyph';
 import { CompletedBadge, TagRow } from '../library/LibraryCards';
 import type { LibrarySort } from '../library/LibraryToolbar';
 import { sortVideos } from '../../lib/videoSort';
-import { Video } from '../../types/video';
+import { inLibrary, Video } from '../../types/video';
 import '../../styles/builder.css';
+import { useRootFolderName } from '../../lib/rootFolder';
 
 export interface PlanBuilderScreenProps {
   editing: boolean;
@@ -76,6 +77,7 @@ type Tab = 'details' | 'schedule';
 export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
   const { t } = useTranslation();
   const labels = useMetaLabels();
+  const rootName = useRootFolderName();
   const isMobile = useIsMobile();
   const tagsFor = useVideoTags();
 
@@ -159,11 +161,11 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
   /** Folder chips: the album each video belongs to, most-used first. */
   const folders = useMemo(() => {
     const counts = new Map<string, { label: string; count: number }>();
-    for (const video of props.videos) {
+    for (const video of props.videos.filter(inLibrary)) {
       const key = albumKeyForVideo(video);
       const label = isExternalAlbumKey(key)
         ? (video.external_playlist_title || t('library.untitled_playlist'))
-        : key === '.' ? t('library.root_folder') : key;
+        : key === '.' ? rootName : key;
       const entry = counts.get(key) || { label, count: 0 };
       entry.count += 1;
       counts.set(key, entry);
@@ -171,12 +173,14 @@ export default function PlanBuilderScreen(props: PlanBuilderScreenProps) {
     return [...counts.entries()]
       .sort((a, b) => b[1].count - a[1].count)
       .map(([key, v]) => ({ key, label: v.label }));
-  }, [props.videos, t]);
+  }, [props.videos, t, rootName]);
 
   const filterCount = equipment.length + trainingType.length + bodyParts.length + intensity.length + (isLengthActive(length) ? 1 : 0);
 
   const pickable = useMemo(() => {
-    const found = props.videos.filter(video => {
+    // Pick from your library; videos that are only here for a plan still show
+    // in that plan's days (props.videos has them all), but aren't offered.
+    const found = props.videos.filter(inLibrary).filter(video => {
     if (folder && albumKeyForVideo(video) !== folder) return false;
     if (!matchesQuery([video.filename, video.description], query)) return false;
     // OR inside a group, AND across groups.

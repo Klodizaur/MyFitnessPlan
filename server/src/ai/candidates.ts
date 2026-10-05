@@ -10,11 +10,14 @@
  */
 import db from '../db.js';
 import { VIDEO_COLUMNS, formatVideoRow } from '../routes/library.js';
+import { PROFILE_VIDEOS } from '../profiles.js';
 
 /** How many candidates to send at most, whatever the library size. */
 const MAX_CANDIDATES = 200;
 
 export interface CandidateFilter {
+  /** Whose library to draw from. */
+  profileId: string;
   /** Equipment the user owns. Empty means "don't filter on equipment". */
   equipment: string[];
   /** Album keys to draw from. Empty means the whole library. */
@@ -92,8 +95,9 @@ function stripExt(filename: string): string {
 }
 
 export function selectCandidates(filter: CandidateFilter): CandidateSet {
-  const rows = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM videos`).all() as any[];
-  const videos = rows.map(formatVideoRow);
+  const rows = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM ${PROFILE_VIDEOS} AS videos`).all(filter.profileId) as any[];
+  // Only what's in this person's library — not videos that are only there for a plan.
+  const videos = rows.map(formatVideoRow).filter(video => video.in_library);
 
   const owned = new Set(filter.equipment);
   const include = new Set(filter.includeAlbums);

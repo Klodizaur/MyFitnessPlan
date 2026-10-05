@@ -235,3 +235,79 @@
 .lg-cloud-key.lg-cloud-word--body { background: var(--t-tag-body-ink); }
 .lg-cloud-key.lg-cloud-word--gear { background: var(--t-tag-gear-ink); }
 .lg-cloud-key.lg-cloud-word--folder { background: var(--t-ink); }
+
+/* --- Custom range ---------------------------------------------------------------- */
+.lg-range-edit {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  cursor: pointer;
+}
+.lg-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.lg-quick button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--t-border);
+  border-radius: 10px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lg-quick button:hover { border-color: var(--t-accent); }
+.lg-rcal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 15px; font-weight: 700; text-transform: capitalize; }
+.lg-rcal-head button {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  cursor: pointer;
+}
+.lg-rcal-head button:disabled { opacity: 0.35; cursor: default; }
+.lg-rcal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 4px; }
+.lg-rcal-dow { padding: 4px 0; font-size: 12px; font-weight: 700; color: var(--t-ink-muted); text-align: center; text-transform: uppercase; }
+.lg-rcal-day {
+  position: relative;
+  height: 40px;
+  border: none;
+  background: none;
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lg-rcal-day:disabled { color: var(--t-ink-faint); opacity: 0.45; cursor: default; }
+.lg-rcal-day:hover:not(:disabled):not(.is-edge) { background: var(--t-tint); border-radius: 10px; }
+/* The range: a band across the days inside, with the ends as solid pills. */
+.lg-rcal-day.is-in { background: var(--t-tint); }
+.lg-rcal-day.is-edge { background: var(--t-btn); color: var(--t-on-btn); border-radius: 10px; }
+.lg-rcal-day.is-start { border-radius: 10px 0 0 10px; }
+.lg-rcal-day.is-end { border-radius: 0 10px 10px 0; }
+.lg-rcal-day.is-today:not(.is-edge) { box-shadow: inset 0 0 0 1.5px var(--t-accent); border-radius: 10px; }
+.lg-rcal-dot {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--t-accent);
+}
+.lg-rcal-day.is-edge .lg-rcal-dot { background: currentColor; }

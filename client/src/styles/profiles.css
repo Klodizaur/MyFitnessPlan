@@ -1,0 +1,361 @@
+/** Profiles: the picker, the PIN pad, the wizards and Settings › Profiles. */
+
+/* --- Header avatar -------------------------------------------------------------- */
+.rx-profile {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.rx-profile img { width: 32px; height: 32px; border-radius: 50%; display: block; }
+.rx-profile:hover img, .rx-profile:focus-visible img { box-shadow: 0 0 0 3px var(--t-tint); }
+.rx-nav .rx-profile { margin-right: 4px; }
+
+/* --- Avatars ---------------------------------------------------------------------- */
+.pf-avatar { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.pf-avatar--lg { width: 96px; height: 96px; }
+.pf-avatar--md { width: 64px; height: 64px; flex-shrink: 0; }
+.pf-avatar--sm { width: 36px; height: 36px; flex-shrink: 0; }
+
+/* --- Full-screen picker and welcome --------------------------------------------- */
+.pf-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--t-page);
+  color: var(--t-ink);
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+/* Over the app as a switcher: solid, so the page underneath doesn't show through. */
+.pf-screen--over { background: var(--t-page); }
+
+.pf-lang { position: fixed; top: 16px; right: 16px; z-index: 1; }
+
+.pf-panel {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+.pf-panel--form { max-width: 460px; align-items: stretch; text-align: left; }
+.pf-panel--form .pf-title, .pf-panel--form .pf-lede, .pf-panel--form .pf-logo { align-self: center; text-align: center; }
+
+.pf-logo { width: 56px; height: 56px; border-radius: 50%; }
+.pf-title { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.02em; }
+.pf-lede { margin: -6px 0 0; font-size: 15px; line-height: 1.5; color: var(--t-ink-muted); text-wrap: pretty; }
+.pf-hint { margin: 0; font-size: 13px; line-height: 1.45; color: var(--t-ink-muted); }
+
+.pf-corner {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  cursor: pointer;
+}
+.pf-corner--left { right: auto; left: 16px; }
+
+.pf-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px 18px; margin-top: 8px; }
+.pf-person {
+  width: 128px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 6px;
+  border: none;
+  border-radius: 20px;
+  background: none;
+  color: var(--t-ink);
+  font-family: inherit;
+  cursor: pointer;
+}
+.pf-person-pic { position: relative; width: 104px; height: 104px; border-radius: 50%; transition: transform 0.15s, box-shadow 0.15s; }
+.pf-person:hover .pf-person-pic, .pf-person:focus-visible .pf-person-pic { transform: translateY(-3px); box-shadow: 0 0 0 4px var(--t-accent); }
+.pf-person.is-current .pf-person-pic { box-shadow: 0 0 0 4px var(--t-tint); }
+.pf-person--add .pf-person-pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--t-border);
+  color: var(--t-ink-muted);
+}
+.pf-person--add:hover .pf-person-pic, .pf-person--add:focus-visible .pf-person-pic { color: var(--t-accent); }
+.pf-person-name { max-width: 100%; font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-lock {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  box-shadow: 0 0 0 2px var(--t-page);
+}
+
+.pf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  padding: 6px 4px;
+  border: none;
+  background: none;
+  color: var(--t-accent);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pf-link:disabled { opacity: 0.5; cursor: default; }
+
+/* --- PIN pad --------------------------------------------------------------------- */
+.pf-pin { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.pf-pin-dots { display: flex; gap: 16px; padding: 6px 0; }
+.pf-pin-dots span { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--t-ink-muted); transition: background 0.1s; }
+.pf-pin-dots span.is-on { background: var(--t-ink); border-color: var(--t-ink); }
+.pf-pin-dots.is-wrong { animation: pf-shake 0.35s; }
+@keyframes pf-shake {
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+.pf-pin-error { min-height: 20px; margin: 0; font-size: 14px; font-weight: 600; color: var(--t-danger); text-align: center; }
+.pf-pin-keys { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; }
+.pf-pin-keys button {
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--t-tint);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 26px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pf-pin-keys button:hover:not(:disabled), .pf-pin-keys button:focus-visible { background: var(--t-border); }
+.pf-pin-keys button:disabled { opacity: 0.45; cursor: default; }
+
+/* --- Form fields ------------------------------------------------------------------- */
+.pf-field { display: flex; flex-direction: column; gap: 8px; }
+.pf-field--grow { flex: 1; min-width: 0; }
+.pf-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--t-ink-muted); }
+.pf-input {
+  height: 48px;
+  padding: 0 14px;
+  border: 1.5px solid var(--t-border);
+  border-radius: 14px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 16px;
+}
+.pf-input:focus { outline: none; border-color: var(--t-accent); }
+.pf-input--pin { width: 132px; letter-spacing: 0.4em; font-size: 20px; text-align: center; }
+.pf-input--pin::placeholder { letter-spacing: normal; font-size: 14px; }
+
+.pf-avatars { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 440px; }
+.pf-avatar-pick {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.pf-avatar-pick:hover { transform: scale(1.05); }
+/* The ring sits inside the circle, so the row lines up with the fields around it
+   instead of the chosen picture poking out past their edge. */
+.pf-avatar-pick.is-on { outline: 3px solid var(--t-accent); outline-offset: -3px; }
+.pf-avatar-pick.is-on img { transform: scale(0.84); transition: transform 0.12s; }
+.pf-avatar-check {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--t-accent);
+  color: #FFFFFF;
+}
+
+.pf-pin-choice { display: flex; flex-direction: column; gap: 10px; }
+.pf-pin-fields { display: flex; flex-wrap: wrap; gap: 10px; }
+.pf-check { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+.pf-check input { width: 18px; height: 18px; accent-color: var(--t-accent); flex-shrink: 0; }
+
+.pf-primary {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+  border: none;
+  border-radius: 14px;
+  background: var(--t-btn);
+  color: var(--t-on-btn);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pf-primary:disabled { opacity: 0.6; cursor: default; }
+
+/* --- Add-profile wizard ------------------------------------------------------------ */
+.pf-options { display: flex; flex-direction: column; gap: 10px; }
+.pf-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 1.5px solid var(--t-border);
+  border-radius: 16px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pf-option svg { flex-shrink: 0; margin-top: 2px; color: var(--t-accent); }
+.pf-option > span { display: flex; flex-direction: column; gap: 4px; }
+.pf-option strong { font-size: 15px; }
+.pf-option > span > span { font-size: 13px; line-height: 1.45; color: var(--t-ink-muted); }
+.pf-option.is-on { border-color: var(--t-accent); box-shadow: 0 0 0 1px var(--t-accent); }
+
+.pf-plan-tools { display: flex; align-items: center; gap: 12px; }
+.pf-plan-tools .pf-link { align-self: auto; padding: 0; }
+.pf-plan-tools .pf-hint { margin-left: auto; }
+.pf-plans { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; max-height: 320px; overflow-y: auto; }
+.pf-plans .pf-check { padding: 8px 4px; font-weight: 500; }
+.pf-plans .pf-check .pf-hint { margin-left: auto; white-space: nowrap; }
+.pf-done { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+
+/* --- Settings › Profiles ----------------------------------------------------------- */
+.pf-me { display: flex; align-items: flex-end; gap: 16px; }
+.pf-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.pf-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--t-border); }
+.pf-row:last-child { border-bottom: none; }
+.pf-row-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.pf-you { padding: 2px 8px; border-radius: 8px; background: var(--t-tint); font-size: 12px; font-weight: 700; }
+.st-btn--icon { width: 44px; padding: 0; justify-content: center; }
+
+@media (max-width: 767px) {
+  .pf-title { font-size: 28px; }
+  .pf-person { width: 112px; }
+  .pf-person-pic { width: 88px; height: 88px; }
+  .pf-pin-keys { grid-template-columns: repeat(3, 68px); }
+  .pf-pin-keys button { height: 68px; }
+  .pf-avatars { gap: 8px; }
+}
+
+/* Long names make long buttons ("Switch to … and pick their folder"): let the
+   wizard's footer wrap instead of pushing a button off the edge of a phone. */
+.pf-foot { flex-wrap: wrap; }
+.pf-foot .md-btn { flex: 1 1 auto; min-width: 0; white-space: normal; text-align: center; }
+
+.pf-danger { color: var(--t-danger); border-color: color-mix(in srgb, var(--t-danger) 40%, transparent); }
+
+/* Your own photo: the upload tile, and room for a seventh (and eighth) tile. */
+.pf-avatars--upload { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); max-width: 520px; }
+.pf-avatar-upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--t-border);
+  color: var(--t-ink-muted);
+}
+.pf-avatar-upload:hover:not(:disabled) { color: var(--t-accent); border-color: var(--t-accent); }
+.pf-avatar-upload:disabled { cursor: default; }
+
+/* Your photo's tile carries a small × to remove it. */
+.pf-avatar-custom { position: relative; display: block; }
+.pf-avatar-custom .pf-avatar-pick { width: 100%; }
+.pf-avatar-remove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid var(--t-page);
+  border-radius: 50%;
+  background: var(--t-ink);
+  color: var(--t-page);
+  cursor: pointer;
+}
+.pf-avatar-remove:hover, .pf-avatar-remove:focus-visible { background: var(--t-danger); color: #FFFFFF; }
+
+/* --- Settings › My profile › Backup ---------------------------------------------- */
+.bk-rows { display: flex; flex-direction: column; gap: 12px; }
+.bk-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 15px; font-weight: 600; }
+.bk-row > span:first-child { min-width: 150px; }
+.bk-select {
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid var(--t-border);
+  border-radius: 12px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-family: inherit;
+  font-size: 15px;
+}
+.bk-row--folder { align-items: flex-start; }
+.bk-path {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--t-tint);
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.bk-last { margin: 0; font-size: 13px; color: var(--t-ink-muted); }
+.bk-actions { flex-wrap: wrap; }
+/* The download is a link (so the browser saves the file), dressed as a button. */
+a.st-btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--t-ink); }
+.pf-restore-link { align-self: flex-start; padding-left: 0; }
+.bk-warn { margin: 0; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--t-danger) 10%, transparent); color: var(--t-danger); font-size: 13px; font-weight: 600; }
+

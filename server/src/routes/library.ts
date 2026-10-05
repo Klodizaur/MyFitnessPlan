@@ -6,6 +6,7 @@ import { nanoid } from 'nanoid';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { rematchAllPlans } from '../matcher.js';
+import { getProfileSetting, PROFILE_VIDEOS, requireProfile, setProfileSetting } from '../profiles.js';
 
 const execPromise = promisify(exec);
 const THUMB_DIR = path.join(process.cwd(), 'data', 'thumbnails');
@@ -77,8 +78,9 @@ function parseTrainingTypes(raw: string | null | undefined): string[] {
 }
 
 /** Columns every endpoint needs to build a client-shaped video object. */
+/** Columns every endpoint needs to build a client-shaped video object (from PROFILE_VIDEOS). */
 export const VIDEO_COLUMNS =
-  'id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds, source, external_id, external_url, external_playlist_id, external_playlist_title, is_favorite, added_at, file_created_at';
+  'id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds, source, external_id, external_url, external_playlist_id, external_playlist_title, is_favorite, added_at, file_created_at, in_library';
 
 export function formatVideoRow(row: {
   id: string;
@@ -99,6 +101,7 @@ export function formatVideoRow(row: {
   is_favorite?: number | null;
   added_at?: string | null;
   file_created_at?: string | null;
+  in_library?: number | null;
 }) {
   return {
     id: row.id,
@@ -123,6 +126,9 @@ export function formatVideoRow(row: {
     // added to the app (imports, or a file whose date couldn't be read).
     // `added_at` is SQLite's UTC "YYYY-MM-DD HH:MM:SS"; both go out as ISO.
     added_at: row.file_created_at || (row.added_at ? `${row.added_at.replace(' ', 'T')}Z` : null),
+    // False for a video that's only here for one of your plans: the plan can
+    // play it, but the Library doesn't list it.
+    in_library: row.in_library !== 0,
   };
 }
 
@@ -147,12 +153,12 @@ export function logVideoResolver(videos: { id: string; filename: string }[]) {
  * (see `logVideoResolver`). A video looped several times in one go counts once
  * per round.
  */
-function completionCounts(videos: { id: string; filename: string }[]): Map<string, number> {
+function completionCounts(profileId: string, videos: { id: string; filename: string }[]): Map<string, number> {
   const resolve = logVideoResolver(videos);
 
   const rows = db.prepare(
-    'SELECT video_id, video_filename, loop_count FROM workout_log WHERE video_id IS NOT NULL OR video_filename IS NOT NULL'
-  ).all() as { video_id: string | null; video_filename: string | null; loop_count: number | null }[];
+    'SELECT video_id, video_filename, loop_count FROM workout_log WHERE profile_id = ? AND (video_id IS NOT NULL OR video_filename IS NOT NULL)'
+  ).all(profileId) as { video_id: string | null; video_filename: string | null; loop_count: number | null }[];
 
   const counts = new Map<string, number>();
   for (const row of rows) {
@@ -286,6 +292,8 @@ export default async function (fastify: FastifyInstance) {
   });
 
   fastify.post('/set-directory', async (request, reply) => {
+    const profileId = requireProfile(request, reply);
+    if (!profileId) return;
     const { directory } = request.body as { directory: string };
 
     // Normalize: trim whitespace and expand ~ on Unix-like systems
@@ -321,22 +329,26 @@ normalizedDir = path.resolve(normalizedDir);
     scanProgress.phase = 'discovering';
 
     try {
-    // Save to settings
-    db.prepare("UPDATE settings SET value = ? WHERE key = 'video_directory'").run(normalizedDir);
+    // The folder is this profile's own; someone else's is untouched.
+    setProfileSetting(profileId, 'video_directory', normalizedDir);
 
-    // Get existing videos for stable IDs. Scoped to local videos: the scan
-    // reconciles against the filesystem and deletes anything it didn't find, so
-    // external (YouTube) rows — which have no file on disk — must never be in
-    // this set or every scan would wipe them out of the user's plans.
+    // Every local video already known, whoever's library it's in, so a file two
+    // profiles share keeps one row (and its tags). Scoped to local videos:
+    // external (YouTube) rows have no file on disk and must never be touched by
+    // a scan.
     const existingVideos = db.prepare(
       "SELECT id, filepath, duration_seconds FROM videos WHERE source = 'local'"
     ).all() as { id: string; filepath: string; duration_seconds: number | null }[];
     const existingMap = new Map(existingVideos.map(v => [v.filepath, v.id]));
     const existingDurations = new Map(existingVideos.map(v => [v.filepath, v.duration_seconds]));
-    
+    // What this profile's library held before the scan.
+    const libraryBefore = db.prepare(`
+      SELECT pv.video_id AS id FROM profile_videos pv JOIN videos v ON v.id = pv.video_id
+      WHERE pv.profile_id = ? AND v.source = 'local'
+    `).all(profileId) as { id: string }[];
+
     // Get exclude paths
-    const excludeRow = db.prepare("SELECT value FROM settings WHERE key = 'exclude_paths'").get() as { value: string } | undefined;
-    const excludePaths = JSON.parse(excludeRow?.value || '[]');
+    const excludePaths = JSON.parse(getProfileSetting(profileId, 'exclude_paths') || '[]');
 
     // Scan directory
     const { files: videoFiles, unreadable } = scanDirectory(normalizedDir, excludePaths);
@@ -358,8 +370,8 @@ normalizedDir = path.resolve(normalizedDir);
         const thumbnailPath = await generateThumbnail(file, id);
         const knownDuration = existingDurations.get(file) ?? null;
         const duration = knownDuration ?? await probeDuration(file);
-        db.prepare('UPDATE videos SET filename = ?, relative_path = ?, thumbnail_path = ?, duration_seconds = ?, file_created_at = COALESCE(file_created_at, ?) WHERE id = ?')
-          .run(path.basename(file), relativePath, thumbnailPath, duration, fileCreatedAt(file), id);
+        db.prepare('UPDATE videos SET filename = ?, thumbnail_path = ?, duration_seconds = ?, file_created_at = COALESCE(file_created_at, ?) WHERE id = ?')
+          .run(path.basename(file), thumbnailPath, duration, fileCreatedAt(file), id);
       } else {
         // Insert new video
         id = nanoid();
@@ -368,6 +380,12 @@ normalizedDir = path.resolve(normalizedDir);
         db.prepare('INSERT INTO videos (id, filename, filepath, relative_path, thumbnail_path, duration_seconds, file_created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
           .run(id, path.basename(file), file, relativePath, thumbnailPath, duration, fileCreatedAt(file));
       }
+      // In this profile's library, at its path from this profile's folder. The
+      // favourite star survives a rescan.
+      db.prepare(`
+        INSERT INTO profile_videos (profile_id, video_id, relative_path, in_library) VALUES (?, ?, ?, 1)
+        ON CONFLICT(profile_id, video_id) DO UPDATE SET relative_path = excluded.relative_path, in_library = 1
+      `).run(profileId, id, relativePath);
       scannedIds.add(id);
       scanProgress.processed++;
     }
@@ -383,26 +401,57 @@ normalizedDir = path.resolve(normalizedDir);
     // find of nothing at all where the library previously had videos — which
     // in practice is never a user deleting their entire collection between
     // scans, and always something wrong with the path.
-    const emptiedEverything = videoFiles.length === 0 && existingVideos.length > 0;
+    //
+    // With profiles, "gone" has two meanings, kept strictly apart:
+    //   - not in this profile's folder any more → it leaves THIS profile's
+    //     library only. Someone else may still have it in theirs.
+    //   - its file sat inside the scanned folder and no longer exists on disk
+    //     → the video is gone for everyone, so its row goes. Checked file by
+    //     file, so a scan of one person's folder can never delete videos that
+    //     live in someone else's.
+    const emptiedEverything = videoFiles.length === 0 && libraryBefore.length > 0;
     const canReconcile = unreadable.length === 0 && !emptiedEverything;
 
     let removed = 0;
     if (canReconcile) {
-      const toDelete = existingVideos.filter(v => !scannedIds.has(v.id));
-      for (const v of toDelete) {
+      // Videos this profile's own plans use stay, wherever they live — a plan
+      // copied from someone else shouldn't empty out the moment its new owner
+      // picks a folder of their own.
+      const usedByPlans = new Set(
+        (db.prepare(`
+          SELECT DISTINCT j.value AS id FROM workout_plans p
+          JOIN workouts w ON w.plan_id = p.id, json_each(CASE WHEN json_valid(w.video_ids) THEN w.video_ids ELSE '[]' END) j
+          WHERE p.profile_id = ?
+        `).all(profileId) as { id: string }[]).map(r => r.id)
+      );
+      const leaving = libraryBefore.filter(v => !scannedIds.has(v.id) && !usedByPlans.has(v.id));
+      // Those plan videos stay for the plans, but they're no longer part of the
+      // library this person browses.
+      const keepForPlans = db.prepare('UPDATE profile_videos SET in_library = 0 WHERE profile_id = ? AND video_id = ?');
+      for (const v of libraryBefore) {
+        if (!scannedIds.has(v.id) && usedByPlans.has(v.id)) keepForPlans.run(profileId, v.id);
+      }
+      const dropMembership = db.prepare('DELETE FROM profile_videos WHERE profile_id = ? AND video_id = ?');
+      for (const v of leaving) dropMembership.run(profileId, v.id);
+      removed = leaving.length;
+
+      const insideFolder = (file: string) => file === normalizedDir || file.startsWith(normalizedDir + path.sep);
+      const deletedFiles = existingVideos.filter(v =>
+        !scannedIds.has(v.id) && insideFolder(v.filepath) && !fs.existsSync(v.filepath));
+      for (const v of deletedFiles) {
+        db.prepare('DELETE FROM profile_videos WHERE video_id = ?').run(v.id);
         db.prepare('DELETE FROM videos WHERE id = ?').run(v.id);
       }
-      removed = toDelete.length;
     } else {
       console.warn(
         `[Library] Skipped removing missing videos: ` +
         `${unreadable.length} unreadable path(s), found ${videoFiles.length} file(s), ` +
-        `${existingVideos.length} already in the library.`
+        `${libraryBefore.length} already in the library.`
       );
     }
 
-    // Rematch all plans to fix any stale video IDs or paths
-    rematchAllPlans();
+    // Rematch this profile's plans to fix any stale video IDs or paths
+    rematchAllPlans(profileId);
 
     scanProgress.phase = 'done';
     return reply.send({
@@ -424,28 +473,37 @@ normalizedDir = path.resolve(normalizedDir);
   });
 
   fastify.get('/videos', async (request, reply) => {
-    const videos = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM videos`).all() as any[];
-    const counts = completionCounts(videos);
+    const profileId = requireProfile(request, reply);
+    if (!profileId) return;
+    const videos = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM ${PROFILE_VIDEOS} AS videos`).all(profileId) as any[];
+    const counts = completionCounts(profileId, videos);
     return reply.send(videos.map(row => ({ ...formatVideoRow(row), completed_count: counts.get(row.id) || 0 })));
   });
 
   // Star or un-star a video.
   fastify.put('/videos/:id/favorite', async (request, reply) => {
+    const profileId = requireProfile(request, reply);
+    if (!profileId) return;
     const { id } = request.params as { id: string };
     const { favorite } = request.body as { favorite?: boolean };
-    const existing = db.prepare('SELECT id FROM videos WHERE id = ?').get(id);
-    if (!existing) return reply.code(404).send({ error: 'Video not found' });
 
+    // The star is per person.
     const value = favorite ? 1 : 0;
-    db.prepare('UPDATE videos SET is_favorite = ? WHERE id = ?').run(value, id);
+    const { changes } = db.prepare('UPDATE profile_videos SET is_favorite = ? WHERE profile_id = ? AND video_id = ?')
+      .run(value, profileId, id);
+    if (!changes) return reply.code(404).send({ error: 'Video not found' });
     return reply.send({ success: true, isFavorite: value === 1 });
   });
 
   fastify.patch('/videos/:id', async (request, reply) => {
+    const profileId = requireProfile(request, reply);
+    if (!profileId) return;
     const { id } = request.params as { id: string };
     const body = request.body as { description?: string; equipment?: string[]; training_type?: string[]; body_parts?: string[]; intensity?: string };
 
-    const existing = db.prepare('SELECT id FROM videos WHERE id = ?').get(id);
+    // Tags and descriptions are shared (a video is the same video for everyone),
+    // but only someone with the video in their library can edit them.
+    const existing = db.prepare('SELECT 1 FROM profile_videos WHERE profile_id = ? AND video_id = ?').get(profileId, id);
     if (!existing) {
       return reply.code(404).send({ error: 'Video not found' });
     }
@@ -470,7 +528,7 @@ normalizedDir = path.resolve(normalizedDir);
     db.prepare('UPDATE videos SET description = ?, equipment = ?, training_type = ?, body_parts = ?, intensity = ? WHERE id = ?')
       .run(description, JSON.stringify(equipment), JSON.stringify(training_type), JSON.stringify(body_parts), intensity, id);
 
-    const updated = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM videos WHERE id = ?`).get(id) as any;
+    const updated = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM ${PROFILE_VIDEOS} AS videos WHERE id = ?`).get(profileId, id) as any;
 
     return reply.send(formatVideoRow(updated));
   });

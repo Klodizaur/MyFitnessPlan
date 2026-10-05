@@ -231,7 +231,10 @@ select.st-input { padding: 0 12px; cursor: pointer; }
 .st-bar,
 .st-toast {
   position: fixed;
-  z-index: 9;
+  /* Above everything that can sit under it — including the Settings layer
+     the mobile gear opens over the page (11) and the header (12) — or the
+     bar would be there but covered, and there'd be no way to save. */
+  z-index: 13;
   left: 50%;
   transform: translateX(-50%);
   bottom: 24px;

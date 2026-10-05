@@ -14,6 +14,8 @@ import {
 import { useIsMobile } from '../lib/useIsMobile';
 import { SETTINGS_SAVED_EVENT } from '../lib/settingsEvents';
 import Settings from '../pages/Settings';
+import { useProfiles } from './profiles/ProfileGate';
+import ProfileAvatar from './profiles/ProfileAvatar';
 
 /**
  * The redesign's app shell.
@@ -97,11 +99,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Widening past phone size drops the layer; desktop has Settings in its nav.
   useEffect(() => { if (!isMobile) closeSettings(); }, [isMobile, closeSettings]);
 
+  const profiles = useProfiles();
+  // Who's using this device; tap to switch (or reach Settings › Profiles).
+  const profileButton = profiles?.current ? (
+    <button
+      type="button"
+      className="rx-profile"
+      onClick={profiles.openSwitcher}
+      aria-label={t('profiles.switch_from', { name: profiles.current.name })}
+      title={profiles.current.name}
+    >
+      <ProfileAvatar avatar={profiles.current.avatar} ownerName={profiles.current.name} className="" />
+    </button>
+  ) : null;
+
   const isEnglish = i18n.language.startsWith('en');
   const toggleLanguage = () => i18n.changeLanguage(isEnglish ? 'pl' : 'en');
 
   const brand = (
-    <NavLink to="/" className="rx-brand">
+    <NavLink to="/" className="rx-brand" onClick={closeSettings}>
       <img src="/logo.png" alt="" />
       <span className="rx-brand-text">MYFITNESSPLAN</span>
     </NavLink>
@@ -112,6 +128,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {isMobile ? (
         <div className="rx-mobile-head">
           {brand}
+          {profileButton}
           <button
             type="button"
             className={`rx-head-icon${settingsOpen || location.pathname === '/settings' ? ' is-on' : ''}`}
@@ -138,6 +155,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </NavLink>
               ))}
             </div>
+            {profileButton}
             <button
               type="button"
               className="rx-lang"

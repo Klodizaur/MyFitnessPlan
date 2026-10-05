@@ -488,7 +488,8 @@ async function importDatabase() {
       if (fs.existsSync(s)) fs.copyFileSync(s, targetDb + suffix);
     }
     // Bring over sibling asset folders if present (merge with any existing).
-    for (const sub of ['thumbnails', 'plan-backgrounds']) {
+    // "Back Up Everything..." writes exactly this layout.
+    for (const sub of ['thumbnails', 'plan-backgrounds', 'profile-pictures']) {
       const s = path.join(srcDir, sub);
       if (fs.existsSync(s) && fs.statSync(s).isDirectory()) {
         fs.cpSync(s, path.join(dataDir, sub), { recursive: true });
@@ -508,6 +509,54 @@ async function importDatabase() {
     message: 'Your data was imported.',
     detail: 'MyFitnessPlan restarted with your imported database.',
   });
+}
+
+// --- Back up everything (the other half of Import Database) -------------------
+// Every profile's data in one go: the server writes a dated folder with the
+// database and its picture folders, in the layout "Import Database..." reads.
+// Each person's own backups live in the app, under Settings > My profile.
+async function backupEverything() {
+  if (serverState !== 'running') {
+    await dialog.showMessageBox({
+      type: 'info',
+      title: 'Back Up Everything',
+      message: 'Start the server first.',
+      detail: 'The backup is made by the running app, so it is a consistent copy even while it is in use.',
+    });
+    return;
+  }
+
+  const pick = await dialog.showOpenDialog({
+    title: 'Back up everything',
+    message: 'Choose where to save the backup (a folder like iCloud Drive keeps it safe if this computer fails).',
+    buttonLabel: 'Back Up Here',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (pick.canceled || !pick.filePaths || pick.filePaths.length === 0) return;
+
+  const apiPort = isPackaged ? currentPort : DEV_PORT;
+  try {
+    const res = await fetch(`http://127.0.0.1:${apiPort}/api/backup/full`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dir: pick.filePaths[0] }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.folder) throw new Error(data.error || `HTTP ${res.status}`);
+    log('Backed up everything to', data.folder);
+    const { response } = await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Done', process.platform === 'darwin' ? 'Show in Finder' : 'Show Folder'],
+      defaultId: 0,
+      title: 'Backup complete',
+      message: 'Everything was backed up.',
+      detail: `${data.folder}\n\nTo bring it back, use Import Database... and choose the workout-planner.db inside that folder.`,
+    });
+    if (response === 1) shell.showItemInFolder(path.join(data.folder, 'workout-planner.db'));
+  } catch (e) {
+    log('Backup failed:', e.message);
+    dialog.showErrorBox('Backup failed', `The backup could not be saved.\n\n${e.message}`);
+  }
 }
 
 // --- Check for updates (lightweight; no code signing required) ---------------
@@ -608,6 +657,18 @@ async function checkForUpdates() {
 function currentUrl() {
   return isPackaged ? `http://localhost:${currentPort}/` : CLIENT_DEV_URL;
 }
+
+/**
+ * Show a folder in Finder / Explorer (where a profile's backups are). Only a
+ * real, existing folder: never a file, so a page can't use this to open one.
+ */
+ipcMain.handle('open-folder', async (_event, folder) => {
+  try {
+    if (typeof folder !== 'string' || !path.isAbsolute(folder) || !fs.statSync(folder).isDirectory()) return false;
+  } catch (e) { return false; }
+  const error = await shell.openPath(folder);
+  return !error;
+});
 
 /** Native folder picker for Settings (video library / exclude paths). */
 ipcMain.handle('pick-directory', async (event) => {
@@ -766,6 +827,7 @@ function updateTray() {
     ...(sharedAt ? [{ label: sharedAt, enabled: false }] : []),
     { type: 'separator' },
     { label: 'Open App', click: () => openApp() },
+    { label: 'Back Up Everything...', enabled: running, click: () => backupEverything() },
     { label: 'Import Database...', enabled: !starting, click: () => importDatabase() },
     { type: 'separator' },
     {

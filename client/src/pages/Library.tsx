@@ -15,10 +15,11 @@ import { ImportResult, useDescriptionProgress, useImportAvailable } from '../lib
 import { useIsMobile } from '../lib/useIsMobile';
 import VideoDetailsModal from '../components/VideoDetailsModal';
 import YouTubeImportModal from '../components/YouTubeImportModal';
-import { Video } from '../types/video';
+import { inLibrary, Video } from '../types/video';
 import '../styles/library.css';
 import { compareAdded, naturalCompare, sortVideos } from '../lib/videoSort';
 import { timeAgo } from '../lib/dates';
+import { useRootFolderName } from '../lib/rootFolder';
 
 const PAGE = 24;
 const RECENT_COUNT = 6;
@@ -32,6 +33,7 @@ const RECENT_COUNT = 6;
  */
 export default function Library() {
   const { t, i18n } = useTranslation();
+  const rootName = useRootFolderName();
   const labels = useMetaLabels();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -64,7 +66,8 @@ export default function Library() {
   const loadVideos = useCallback(() => {
     fetch('/api/library/videos')
       .then(r => r.json())
-      .then((data: Video[]) => setVideos(data || []))
+      // Only your library — not videos that are only here for one of your plans.
+      .then((data: Video[]) => setVideos((data || []).filter(inLibrary)))
       .catch(err => console.error('Failed to load library:', err));
   }, []);
 
@@ -111,7 +114,7 @@ export default function Library() {
         key,
         title: isExternalAlbumKey(key)
           ? (vids[0]?.external_playlist_title || t('library.untitled_playlist'))
-          : key === '.' ? t('library.root_folder') : key,
+          : key === '.' ? rootName : key,
         cover: stored || (vids[0]?.thumbnail_path ? `/thumbnails/${vids[0].thumbnail_path}` : null),
         count: vids.length,
         isExternal: isExternalAlbumKey(key),
@@ -141,7 +144,7 @@ export default function Library() {
       });
     }
     return result;
-  }, [filteredVideos, sort, t]);
+  }, [filteredVideos, sort, t, rootName]);
 
   /** How many albums the library has in total — the header describes the
       library, so it shouldn't shrink as filters are applied. */

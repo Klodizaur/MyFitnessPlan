@@ -31,6 +31,15 @@ export type Video = {
    * or when an imported video was added to the app.
    */
   added_at?: string | null;
-  /** Times this video has been completed, from the workout log. */
+  /**
+   * False for a video that's only here because one of your plans uses it (a
+   * plan copied from someone whose folder isn't yours): the plan plays it, but
+   * it isn't part of the library you browse.
+   */
+  in_library?: boolean;
+    /** Times this video has been completed, from the workout log. */
   completed_count?: number;
 };
+
+/** Whether a video is part of the library you browse (see `in_library`). */
+export const inLibrary = (video: { in_library?: boolean }) => video.in_library !== false;

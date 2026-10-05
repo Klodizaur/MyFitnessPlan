@@ -26,7 +26,7 @@ import { albumKeyForVideo, isExternalAlbumKey } from '../../lib/paths';
 import { DEFAULT_PATTERN } from '../WorkoutPatternPicker';
 import RhythmEditor from '../builder/RhythmEditor';
 import { BuilderWeek, createWeek } from '../../lib/builderModel';
-import { Video } from '../../types/video';
+import { inLibrary, Video } from '../../types/video';
 import '../../styles/aiplan.css';
 import '../../styles/builder.css';
 import { localDateString } from '../../lib/dates';
@@ -227,7 +227,7 @@ export default function AiPlanModal({ open, onClose, onGenerated, onSaved }: Pro
     if (!open || videos.length > 0) return;
     fetch('/api/library/videos')
       .then(r => r.json())
-      .then((data: Video[]) => setVideos(data || []))
+      .then((data: Video[]) => setVideos((data || []).filter(inLibrary)))
       .catch(() => setVideos([]));
   }, [open, videos.length]);
 

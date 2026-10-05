@@ -18,6 +18,8 @@ const DAY_NAMES = new Set([
 import { matchVideo, rematchPlanWorkouts, rematchAllPlans } from '../matcher.js';
 import { analyzeImport, exportPlans, importPlans, validateExportFile } from '../planTransfer.js';
 import { appVersion } from '../version.js';
+import { ownsPlan, profileHook, PROFILE_VIDEOS } from '../profiles.js';
+import { copyPlanTo } from '../planCopy.js';
 
 function isSkip(cell: string): boolean {
   const t = cell.trim();
@@ -172,7 +174,20 @@ function parseRowFormat(records: string[][]): Session[] {
 }
 
 export default async function (fastify: FastifyInstance) {
+  // Every plan belongs to a profile. Any route naming a plan (`:id`) answers
+  // "not found" for someone else's — checked once here rather than in each
+  // handler, so no route can forget.
+  fastify.addHook('preHandler', profileHook);
+  fastify.addHook('preHandler', async (request, reply) => {
+    const id = (request.params as { id?: string } | undefined)?.id;
+    if (id && !ownsPlan(request.profileId, id)) {
+      reply.code(404).send({ error: 'Plan not found' });
+      return reply;
+    }
+  });
+
   fastify.post('/upload', async (request, reply) => {
+    const profileId = request.profileId;
     const data = await request.file();
     if (!data) return reply.code(400).send({ error: 'No file uploaded' });
 
@@ -205,10 +220,10 @@ export default async function (fastify: FastifyInstance) {
 
     const startDate = new Date().toISOString().split('T')[0];
     // An upload takes over the main slot only; a plan in the extra slot stays active.
-    db.prepare('UPDATE workout_plans SET is_active = 0 WHERE is_active = ?').run(ACTIVE_MAIN);
-    db.prepare('INSERT INTO workout_plans (id, name, is_active, start_date) VALUES (?, ?, ?, ?)').run(planId, planName, ACTIVE_MAIN, startDate);
+    db.prepare('UPDATE workout_plans SET is_active = 0 WHERE is_active = ? AND profile_id = ?').run(ACTIVE_MAIN, profileId);
+    db.prepare('INSERT INTO workout_plans (id, profile_id, name, is_active, start_date) VALUES (?, ?, ?, ?, ?)').run(planId, profileId, planName, ACTIVE_MAIN, startDate);
 
-    const videos = db.prepare('SELECT id, filename FROM videos').all() as { id: string; filename: string }[];
+    const videos = db.prepare(`SELECT id, filename FROM ${PROFILE_VIDEOS} AS videos`).all(profileId) as { id: string; filename: string }[];
 
     const insertStmt = db.prepare(
       'INSERT INTO workouts (id, plan_id, name, sequence_order, video_ids) VALUES (?, ?, ?, ?, ?)'
@@ -249,8 +264,8 @@ export default async function (fastify: FastifyInstance) {
 
     db.transaction(() => {
       db.prepare(
-        'INSERT INTO workout_plans (id, name, is_active, start_date, category, description, workout_pattern) VALUES (?, ?, 0, ?, ?, ?, ?)'
-      ).run(planId, planName, startDate, category, description, pattern);
+        'INSERT INTO workout_plans (id, profile_id, name, is_active, start_date, category, description, workout_pattern) VALUES (?, ?, ?, 0, ?, ?, ?, ?)'
+      ).run(planId, request.profileId, planName, startDate, category, description, pattern);
       const insertStmt = db.prepare(
         'INSERT INTO workouts (id, plan_id, name, sequence_order, video_ids) VALUES (?, ?, ?, ?, ?)'
       );
@@ -389,8 +404,8 @@ export default async function (fastify: FastifyInstance) {
   fastify.get('/active', async (request, reply) => {
     // Main slot first, then the extra plan when one is active.
     const plans = db.prepare(
-      'SELECT * FROM workout_plans WHERE is_active IN (?, ?) ORDER BY is_active ASC'
-    ).all(ACTIVE_MAIN, ACTIVE_EXTRA) as any[];
+      'SELECT * FROM workout_plans WHERE is_active IN (?, ?) AND profile_id = ? ORDER BY is_active ASC'
+    ).all(ACTIVE_MAIN, ACTIVE_EXTRA, request.profileId) as any[];
     const withWorkouts = plans.map(plan => ({
       slot: plan.is_active === ACTIVE_EXTRA ? 'extra' : 'main',
       plan,
@@ -411,10 +426,12 @@ export default async function (fastify: FastifyInstance) {
     // Active plans first (main, then extra), then newest uploads. Each plan is
     // enriched with its workout count and the union of equipment tags across its videos.
     const plans = db.prepare(`
-      SELECT * FROM workout_plans
+      SELECT * FROM workout_plans WHERE profile_id = ?
       ORDER BY (CASE is_active WHEN ${ACTIVE_MAIN} THEN 0 WHEN ${ACTIVE_EXTRA} THEN 1 ELSE 2 END), uploaded_at DESC
-    `).all() as any[];
-    const workouts = db.prepare('SELECT plan_id, video_ids FROM workouts').all() as { plan_id: string; video_ids: string | null }[];
+    `).all(request.profileId) as any[];
+    const workouts = db.prepare(
+      'SELECT plan_id, video_ids FROM workouts WHERE plan_id IN (SELECT id FROM workout_plans WHERE profile_id = ?)'
+    ).all(request.profileId) as { plan_id: string; video_ids: string | null }[];
     const videos = db.prepare('SELECT id, equipment, source FROM videos').all() as { id: string; equipment: string | null; source: string | null }[];
 
     const equipmentByVideo = new Map<string, string[]>();
@@ -433,8 +450,8 @@ export default async function (fastify: FastifyInstance) {
 
     // Times each plan has been finished, from the durable record.
     const finishes = new Map(
-      (db.prepare('SELECT plan_id, COUNT(*) AS n FROM plan_completions WHERE plan_id IS NOT NULL GROUP BY plan_id')
-        .all() as { plan_id: string; n: number }[]).map(r => [r.plan_id, r.n])
+      (db.prepare('SELECT plan_id, COUNT(*) AS n FROM plan_completions WHERE plan_id IS NOT NULL AND profile_id = ? GROUP BY plan_id')
+        .all(request.profileId) as { plan_id: string; n: number }[]).map(r => [r.plan_id, r.n])
     );
 
     const enriched = plans.map(plan => {
@@ -495,8 +512,8 @@ export default async function (fastify: FastifyInstance) {
       ? db.prepare(
           `SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type,
                   body_parts, intensity, duration_seconds, source, external_id, external_url
-           FROM videos WHERE id IN (${orderedIds.map(() => '?').join(', ')})`
-        ).all(...orderedIds) as any[]
+           FROM ${PROFILE_VIDEOS} AS videos WHERE id IN (${orderedIds.map(() => '?').join(', ')})`
+        ).all(request.profileId, ...orderedIds) as any[]
       : [];
 
     const resolved = new Map(
@@ -558,7 +575,8 @@ export default async function (fastify: FastifyInstance) {
     const flag = FLAG_BY_SLOT[targetSlot];
 
     db.transaction(() => {
-      db.prepare('UPDATE workout_plans SET is_active = ? WHERE is_active = ?').run(ACTIVE_NONE, flag);
+      // Only your own plan in that slot makes way; slots are per profile.
+      db.prepare('UPDATE workout_plans SET is_active = ? WHERE is_active = ? AND profile_id = ?').run(ACTIVE_NONE, flag, request.profileId);
       db.prepare('UPDATE workout_plans SET is_active = ?, start_date = ? WHERE id = ?').run(flag, finalStartDate, id);
     })();
 
@@ -571,42 +589,14 @@ export default async function (fastify: FastifyInstance) {
     const { id } = request.params as { id: string };
     const { name } = request.body as { name?: string } | null || {};
 
-    const plan = db.prepare('SELECT * FROM workout_plans WHERE id = ?').get(id) as any;
+    const plan = db.prepare('SELECT name FROM workout_plans WHERE id = ?').get(id) as { name: string } | undefined;
     if (!plan) return reply.code(404).send({ error: 'Plan not found' });
 
-    const workouts = db.prepare(
-      'SELECT name, sequence_order, video_ids FROM workouts WHERE plan_id = ? ORDER BY sequence_order ASC'
-    ).all(id) as { name: string; sequence_order: number; video_ids: string | null }[];
-
-    const copyId = nanoid();
     // The client supplies the copy's name so it follows the UI language.
     const copyName = (typeof name === 'string' && name.trim() ? name.trim() : `${plan.name} (copy)`).slice(0, 200);
+    const copy = copyPlanTo(id, request.profileId, copyName)!;
 
-    db.transaction(() => {
-      db.prepare(`
-        INSERT INTO workout_plans
-          (id, name, is_active, start_date, category, description, background_image, background_blur, workout_pattern)
-        VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?)
-      `).run(
-        copyId,
-        copyName,
-        plan.start_date,
-        plan.category ?? null,
-        plan.description ?? null,
-        plan.background_image ?? null,
-        plan.background_blur ?? 0,
-        plan.workout_pattern ?? null
-      );
-
-      const insertStmt = db.prepare(
-        'INSERT INTO workouts (id, plan_id, name, sequence_order, video_ids) VALUES (?, ?, ?, ?, ?)'
-      );
-      for (const workout of workouts) {
-        insertStmt.run(nanoid(), copyId, workout.name, workout.sequence_order, workout.video_ids);
-      }
-    })();
-
-    return reply.send({ success: true, planId: copyId, workoutCount: workouts.length });
+    return reply.send({ success: true, planId: copy.planId, workoutCount: copy.workoutCount });
   });
 
   // Take a plan out of whichever slot it occupies, without deleting it.
@@ -621,8 +611,8 @@ export default async function (fastify: FastifyInstance) {
 
   fastify.post('/rematch-active', async (request, reply) => {
     const activePlans = db.prepare(
-      'SELECT id FROM workout_plans WHERE is_active IN (?, ?)'
-    ).all(ACTIVE_MAIN, ACTIVE_EXTRA) as { id: string }[];
+      'SELECT id FROM workout_plans WHERE is_active IN (?, ?) AND profile_id = ?'
+    ).all(ACTIVE_MAIN, ACTIVE_EXTRA, request.profileId) as { id: string }[];
     if (!activePlans.length) return reply.code(404).send({ error: 'No active plan' });
 
     for (const plan of activePlans) rematchPlanWorkouts(plan.id);
@@ -704,7 +694,7 @@ export default async function (fastify: FastifyInstance) {
   });
 
   fastify.post('/rematch-all', async (request, reply) => {
-    const plans = db.prepare('SELECT id FROM workout_plans').all() as { id: string }[];
+    const plans = db.prepare('SELECT id FROM workout_plans WHERE profile_id = ?').all(request.profileId) as { id: string }[];
     for (const plan of plans) {
       rematchPlanWorkouts(plan.id);
     }
@@ -722,7 +712,7 @@ export default async function (fastify: FastifyInstance) {
       ? ids.split(',').map(v => v.trim()).filter(Boolean)
       : null;
 
-    const file = exportPlans(planIds, appVersion);
+    const file = exportPlans(request.profileId, planIds, appVersion);
     if (file.plans.length === 0) return reply.code(404).send({ error: 'No plans to export' });
 
     return reply.type('application/json').send(file);
@@ -745,10 +735,10 @@ export default async function (fastify: FastifyInstance) {
     }
 
     if (body?.dryRun) {
-      return reply.send({ dryRun: true, reports: analyzeImport(validated.file) });
+      return reply.send({ dryRun: true, reports: analyzeImport(request.profileId, validated.file) });
     }
 
-    const { reports, planIds } = importPlans(validated.file);
+    const { reports, planIds } = importPlans(request.profileId, validated.file);
     return reply.send({ success: true, reports, planIds });
   });
 }

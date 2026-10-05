@@ -2,27 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Check, CircleCheck, Dumbbell, Folder, FolderX, Info, Loader, MonitorSmartphone, Minus, Moon, Palette, Plus, RefreshCw, Sparkles, X,
+  Check, CircleCheck, Dumbbell, Folder, FolderX, Info, Loader, MonitorSmartphone, Minus, Moon, Palette, Plus, RefreshCw, Sparkles, Users, X,
 } from 'lucide-react';
 import AiSettingsSection from '../components/ai/AiSettingsSection';
 import { isTv } from '../lib/tv';
 import DevicesSection, { sharingBridge } from '../components/DevicesSection';
+import ProfilesSection from '../components/profiles/ProfilesSection';
+import { useProfiles } from '../components/profiles/ProfileGate';
+import { avatarUrl, BackupInfo, BackupPrefs, getMyBackup, saveMyBackup, updateMyProfile, uploadMyPicture } from '../lib/profiles';
+import BackupSection from '../components/profiles/BackupSection';
+import { PictureError, squarePicture } from '../lib/imageResize';
 import { announceSettingsSaved } from '../lib/settingsEvents';
+import { THEMES } from '../lib/themes';
 import '../styles/settings.css';
-
-/**
- * Themes as the settings card draws them: the page colour behind the tile, its
- * accent, the text colour that reads on it and a surface swatch.
- */
-const THEMES = [
-  { id: 'midnight', bg: '#111A2E', accent: '#3B82F6', fg: '#FFFFFF', surface: '#111A2E' },
-  { id: 'sunset', bg: '#2E1A33', accent: '#F97316', fg: '#FFFFFF', surface: '#2E1A33' },
-  { id: 'forest', bg: '#08503E', accent: '#10B981', fg: '#FFFFFF', surface: '#08503E' },
-  { id: 'pastel-orange', bg: '#FFF5EC', accent: '#F9B27A', fg: '#6B2410', surface: '#FFFFFF' },
-  { id: 'pastel-pink', bg: '#FDF0F6', accent: '#F59AC6', fg: '#5A1E3A', surface: '#FFFFFF' },
-  { id: 'sky-blue', bg: '#EEF6FD', accent: '#7CCBF2', fg: '#153A5A', surface: '#FFFFFF' },
-  { id: 'watermelon', bg: '#EAF6EC', accent: '#DC2F4B', fg: '#4A1520', surface: '#FFFFFF' },
-];
 
 /**
  * Settings tabs, in the order they're shown.
@@ -33,6 +25,7 @@ const THEMES = [
 const SETTINGS_TABS = [
   { id: 'workouts', Icon: Dumbbell },
   { id: 'appearance', Icon: Palette },
+  { id: 'profiles', Icon: Users },
   { id: 'ai', Icon: Sparkles },
   // Desktop app only: filtered out below anywhere else (see DevicesSection).
   { id: 'devices', Icon: MonitorSmartphone },
@@ -76,9 +69,13 @@ export default function Settings() {
   const canShare = sharingBridge() !== null;
   const tabs = SETTINGS_TABS.filter(({ id }) => id !== 'devices' || canShare);
   // The desktop app reopens here (?tab=devices) after switching sharing restarts it.
-  const [tab, setTab] = useState<SettingsTab>(() =>
-    canShare && new URLSearchParams(window.location.search).get('tab') === 'devices' ? 'devices' : 'workouts'
-  );
+  // Reopened on a tab by ?tab=… (the desktop app after a sharing restart, the
+  // profile switcher's "Manage profiles").
+  const [tab, setTab] = useState<SettingsTab>(() => {
+    const asked = new URLSearchParams(window.location.search).get('tab');
+    if (asked === 'devices') return canShare ? 'devices' : 'workouts';
+    return asked === 'profiles' ? 'profiles' : 'workouts';
+  });
   const [scanNote, setScanNote] = useState<{ text: string; ok: boolean } | null>(null);
   const [toast, setToast] = useState('');
   const toastTimer = useRef<number | undefined>(undefined);
@@ -132,10 +129,68 @@ export default function Settings() {
     if (savedThemeRef.current) document.body.setAttribute('data-theme', savedThemeRef.current);
   }, []);
 
-  const dirty = useMemo(
+  const settingsDirty = useMemo(
     () => saved !== null && JSON.stringify({ pattern, excludePaths, theme, calendarView }) !== JSON.stringify(saved),
     [saved, pattern, excludePaths, theme, calendarView]
   );
+
+  // Your profile's name and picture go through the same unsaved-changes bar as
+  // everything else here, rather than a Save button of their own.
+  const profiles = useProfiles();
+  const me = profiles?.current ?? null;
+  const [profileName, setProfileName] = useState(me?.name ?? '');
+  const [profileAvatar, setProfileAvatar] = useState(me?.avatar ?? '');
+  useEffect(() => {
+    if (!me) return;
+    setProfileName(me.name);
+    setProfileAvatar(me.avatar);
+  }, [me?.name, me?.avatar]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A photo picked but not saved yet: shrunk already, uploaded on Save.
+  const PENDING = 'pending-photo';
+  const [pendingPhoto, setPendingPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [preparingPhoto, setPreparingPhoto] = useState(false);
+  const dropPendingPhoto = () => {
+    setPendingPhoto(prev => { if (prev) URL.revokeObjectURL(prev.url); return null; });
+  };
+  useEffect(() => () => { if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url); }, [pendingPhoto]);
+  // Set by the × on your saved photo: it disappears now and is deleted on Save.
+  const [photoRemoved, setPhotoRemoved] = useState(false);
+  const customPicture = pendingPhoto
+    ? { value: PENDING, url: pendingPhoto.url }
+    : me?.avatar.startsWith('custom:') && !photoRemoved ? { value: me.avatar, url: avatarUrl(me.avatar) } : null;
+  const removePhoto = () => {
+    if (pendingPhoto) dropPendingPhoto();
+    else setPhotoRemoved(true);
+    // Still showing the photo that's going? Fall back to the default picture.
+    if (profileAvatar === PENDING || profileAvatar.startsWith('custom:')) setProfileAvatar('avatar-1');
+  };
+  const pickPhoto = async (file: File) => {
+    setPreparingPhoto(true);
+    try {
+      const blob = await squarePicture(file);
+      dropPendingPhoto();
+      setPendingPhoto({ blob, url: URL.createObjectURL(blob) });
+      setProfileAvatar(PENDING);
+    } catch (err) {
+      flash(t(err instanceof PictureError && err.code === 'too_large' ? 'profiles.photo_too_large' : 'profiles.photo_not_image'));
+    } finally {
+      setPreparingPhoto(false);
+    }
+  };
+  const profileDirty = Boolean(me) && (profileName.trim() !== me!.name || profileAvatar !== me!.avatar);
+
+  // Your backup schedule: edited here, saved with everything else by the bar.
+  const [backupInfo, setBackupInfo] = useState<BackupInfo | null>(null);
+  const [backupPrefs, setBackupPrefs] = useState<BackupPrefs | null>(null);
+  const loadBackup = () => getMyBackup()
+    .then(info => { setBackupInfo(info); setBackupPrefs({ everyDays: info.everyDays, keep: info.keep, dir: info.dir }); })
+    .catch(() => { /* the card just doesn't show */ });
+  useEffect(() => { if (me) loadBackup(); }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const backupDirty = Boolean(backupInfo && backupPrefs) && (
+    backupPrefs!.everyDays !== backupInfo!.everyDays || backupPrefs!.keep !== backupInfo!.keep || backupPrefs!.dir !== backupInfo!.dir
+  );
+
+  const dirty = settingsDirty || profileDirty || backupDirty;
 
   const handleBrowseDirectory = async () => {
     const picked = await window.myFitnessPlan?.pickDirectory();
@@ -187,7 +242,42 @@ export default function Settings() {
   };
 
   const handleSaveSettings = async () => {
+    if (profileDirty && !profileName.trim()) {
+      flash(t('profiles.name_required'));
+      return;
+    }
     try {
+      if (profileDirty) {
+        if (profileAvatar === PENDING && pendingPhoto) {
+          // If the upload fails, nothing else is saved and the bar stays, so
+          // it can simply be tried again; the old picture is untouched.
+          try {
+            await uploadMyPicture(pendingPhoto.blob);
+          } catch {
+            flash(t('profiles.photo_failed'));
+            return;
+          }
+          dropPendingPhoto();
+          if (profileName.trim() !== me!.name) await updateMyProfile({ name: profileName.trim() });
+        } else {
+          await updateMyProfile({ name: profileName.trim(), avatar: profileAvatar });
+        }
+        await profiles?.refresh();
+        setPhotoRemoved(false);
+      }
+      if (backupDirty && backupPrefs) {
+        try {
+          await saveMyBackup(backupPrefs);
+          await loadBackup();
+        } catch {
+          flash(t('backup.folder_failed'));
+          return;
+        }
+      }
+      if (!settingsDirty) {
+        flash(t('settings.settings_saved'));
+        return;
+      }
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,6 +299,13 @@ export default function Settings() {
   };
 
   const handleDiscard = () => {
+    if (me) {
+      setProfileName(me.name);
+      setProfileAvatar(me.avatar);
+    }
+    dropPendingPhoto();
+    setPhotoRemoved(false);
+    if (backupInfo) setBackupPrefs({ everyDays: backupInfo.everyDays, keep: backupInfo.keep, dir: backupInfo.dir });
     if (!saved) return;
     setPattern(saved.pattern);
     setExcludePaths(saved.excludePaths);
@@ -438,6 +535,28 @@ export default function Settings() {
         {tab === 'ai' && <AiSettingsSection />}
 
         {tab === 'devices' && <DevicesSection />}
+
+        {tab === 'profiles' && (
+          <ProfilesSection
+            name={profileName}
+            onName={setProfileName}
+            avatar={profileAvatar}
+            onAvatar={setProfileAvatar}
+            customPicture={customPicture}
+            onUpload={pickPhoto}
+            uploading={preparingPhoto}
+            onRemovePhoto={removePhoto}
+            backup={backupInfo && backupPrefs && me ? (
+              <BackupSection
+                info={backupInfo}
+                prefs={backupPrefs}
+                onPrefs={setBackupPrefs}
+                onBackedUp={loadBackup}
+                currentId={me.id}
+              />
+            ) : null}
+          />
+        )}
 
         {tab === 'about' && (
           <div className="st-stack">

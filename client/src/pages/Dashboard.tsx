@@ -6,7 +6,7 @@ import { CompletedBadge } from '../components/library/LibraryCards';
 import { useTranslation } from 'react-i18next';
 import { albumKeyForVideo, isExternalAlbumKey, toAlbumRouteParam } from '../lib/paths';
 import { timeAgo, useToday } from '../lib/dates';
-import { Video } from '../types/video';
+import { inLibrary, Video } from '../types/video';
 import '../styles/dashboard.css';
 
 /** How many of the newest videos the "Recently added" strip shows. */
@@ -101,7 +101,8 @@ export default function Dashboard() {
   useEffect(() => {
     fetch('/api/library/videos')
       .then(r => r.json())
-      .then((data: any[]) => {
+      .then((all: any[]) => {
+        const data = (all || []).filter(inLibrary);
         // Newest arrivals first: a file's creation date on disk, or when an
         // imported video was added. Videos without a date sort last.
         setRecentVideos(

@@ -174,11 +174,26 @@ body {
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease;
-  /* The tape's full-bleed rows use `width: 100vw` to break out of the page's
-     own max-width — 100vw includes the vertical scrollbar's own width on
-     desktop, which is fractionally wider than the true visible viewport and
-     otherwise shows up as a page-level horizontal scrollbar. */
+}
+
+/* The page's own scrolling, set on <html> so it applies to the window:
+   - overflow-x: the tape's full-bleed rows use `width: 100vw` to break out of
+     the page's max-width — 100vw includes the vertical scrollbar's width on
+     desktop, so it's fractionally wider than the visible page and would
+     otherwise show a page-level horizontal scrollbar.
+   - overflow-y: always show the vertical scrollbar. Otherwise a page that's
+     briefly short — while its data loads after switching tabs — has none, the
+     header spans the full width for a moment, and then shrinks back once the
+     scrollbar appears. (`scrollbar-gutter: stable` would be the gentler way,
+     but Chrome ignores it on the page itself; it's kept for browsers that
+     honour it.) Where scrollbars overlay the page (macOS by default, phones)
+     this changes nothing visible.
+   Both live here rather than on <body>: hiding overflow on <body> makes it
+   the page's scrolling box, which breaks sticky headers. */
+html {
   overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
 }
 
 #root {

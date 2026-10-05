@@ -13,6 +13,11 @@ import scheduleRoutes from './routes/schedule.js';
 import profileRoutes from './routes/profile.js';
 import externalRoutes from './routes/external.js';
 import aiRoutes from './routes/ai.js';
+import profilesRoutes from './routes/profiles.js';
+import { startBackupSchedule } from './profileBackup.js';
+import {
+  currentProfileId, getProfileSetting, isLocalRequest, isProfileSetting, PROFILE_VIDEOS, requireProfile, setProfileSetting,
+} from './profiles.js';
 import { appVersion } from './version.js';
 import { clientProfile, copyPlan, decidePlayback, mediaForVideo, probeMedia } from './playback.js';
 import { hlsPlaylist, hlsSegment, progressiveMp4, SEGMENT_SECONDS, segmentCount } from './transcode.js';
@@ -99,12 +104,9 @@ function streamFile(filePath: string, options?: { start: number; end: number }) 
   return stream;
 }
 
-/** The configured library root, or null when the user has not picked one. */
-function videoDirectory(): string | null {
-  const row = db.prepare("SELECT value FROM settings WHERE key = 'video_directory'").get() as
-    | { value: string }
-    | undefined;
-  return row?.value || null;
+/** A profile's library root, or null when it has not picked one. */
+function videoDirectory(profileId: string | null): string | null {
+  return profileId ? getProfileSetting(profileId, 'video_directory') || null : null;
 }
 
 /**
@@ -113,8 +115,8 @@ function videoDirectory(): string | null {
  * against the root means a crafted URL cannot walk out of the library — which
  * matters now that the server can be reachable from other devices on the network.
  */
-function resolveLibraryFile(relativePath: string): string | null {
-  const videoDir = videoDirectory();
+function resolveLibraryFile(relativePath: string, profileId: string | null): string | null {
+  const videoDir = videoDirectory(profileId);
   if (!videoDir) return null;
   const segments = relativePath
     .replace(/\\/g, '/')
@@ -128,13 +130,27 @@ function resolveLibraryFile(relativePath: string): string | null {
 
 // Dynamic video route
 fastify.get('/videos/*', async (request, reply) => {
-  if (!videoDirectory()) {
-    return reply.code(404).send({ error: 'Video directory not configured' });
-  }
-
+  // Paths are relative to the requesting profile's own library folder.
+  const profileId = currentProfileId(request);
   // Accept either `/` or `\` in the URL; resolve with the OS path module.
   const relativePath = decodeURIComponent((request.params as any)['*']);
-  const fullPath = resolveLibraryFile(relativePath);
+
+  // Looked up in the profile's library and served from the file itself, so a
+  // video that came with a copied plan plays even if it isn't under this
+  // person's own folder (or they haven't picked one yet). Anything not in the
+  // library falls back to their folder.
+  const known = profileId
+    ? db.prepare(`
+        SELECT v.filepath FROM profile_videos pv JOIN videos v ON v.id = pv.video_id
+        WHERE pv.profile_id = ? AND pv.relative_path = ? AND v.source = 'local'
+      `).get(profileId, relativePath.replace(/\\/g, '/')) as { filepath: string } | undefined
+    : undefined;
+  if (!known && !videoDirectory(profileId)) {
+    return reply.code(404).send({ error: 'Video directory not configured' });
+  }
+  const fullPath = known?.filepath && fs.existsSync(known.filepath)
+    ? known.filepath
+    : resolveLibraryFile(relativePath, profileId);
 
   if (!fullPath || !fs.existsSync(fullPath)) {
     fastify.log.error(`File not found: ${fullPath ?? `outside the library (${relativePath})`}`);
@@ -146,8 +162,8 @@ fastify.get('/videos/*', async (request, reply) => {
   const query = request.query as { transcode?: string; start?: string };
   if (query.transcode === '1') {
     const row = db
-      .prepare('SELECT id FROM videos WHERE relative_path = ?')
-      .get(relativePath.replace(/\\/g, '/')) as { id: string } | undefined;
+      .prepare('SELECT video_id AS id FROM profile_videos WHERE profile_id = ? AND relative_path = ?')
+      .get(profileId, relativePath.replace(/\\/g, '/')) as { id: string } | undefined;
     const info = row
       ? await mediaForVideo(row.id, fullPath)
       : await probeMedia(fullPath);
@@ -250,13 +266,20 @@ interface VideoRow {
   source: string;
 }
 
-/** The library file behind a video id, or null for external or missing videos. */
-function fileForVideoId(videoId: string): { row: VideoRow; filePath: string } | null {
+/**
+ * The library file behind a video id, or null for external or missing videos —
+ * or a video that isn't in the requesting profile's library.
+ */
+function fileForVideoId(videoId: string, profileId: string | null): { row: VideoRow; filePath: string } | null {
+  if (!profileId) return null;
   const row = db
-    .prepare('SELECT id, relative_path, source FROM videos WHERE id = ?')
-    .get(videoId) as VideoRow | undefined;
+    .prepare(`SELECT id, relative_path, source, filepath FROM ${PROFILE_VIDEOS} AS videos WHERE id = ?`)
+    .get(profileId, videoId) as (VideoRow & { filepath: string }) | undefined;
   if (!row || (row.source || 'local') !== 'local') return null;
-  const filePath = resolveLibraryFile(row.relative_path || '');
+  // The file itself, wherever it lives — see /videos/* above.
+  const filePath = row.filepath && fs.existsSync(row.filepath)
+    ? row.filepath
+    : resolveLibraryFile(row.relative_path || '', profileId);
   if (!filePath || !fs.existsSync(filePath)) return null;
   return { row, filePath };
 }
@@ -297,7 +320,7 @@ function pipeFfmpeg(
  */
 fastify.get('/api/playback/:videoId', async (request, reply) => {
   const { videoId } = request.params as { videoId: string };
-  const found = fileForVideoId(videoId);
+  const found = fileForVideoId(videoId, currentProfileId(request));
   if (!found) return reply.code(404).send({ error: 'Video file not found' });
 
   const profile = clientProfile(request.headers['user-agent']);
@@ -343,7 +366,7 @@ fastify.get('/api/playback/:videoId', async (request, reply) => {
 /** The HLS playlist. Written from the runtime; no segment exists yet. */
 fastify.get('/videos/hls/:videoId/index.m3u8', async (request, reply) => {
   const { videoId } = request.params as { videoId: string };
-  const found = fileForVideoId(videoId);
+  const found = fileForVideoId(videoId, currentProfileId(request));
   if (!found) return reply.code(404).send({ error: 'Video file not found' });
 
   const info = await mediaForVideo(videoId, found.filePath);
@@ -361,7 +384,7 @@ fastify.get('/videos/hls/:videoId/index.m3u8', async (request, reply) => {
 /** One segment, encoded on demand. Any index, in any order — that is the seeking. */
 fastify.get('/videos/hls/:videoId/segment-:index.ts', async (request, reply) => {
   const { videoId, index } = request.params as { videoId: string; index: string };
-  const found = fileForVideoId(videoId);
+  const found = fileForVideoId(videoId, currentProfileId(request));
   if (!found) return reply.code(404).send({ error: 'Video file not found' });
 
   const info = await mediaForVideo(videoId, found.filePath);
@@ -412,6 +435,7 @@ fastify.register(scheduleRoutes, { prefix: '/api/schedule' });
 fastify.register(profileRoutes, { prefix: '/api/profile' });
 fastify.register(externalRoutes, { prefix: '/api/external' });
 fastify.register(aiRoutes, { prefix: '/api/ai' });
+fastify.register(profilesRoutes, { prefix: '/api/profiles' });
 
 // Exposed so the UI shows the running version automatically.
 /**
@@ -422,40 +446,80 @@ const computerName = os.hostname().replace(/\.local$/i, '').replace(/[-_]+/g, ' 
 
 fastify.get('/api/version', async (_request, reply) => reply.send({ version: appVersion, name: computerName }));
 
+/**
+ * Back up the whole app — everyone's data — into a new dated folder inside
+ * `dir`: the database plus the thumbnails, plan backgrounds and profile photos
+ * beside it. That's the layout the desktop app's "Import Database…" reads, so
+ * this is its other half. Called from the desktop tray; the computer running
+ * the app only.
+ */
+fastify.post('/api/backup/full', async (request, reply) => {
+  if (!isLocalRequest(request)) return reply.code(403).send({ error: 'only_on_host' });
+  const { dir } = (request.body ?? {}) as { dir?: string };
+  let ok = false;
+  try { ok = typeof dir === 'string' && path.isAbsolute(dir) && fs.statSync(dir).isDirectory(); } catch { ok = false; }
+  if (!ok) return reply.code(400).send({ error: 'folder_not_found' });
+
+  // Local time, so the folder name matches the clock on the wall.
+  const now = new Date();
+  const two = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}-${two(now.getMinutes())}`;
+  const target = path.join(dir!, `MyFitnessPlan backup ${stamp}`);
+  try {
+    fs.mkdirSync(target, { recursive: true });
+    db.prepare('VACUUM INTO ?').run(path.join(target, 'workout-planner.db'));
+    const dataDir = path.join(process.cwd(), 'data');
+    for (const sub of ['thumbnails', 'plan-backgrounds', 'profile-pictures']) {
+      const from = path.join(dataDir, sub);
+      if (fs.existsSync(from)) fs.cpSync(from, path.join(target, sub), { recursive: true, dereference: true });
+    }
+  } catch (err) {
+    request.log.error(err);
+    return reply.code(500).send({ error: 'backup_failed' });
+  }
+  return reply.send({ success: true, folder: target });
+});
+
 // Generic settings route
+// Generic settings: the shared ones, with the profile's own values on top
+// (rhythm, theme, calendar view, library folder, exclusions).
 fastify.get('/api/settings', async (request, reply) => {
+  const profileId = requireProfile(request, reply);
+  if (!profileId) return;
   const settings = db.prepare('SELECT * FROM settings').all();
+  const parse = (key: string, value: string | null) =>
+    (key === 'workout_pattern' || key === 'exclude_paths') ? JSON.parse(value || '[]') : value;
   const settingsObj = settings.reduce((acc: any, curr: any) => {
     // `ai_*` rows hold the optional AI integration's config, including an API
     // key. They are served by /api/ai/settings, which never returns the key —
-    // this endpoint must not leak it through the generic dump.
-    if (curr.key.startsWith('ai_')) return acc;
-    acc[curr.key] = (curr.key === 'workout_pattern' || curr.key === 'exclude_paths')
-      ? JSON.parse(curr.value)
-      : curr.value;
+    // this endpoint must not leak it through the generic dump. Same for the
+    // secret profile cookies are signed with.
+    if (curr.key.startsWith('ai_') || curr.key === 'profile_secret') return acc;
+    acc[curr.key] = parse(curr.key, isProfileSetting(curr.key) ? getProfileSetting(profileId, curr.key) : curr.value);
     return acc;
   }, {});
   return reply.send(settingsObj);
 });
 
 fastify.post('/api/settings', async (request, reply) => {
+  const profileId = requireProfile(request, reply);
+  if (!profileId) return;
   const body = request.body as any;
-  const updateStmt = db.prepare('UPDATE settings SET value = ? WHERE key = ?');
-  
+
   if (body.workout_pattern !== undefined) {
-    updateStmt.run(JSON.stringify(body.workout_pattern), 'workout_pattern');
+    setProfileSetting(profileId, 'workout_pattern', JSON.stringify(body.workout_pattern));
   }
   if (body.start_date !== undefined) {
-    updateStmt.run(body.start_date, 'start_date');
+    setProfileSetting(profileId, 'start_date', body.start_date);
   }
   if (body.exclude_paths !== undefined) {
-    updateStmt.run(JSON.stringify(body.exclude_paths), 'exclude_paths');
+    setProfileSetting(profileId, 'exclude_paths', JSON.stringify(body.exclude_paths));
   }
   if (body.theme !== undefined) {
-    updateStmt.run(body.theme, 'theme');
+    setProfileSetting(profileId, 'theme', body.theme);
   }
   if (body.calendar_view !== undefined) {
-    updateStmt.run(body.calendar_view, 'calendar_view');
+    setProfileSetting(profileId, 'calendar_view', body.calendar_view);
   }
   return reply.send({ success: true });
 });
@@ -466,6 +530,8 @@ const host = process.env.HOST || '0.0.0.0';
 const start = async () => {
   try {
     await fastify.listen({ port, host });
+    // Each profile's automatic backups, on their own schedules.
+    startBackupSchedule(msg => fastify.log.info(msg));
     console.log(`Server running on http://localhost:${port}`);
   } catch (err) {
     fastify.log.error(err);

@@ -7,6 +7,7 @@ import { FastifyBaseLogger } from 'fastify';
 import { importAvailable, PlaylistResolveError, PlaylistResolver, resolverFor } from '../external/index.js';
 import { formatVideoRow, VIDEO_COLUMNS } from './library.js';
 import { autoTagFromTitle } from '../autoTag.js';
+import { PROFILE_VIDEOS, requireProfile } from '../profiles.js';
 
 const THUMB_DIR = path.join(process.cwd(), 'data', 'thumbnails');
 
@@ -212,6 +213,8 @@ export default async function (fastify: FastifyInstance) {
   });
 
   fastify.post('/import', async (request, reply) => {
+    const profileId = requireProfile(request, reply);
+    if (!profileId) return;
     const { url } = request.body as { url?: string };
     const trimmed = typeof url === 'string' ? url.trim() : '';
     if (!trimmed) {
@@ -316,13 +319,20 @@ export default async function (fastify: FastifyInstance) {
       db.prepare(
         'UPDATE videos SET external_playlist_title = ? WHERE external_playlist_id = ?'
       ).run(albumTitle, playlist.playlistId);
+      // The playlist joins the importer's library (a video someone else
+      // imported first is shared, not duplicated).
+      const addToLibrary = db.prepare(
+        `INSERT INTO profile_videos (profile_id, video_id, relative_path, in_library) VALUES (?, ?, '', 1)
+         ON CONFLICT(profile_id, video_id) DO UPDATE SET in_library = 1`
+      );
+      for (const row of prepared) addToLibrary.run(profileId, row.id);
     })();
 
     const ids = prepared.map(r => r.id);
     const placeholders = ids.map(() => '?').join(',');
     const rows = db.prepare(
-      `SELECT ${VIDEO_COLUMNS} FROM videos WHERE id IN (${placeholders})`
-    ).all(...ids) as any[];
+      `SELECT ${VIDEO_COLUMNS} FROM ${PROFILE_VIDEOS} AS videos WHERE id IN (${placeholders})`
+    ).all(profileId, ...ids) as any[];
 
     // Preserve playlist order, which the DB query does not guarantee.
     const byId = new Map(rows.map(r => [r.id, r]));
@@ -345,7 +355,15 @@ export default async function (fastify: FastifyInstance) {
 
   /** Rename an imported album. Grouping is by playlist ID, so this is display-only. */
   fastify.patch('/playlist/:playlistId', async (request, reply) => {
+    const profileId = requireProfile(request, reply);
+    if (!profileId) return;
     const { playlistId } = request.params as { playlistId: string };
+    // The album name is shared, like tags — but only someone who has the
+    // playlist can rename it.
+    const hasIt = db.prepare(
+      `SELECT 1 FROM ${PROFILE_VIDEOS} AS videos WHERE external_playlist_id = ? LIMIT 1`
+    ).get(profileId, playlistId);
+    if (!hasIt) return reply.code(404).send({ error: 'Playlist not found' });
     const { title } = request.body as { title?: string };
 
     const trimmed = typeof title === 'string' ? title.trim().slice(0, 120) : '';
@@ -365,26 +383,44 @@ export default async function (fastify: FastifyInstance) {
   });
 
   /**
-   * Remove an imported album and every video in it.
+   * Remove an imported album from your library.
+   *
+   * Only from yours: if someone else has the same playlist, it stays theirs,
+   * tags and all. A video nobody has any more is deleted outright, with the
+   * thumbnail that was downloaded for it.
    *
    * Plans may still reference these videos. Their IDs are left in
    * `workouts.video_ids`, which the schedule already tolerates — it drops IDs
-   * with no matching row — so a plan loses those entries rather than breaking.
-   * The response reports how many plans were affected so the client can warn
-   * before deleting.
+   * that aren't in your library — so a plan loses those entries rather than
+   * breaking. The response reports how many plans were affected so the client
+   * can warn before deleting.
    */
   fastify.delete('/playlist/:playlistId', async (request, reply) => {
+    const profileId = requireProfile(request, reply);
+    if (!profileId) return;
     const { playlistId } = request.params as { playlistId: string };
 
-    const videos = db.prepare(
-      'SELECT id, thumbnail_path FROM videos WHERE external_playlist_id = ?'
-    ).all(playlistId) as { id: string; thumbnail_path: string | null }[];
+    const mine = db.prepare(
+      `SELECT id FROM ${PROFILE_VIDEOS} AS videos WHERE external_playlist_id = ?`
+    ).all(profileId, playlistId) as { id: string }[];
 
-    if (videos.length === 0) {
+    if (mine.length === 0) {
       return reply.code(404).send({ error: 'Playlist not found' });
     }
 
-    db.prepare('DELETE FROM videos WHERE external_playlist_id = ?').run(playlistId);
+    const videos: { id: string; thumbnail_path: string | null }[] = [];
+    db.transaction(() => {
+      const leave = db.prepare('DELETE FROM profile_videos WHERE profile_id = ? AND video_id = ?');
+      const stillWanted = db.prepare('SELECT 1 FROM profile_videos WHERE video_id = ? LIMIT 1');
+      const row = db.prepare('SELECT id, thumbnail_path FROM videos WHERE id = ?');
+      const drop = db.prepare('DELETE FROM videos WHERE id = ?');
+      for (const { id } of mine) {
+        leave.run(profileId, id);
+        if (stillWanted.get(id)) continue;
+        videos.push(row.get(id) as { id: string; thumbnail_path: string | null });
+        drop.run(id);
+      }
+    })();
 
     // Thumbnails were downloaded by this app and belong to nothing else.
     for (const video of videos) {
@@ -396,7 +432,7 @@ export default async function (fastify: FastifyInstance) {
       }
     }
 
-    return reply.send({ success: true, deletedCount: videos.length });
+    return reply.send({ success: true, deletedCount: mine.length });
   });
 
   /**
@@ -404,15 +440,19 @@ export default async function (fastify: FastifyInstance) {
    * warn before a delete that would empty out part of a plan.
    */
   fastify.get('/playlist/:playlistId/usage', async (request, reply) => {
+    const profileId = requireProfile(request, reply);
+    if (!profileId) return;
     const { playlistId } = request.params as { playlistId: string };
 
     const ids = new Set(
-      (db.prepare('SELECT id FROM videos WHERE external_playlist_id = ?').all(playlistId) as { id: string }[])
+      (db.prepare(`SELECT id FROM ${PROFILE_VIDEOS} AS videos WHERE external_playlist_id = ?`).all(profileId, playlistId) as { id: string }[])
         .map(v => v.id)
     );
 
-    const workouts = db.prepare('SELECT plan_id, video_ids FROM workouts').all() as
-      { plan_id: string; video_ids: string | null }[];
+    // Only your own plans: removing the album from your library can't touch anyone else's.
+    const workouts = db.prepare(
+      'SELECT plan_id, video_ids FROM workouts WHERE plan_id IN (SELECT id FROM workout_plans WHERE profile_id = ?)'
+    ).all(profileId) as { plan_id: string; video_ids: string | null }[];
 
     const affectedPlans = new Set<string>();
     for (const workout of workouts) {

@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import db from '../db.js';
+import { getProfileSetting, ownsPlan, ownsWorkout, profileHook, PROFILE_VIDEOS } from '../profiles.js';
 
 // Active plans occupy one of two slots: the main plan (is_active = 1) and an
 // optional second plan (is_active = 2) that runs alongside it. Both are
@@ -63,7 +64,7 @@ function isPlanComplete(planId: string): { complete: boolean; workoutCount: numb
  * un-mark now, and no reason to skip recording this one.
  */
 async function syncPlanCompletion(planId: string, completedDate: string): Promise<void> {
-  const plan = db.prepare('SELECT id, name, start_date FROM workout_plans WHERE id = ?').get(planId) as any;
+  const plan = db.prepare('SELECT id, profile_id, name, start_date FROM workout_plans WHERE id = ?').get(planId) as any;
   if (!plan) return;
 
   const { complete, workoutCount } = isPlanComplete(planId);
@@ -91,9 +92,9 @@ async function syncPlanCompletion(planId: string, completedDate: string): Promis
   const { nanoid } = await import('nanoid');
   db.prepare(`
     INSERT INTO plan_completions
-      (id, plan_id, plan_name, workout_count, started_on, finished_on, days_taken)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(nanoid(), plan.id, plan.name, workoutCount, plan.start_date ?? null, completedDate, daysTaken);
+      (id, profile_id, plan_id, plan_name, workout_count, started_on, finished_on, days_taken)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(nanoid(), plan.profile_id, plan.id, plan.name, workoutCount, plan.start_date ?? null, completedDate, daysTaken);
 }
 
 /** The plan a workout belongs to, or '' when the workout is already gone. */
@@ -117,11 +118,14 @@ function isFreezeReason(v: unknown): v is FreezeReason {
 }
 
 export default async function (fastify: FastifyInstance) {
+  // Everything here is one profile's schedule, ticks and freezes.
+  fastify.addHook('preHandler', profileHook);
+
   fastify.get('/', async (request, reply) => {
+    const profileId = request.profileId;
     // Get pattern and start date
-    const settings = db.prepare('SELECT * FROM settings').all() as any[];
-    const patternSetting = settings.find(s => s.key === 'workout_pattern')?.value;
-    const globalStartDate = settings.find(s => s.key === 'start_date')?.value;
+    const patternSetting = getProfileSetting(profileId, 'workout_pattern');
+    const globalStartDate = getProfileSetting(profileId, 'start_date');
     
     const FALLBACK_PATTERN = [1, 1, 1, 1, 1, 0];
     let globalPattern: number[] = FALLBACK_PATTERN;
@@ -148,13 +152,13 @@ export default async function (fastify: FastifyInstance) {
 
     // Active plans, main slot first.
     const activePlans = db.prepare(
-      'SELECT id, name, start_date, is_active, workout_pattern, background_image, category FROM workout_plans WHERE is_active IN (1, 2) ORDER BY is_active ASC'
-    ).all() as any[];
+      'SELECT id, name, start_date, is_active, workout_pattern, background_image, category FROM workout_plans WHERE is_active IN (1, 2) AND profile_id = ? ORDER BY is_active ASC'
+    ).all(profileId) as any[];
     if (!activePlans.length) {
       return reply.send({ schedule: [], schedules: [], pattern: globalPattern });
     }
 
-    const allVideos = db.prepare('SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, source, external_id, duration_seconds FROM videos').all() as any[];
+    const allVideos = db.prepare(`SELECT id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, source, external_id, duration_seconds FROM ${PROFILE_VIDEOS} AS videos`).all(profileId) as any[];
     const videoMap = new Map(allVideos.map(v => [v.id, {
       filename: v.filename,
       path: v.relative_path,
@@ -173,7 +177,10 @@ export default async function (fastify: FastifyInstance) {
     }]));
     
     // Get history (both workout-level and video-level)
-    const history = db.prepare('SELECT workout_id, video_id FROM history').all() as any[];
+    const history = db.prepare(`
+      SELECT workout_id, video_id FROM history
+      WHERE workout_id IN (SELECT w.id FROM workouts w JOIN workout_plans p ON p.id = w.plan_id WHERE p.profile_id = ?)
+    `).all(profileId) as any[];
     const completedWorkouts = new Set(history.filter(h => !h.video_id).map(h => h.workout_id));
     const completedVideos = new Set(history.filter(h => h.video_id).map(h => `${h.workout_id}:${h.video_id}`));
 
@@ -300,6 +307,8 @@ export default async function (fastify: FastifyInstance) {
 
   fastify.post('/toggle-done', async (request, reply) => {
     const { workoutId, videoId, loopCount } = request.body as { workoutId: string, videoId?: string, loopCount?: number };
+    const profileId = request.profileId;
+    if (!ownsWorkout(profileId, workoutId)) return reply.code(404).send({ error: 'Workout not found' });
     // Times through the video, when the player was looping it. Only a real set
     // (2+) is recorded; a single play needs no marker in the log.
     const rawLoops = Number(loopCount);
@@ -316,10 +325,10 @@ export default async function (fastify: FastifyInstance) {
       // Un-mark: remove from both the (ephemeral) history and the durable log.
       if (videoId) {
         db.prepare('DELETE FROM history WHERE workout_id = ? AND video_id = ?').run(workoutId, videoId);
-        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id = ?').run(workoutId, videoId);
+        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id = ? AND profile_id = ?').run(workoutId, videoId, profileId);
       } else {
         db.prepare('DELETE FROM history WHERE workout_id = ? AND video_id IS NULL').run(workoutId);
-        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id IS NULL').run(workoutId);
+        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id IS NULL AND profile_id = ?').run(workoutId, profileId);
       }
       await syncPlanCompletion(planIdOf(workoutId), todayLocal());
       return reply.send({ success: true, completed: false });
@@ -354,15 +363,15 @@ export default async function (fastify: FastifyInstance) {
 
       // Keep at most one log row per (workout_id, video_id), mirroring history.
       if (videoId) {
-        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id = ?').run(workoutId, videoId);
+        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id = ? AND profile_id = ?').run(workoutId, videoId, profileId);
       } else {
-        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id IS NULL').run(workoutId);
+        db.prepare('DELETE FROM workout_log WHERE workout_id = ? AND video_id IS NULL AND profile_id = ?').run(workoutId, profileId);
       }
       db.prepare(`
         INSERT INTO workout_log
-          (id, workout_id, video_id, plan_name, workout_name, video_filename, thumbnail_path, completed_date, loop_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(nanoid(), workoutId, videoId ?? null, planName, workout?.name ?? null, videoFilename, thumbnailPath, completedDate, loops);
+          (id, profile_id, workout_id, video_id, plan_name, workout_name, video_filename, thumbnail_path, completed_date, loop_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(nanoid(), profileId, workoutId, videoId ?? null, planName, workout?.name ?? null, videoFilename, thumbnailPath, completedDate, loops);
 
       // Did that leave the plan with nothing outstanding?
       if (workout?.plan_id) await syncPlanCompletion(workout.plan_id, completedDate);
@@ -373,11 +382,11 @@ export default async function (fastify: FastifyInstance) {
 
   // Today's freeze state per active plan, for the Plans page card — cheap and
   // direct rather than computing each plan's full schedule just to read one day.
-  fastify.get('/freeze-status', async (_request, reply) => {
+  fastify.get('/freeze-status', async (request, reply) => {
     const rows = db.prepare(`
       SELECT plan_id, reason FROM plan_freezes
-      WHERE date = ? AND plan_id IN (SELECT id FROM workout_plans WHERE is_active IN (1, 2))
-    `).all(todayLocal()) as { plan_id: string; reason: string }[];
+      WHERE date = ? AND plan_id IN (SELECT id FROM workout_plans WHERE is_active IN (1, 2) AND profile_id = ?)
+    `).all(todayLocal(), request.profileId) as { plan_id: string; reason: string }[];
     const byPlan: Record<string, string> = {};
     for (const r of rows) byPlan[r.plan_id] = r.reason;
     return reply.send(byPlan);
@@ -415,7 +424,7 @@ export default async function (fastify: FastifyInstance) {
         ? startDate
         : today;
     const dayCount = Number.isInteger(days) && (days as number) >= 1 ? Math.min(days as number, MAX_FREEZE_DAYS) : 1;
-    const plan = db.prepare('SELECT id FROM workout_plans WHERE id = ? AND is_active IN (1, 2)').get(planId);
+    const plan = db.prepare('SELECT id FROM workout_plans WHERE id = ? AND is_active IN (1, 2) AND profile_id = ?').get(planId, request.profileId);
     if (!plan) {
       return reply.code(404).send({ error: 'No active plan with that id' });
     }
@@ -452,6 +461,7 @@ export default async function (fastify: FastifyInstance) {
   // one date it's on.
   fastify.delete('/freeze/:planId/:date', async (request, reply) => {
     const { planId, date } = request.params as { planId: string; date: string };
+    if (!ownsPlan(request.profileId, planId)) return reply.code(404).send({ error: 'Plan not found' });
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return reply.code(400).send({ error: 'date must be a YYYY-MM-DD string' });
     }
@@ -464,6 +474,7 @@ export default async function (fastify: FastifyInstance) {
   // days are left alone — they're history at this point, not something to undo.
   fastify.delete('/freeze/:planId', async (request, reply) => {
     const { planId } = request.params as { planId: string };
+    if (!ownsPlan(request.profileId, planId)) return reply.code(404).send({ error: 'Plan not found' });
     const { changes } = db.prepare('DELETE FROM plan_freezes WHERE plan_id = ? AND date >= ?').run(
       planId, todayLocal()
     );

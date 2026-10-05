@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, ChevronDown, History, PieChart, Plus } from 'lucide-react';
+import { BarChart3, History, PieChart, Plus } from 'lucide-react';
 import { useMetaLabels } from '../lib/labels';
 import AddLogEntryModal from '../components/AddLogEntryModal';
 import VideoMetadataEditor from '../components/VideoMetadataEditor';
@@ -15,10 +15,10 @@ import {
 import { Video } from '../types/video';
 import { confirmDialog } from '../lib/confirm';
 import '../styles/log.css';
+import RangePicker, { inRange, Range, rangeBounds, useRangeLabel } from '../components/log/RangePicker';
 
 const API = '';
 
-type Range = 'week' | 'month' | 'year' | 'all';
 type Dimension = 'type' | 'body' | 'equipment' | 'intensity';
 
 export default function Profile() {
@@ -32,7 +32,8 @@ export default function Profile() {
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   // Picking a day on the calendar narrows the history to it; null shows the month.
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [range, setRange] = useState<Range>('all');
+  const [range, setRange] = useState<Range>({ kind: 'all' });
+  const rangeLabel = useRangeLabel();
   const [dimension, setDimension] = useState<Dimension>('type');
   const [chart, setChart] = useState<'bars' | 'pie'>('bars');
   // On a phone the page is two tabs rather than one long column.
@@ -106,15 +107,6 @@ export default function Profile() {
     return map;
   }, [entries]);
 
-  const stats = useMemo(() => {
-    const totalSeconds = entries.reduce((sum, e) => sum + (e.durationSeconds || 0), 0);
-    // How many entries could contribute a runtime at all, so the label can say when
-    // the total is partial (manual entries and un-probed videos have none).
-    const timedEntries = entries.filter(e => e.durationSeconds).length;
-    const activeDays = new Set(entries.map(e => e.completedDate));
-    const workoutSet = new Set(entries.map(e => `${e.completedDate}|${e.workoutId || e.workoutName || e.id}`));
-    return { workouts: workoutSet.size, activeDays: activeDays.size, totalSeconds, timedEntries, untimedEntries: entries.length - timedEntries };
-  }, [entries]);
 
   const startedPlans = useMemo(() => {
     // Only plans you've actually touched are worth listing, and a finished one is
@@ -160,16 +152,24 @@ export default function Profile() {
   }, [selectedDate, entriesByDate, monthPrefix]);
 
   // --- "What you trained" ---------------------------------------------------------------------
-  const rangeEntries = useMemo(() => {
-    if (range === 'all') return entries;
-    const days = range === 'week' ? 7 : range === 'month' ? 30 : 365;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return entries.filter(e => {
-      const diff = Math.floor((today.getTime() - new Date(e.completedDate + 'T00:00:00').getTime()) / 86400000);
-      return diff >= 0 && diff < days;
-    });
-  }, [entries, range]);
+  const bounds = useMemo(() => rangeBounds(range), [range]);
+  const rangeEntries = useMemo(
+    () => entries.filter(e => inRange(e.completedDate, bounds)),
+    [entries, bounds]
+  );
+  /** Days with anything logged, marked on the custom-range calendar. */
+  const activeDates = useMemo(() => new Set(entries.map(e => e.completedDate)), [entries]);
+
+  // The four numbers at the top of Breakdown, for the chosen period.
+  const stats = useMemo(() => {
+    const totalSeconds = rangeEntries.reduce((sum, e) => sum + (e.durationSeconds || 0), 0);
+    // How many entries could contribute a runtime at all, so the label can say when
+    // the total is partial (manual entries and un-probed videos have none).
+    const timedEntries = rangeEntries.filter(e => e.durationSeconds).length;
+    const activeDays = new Set(rangeEntries.map(e => e.completedDate));
+    const workoutSet = new Set(rangeEntries.map(e => `${e.completedDate}|${e.workoutId || e.workoutName || e.id}`));
+    return { workouts: workoutSet.size, activeDays: activeDays.size, totalSeconds, timedEntries, untimedEntries: rangeEntries.length - timedEntries };
+  }, [rangeEntries]);
 
   const segments = useMemo(() => {
     const counts = new Map<string, number>();
@@ -321,14 +321,16 @@ export default function Profile() {
     );
   }
 
+  // "Rescan" only means something when there are workouts without lengths —
+  // not when the chosen period simply has none.
   const timeLabel = stats.timedEntries === 0
-    ? t('profile.stats_total_time_none')
+    ? (rangeEntries.length === 0 ? t('profile.stats_total_time') : t('profile.stats_total_time_none'))
     : stats.untimedEntries > 0 ? t('profile.stats_total_time_partial') : t('profile.stats_total_time');
   const statTiles = [
     { value: String(stats.workouts), label: t('profile.stats_workouts') },
     { value: String(stats.activeDays), label: t('profile.stats_active_days') },
     { value: stats.timedEntries > 0 ? formatDuration(stats.totalSeconds) : '—', label: timeLabel },
-    { value: String(finishedPlans.length), label: t('profile.stats_plans_finished') },
+    { value: String(finishedPlans.filter(p => inRange(p.finishedOn, bounds)).length), label: t('profile.stats_plans_finished') },
   ];
 
   const dimensions: { key: Dimension; label: string }[] = [
@@ -414,13 +416,7 @@ export default function Profile() {
       <section className="lg-mix">
         <div className="lg-mix-head">
           <h2>{t('profile.what_you_trained')}</h2>
-          <label className="lg-range">
-            <span>{t(`profile.range_${range}`)}</span>
-            <ChevronDown size={13} />
-            <select value={range} onChange={e => setRange(e.target.value as Range)} aria-label={t('profile.summary_heading')}>
-              {(['week', 'month', 'year', 'all'] as Range[]).map(r => <option key={r} value={r}>{t(`profile.range_${r}`)}</option>)}
-            </select>
-          </label>
+          <RangePicker value={range} onChange={setRange} activeDates={activeDates} />
         </div>
         <div className="lg-mix-tools">
           <div className="lg-tabs">
@@ -439,7 +435,7 @@ export default function Profile() {
       <section className="lg-mix">
         <div className="lg-mix-head">
           <h2>{t('profile.cloud_heading')}</h2>
-          <span className="lg-cloud-range">{t(`profile.range_${range}`)}</span>
+          <span className="lg-cloud-range">{rangeLabel(range)}</span>
         </div>
         <TagCloud items={cloudItems} />
       </section>

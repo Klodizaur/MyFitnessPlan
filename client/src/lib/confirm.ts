@@ -13,6 +13,11 @@ export interface ConfirmOptions {
   cancelLabel?: string;
   /** Destructive actions get a red confirm button. */
   danger?: boolean;
+  /**
+   * For what can't be undone: the confirm button stays disabled until this
+   * word is typed (any case). Every other confirm is a plain yes/no.
+   */
+  typeToConfirm?: string;
 }
 
 export interface ConfirmRequest extends ConfirmOptions {
