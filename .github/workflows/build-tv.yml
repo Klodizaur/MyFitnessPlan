@@ -1,0 +1,77 @@
+name: Build TV app
+
+# The Android TV / Fire TV app (tv/) ships on its own schedule, separate from the
+# desktop installers. Trigger manually, or by pushing a tv-v* tag (e.g. tv-v1.0.0).
+#
+# Without signing secrets this builds a debug APK, signed with a throwaway key
+# that changes between runs: installing a newer one over it needs the old one
+# uninstalled first. Add these repository secrets for a signed release APK that
+# updates in place (see tv/README.md, "Release builds"):
+#   TV_KEYSTORE_BASE64   the .jks file, base64-encoded
+#   TV_KEYSTORE_PASSWORD
+#   TV_KEY_ALIAS
+#   TV_KEY_PASSWORD
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'tv-v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tv
+    env:
+      HAS_SIGNING_KEY: ${{ secrets.TV_KEYSTORE_BASE64 != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner already has the Android SDK; the app needs Java 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Write signing key
+        if: env.HAS_SIGNING_KEY == 'true'
+        run: |
+          echo "${{ secrets.TV_KEYSTORE_BASE64 }}" | base64 --decode > release.jks
+          cat > keystore.properties <<EOF
+          storeFile=release.jks
+          storePassword=${{ secrets.TV_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.TV_KEY_ALIAS }}
+          keyPassword=${{ secrets.TV_KEY_PASSWORD }}
+          EOF
+
+      - name: Test and build
+        run: |
+          chmod +x gradlew
+          if [ "$HAS_SIGNING_KEY" = "true" ]; then
+            ./gradlew testDebugUnitTest assembleRelease
+          else
+            ./gradlew testDebugUnitTest assembleDebug
+          fi
+
+      # MyFitnessPlanTV-<versionName>[-debug].apk
+      - name: Name the APK
+        run: |
+          version=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
+          mkdir -p out
+          if [ "$HAS_SIGNING_KEY" = "true" ]; then
+            cp app/build/outputs/apk/release/app-release.apk "out/MyFitnessPlanTV-$version.apk"
+          else
+            cp app/build/outputs/apk/debug/app-debug.apk "out/MyFitnessPlanTV-$version-debug.apk"
+          fi
+          ls -la out
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: myfitnessplan-tv-apk
+          path: tv/out/*.apk
+          if-no-files-found: error
