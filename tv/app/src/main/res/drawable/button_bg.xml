@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Focus is the only "hover" a remote has, so the focused button is filled
+     and ringed: readable from across the room. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="14dp" />
+            <solid android:color="@color/ink" />
+            <stroke android:width="3dp" android:color="@color/accent" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="14dp" />
+            <solid android:color="@color/surface" />
+            <stroke android:width="2dp" android:color="@color/border" />
+        </shape>
+    </item>
+</selector>

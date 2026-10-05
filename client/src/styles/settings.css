@@ -268,3 +268,19 @@ select.st-input { padding: 0 12px; cursor: pointer; }
   .st-toast { bottom: 84px; }
   .st-bar { width: calc(100% - 24px); }
 }
+
+/* --- Devices (desktop app only) ----------------------------------------------------- */
+.dv-head { display: flex; align-items: flex-start; gap: 12px; }
+.dv-head > svg { flex-shrink: 0; margin-top: 3px; color: var(--t-accent); }
+.dv-phone { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+/* The code itself is always dark on light (see DevicesSection); the frame is themed. */
+.dv-qr { width: 180px; height: 180px; padding: 8px; border: 1px solid var(--t-border); border-radius: var(--t-r-chip); image-rendering: pixelated; }
+.dv-address-block { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; min-width: 0; }
+.dv-address { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 20px; font-weight: 600; color: var(--t-ink); overflow-wrap: anywhere; }
+.dv-address--tv { font-size: 30px; letter-spacing: 0.02em; }
+.dv-address-block .rx-btn { display: inline-flex; align-items: center; gap: 8px; }
+.dv-waiting { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; color: var(--t-ink-muted); }
+.dv-warn { color: var(--t-danger); }
+@media (max-width: 767px) {
+  .dv-phone { flex-direction: column; align-items: flex-start; }
+}

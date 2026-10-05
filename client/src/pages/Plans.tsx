@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, ChevronRight, HardDriveUpload, ListPlus, Plus, Search, Sparkles } from 'lucide-react';
 import { useMetaLabels } from '../lib/labels';
+import { isTv } from '../lib/tv';
 import { ImportResult, useImportAvailable } from '../lib/externalImport';
 import { BuilderWeek, createWeek, createInitialBuilderWeeks, workoutSlots } from '../lib/builderModel';
 import { useAiAvailable } from '../lib/useAiAvailable';
@@ -824,14 +825,18 @@ export default function Plans() {
         <div className="pl-head-row">
           <div className="pl-head-text">
             <h1 className="rx-h1">{t('plans.title')}</h1>
-            <p className="pl-lede">{t('plans.upload_msg')}</p>
+            <p className="pl-lede">{t(isTv ? 'plans.upload_msg_tv' : 'plans.upload_msg')}</p>
           </div>
-          <button type="button" className="pl-plus" aria-label={t('plans.create')} onClick={() => setIsCreateOpen(true)}>
-            <Plus size={20} />
-          </button>
+          {!isTv && (
+            <button type="button" className="pl-plus" aria-label={t('plans.create')} onClick={() => setIsCreateOpen(true)}>
+              <Plus size={20} />
+            </button>
+          )}
         </div>
 
-        <div className="pl-actions">
+        {/* The TV app plays plans; building, importing and backing them up need
+            a keyboard, a mouse or files, so they stay on the computer. */}
+        {!isTv && <div className="pl-actions">
           <button type="button" className="rx-btn rx-btn--primary" onClick={() => setIsBuilderOpen(true)}>
             <ListPlus size={17} />
             {t('plans.build_btn')}
@@ -851,7 +856,7 @@ export default function Plans() {
             <HardDriveUpload size={16} />
             {t('transfer.backup_all_btn')}
           </button>
-        </div>
+        </div>}
         <input
           ref={uploadInputRef}
           type="file"
@@ -876,7 +881,8 @@ export default function Plans() {
       <div className="pl-active-grid">
         {(['main', 'extra'] as Slot[]).map(slot => {
           const plan = activePlans.find(p => slotOf(p) === slot);
-          if (!plan) return <EmptySlot key={slot} slot={slot} />;
+          // The TV has no "start one from the list below": no list there.
+          if (!plan) return isTv ? null : <EmptySlot key={slot} slot={slot} />;
           const frozen = Boolean(freezeStatus[plan.id]);
           return (
             <ActivePlanCard
@@ -904,6 +910,11 @@ export default function Plans() {
         })}
       </div>
 
+      {/* On the TV only the active plans: picking, building and activating
+          happen on the computer (the line under the title says so). */}
+      {isTv && activePlans.length === 0 && <div className="pl-none">{t('plans.tv_no_active')}</div>}
+
+      {!isTv && <>
       {otherPlans.length > 0 && (
         <div className="pl-find">
           <label className="pl-search">
@@ -980,6 +991,7 @@ export default function Plans() {
           {t('plans.no_plans')}
         </div>
       )}
+      </>}
 
       {isCreateOpen && (
         <CreateSheet

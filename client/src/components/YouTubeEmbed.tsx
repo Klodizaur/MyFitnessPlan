@@ -56,9 +56,15 @@ type Props = {
   onError: (message: string) => void;
   /** Receives the player instance so the page can drive keyboard shortcuts. */
   onReady?: (player: any) => void;
+  /**
+   * TV mode: the remote can't reach inside YouTube's frame, so the player's own
+   * controls drive it instead. YouTube's controls are hidden and the frame is
+   * kept out of focus so it can't swallow the remote's keys.
+   */
+  ownControls?: boolean;
 };
 
-export default function YouTubeEmbed({ externalId, onEnded, onError, onReady }: Props) {
+export default function YouTubeEmbed({ externalId, onEnded, onError, onReady, ownControls = false }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
 
@@ -80,9 +86,16 @@ export default function YouTubeEmbed({ externalId, onEnded, onError, onReady }: 
             rel: 0,          // don't trail unrelated channels' videos
             modestbranding: 1,
             playsinline: 1,
+            ...(ownControls ? { controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3 } : {}),
           },
           events: {
-            onReady: (event: any) => handlers.current.onReady?.(event.target),
+            onReady: (event: any) => {
+              if (ownControls) {
+                const frame = event.target.getIframe?.() as HTMLIFrameElement | undefined;
+                if (frame) frame.tabIndex = -1;
+              }
+              handlers.current.onReady?.(event.target);
+            },
             onStateChange: (event: any) => {
               if (event.data === YT.PlayerState.ENDED) handlers.current.onEnded();
             },
@@ -111,7 +124,7 @@ export default function YouTubeEmbed({ externalId, onEnded, onError, onReady }: 
       }
       playerRef.current = null;
     };
-  }, [externalId]);
+  }, [externalId, ownControls]);
 
   // YT.Player replaces this node with the iframe, so it needs a wrapper it can
   // fill rather than being the sized element itself.

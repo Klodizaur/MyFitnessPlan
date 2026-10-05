@@ -4,6 +4,7 @@ import { Minus, Plus, Repeat, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { fullscreenElement } from '../lib/fullscreen';
 import { useIsMobile } from '../lib/useIsMobile';
+import { isTv } from '../lib/tv';
 
 /**
  * Loop setup for the player: play the same video N times, with a rest between
@@ -128,7 +129,8 @@ export default function LoopControl({ loops, restSeconds, nextRestSeconds, onApp
       {restRow(t('player.loop_rest_label'), rest, setRest)}
       {restRow(t('player.loop_next_rest_label'), nextRest, setNextRest)}
       <p className="pv-loop-hint">{t('player.loop_hint')}</p>
-      <button type="button" className="pv-loop-go" onClick={submit}>
+      {/* On the TV, focus lands here: one OK starts the loop as shown. */}
+      <button type="button" className="pv-loop-go" onClick={submit} {...(isTv ? { 'data-tv-default': '' } : {})}>
         <Repeat size={16} />{isActive ? t('player.loop_update') : t('player.loop_start')}
       </button>
       {isActive && (

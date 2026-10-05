@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/page">
+
+    <WebView
+        android:id="@+id/web"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <!-- First run, and "Change address": where is the computer? Scrolls, as
+         the list of computers found can outgrow the screen. -->
+    <ScrollView
+        android:id="@+id/setup"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="620dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:paddingTop="32dp"
+        android:paddingBottom="32dp">
+
+        <ImageView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_marginBottom="16dp"
+            android:contentDescription="@null"
+            android:src="@drawable/icon" />
+
+        <TextView
+            style="@style/TvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/setup_title" />
+
+        <TextView
+            style="@style/TvBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/setup_body" />
+
+        <!-- Computers found on the TV's network (Discovery.kt). -->
+        <TextView
+            android:id="@+id/found_status"
+            style="@style/TvBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:textColor="@color/ink"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/found_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <Button
+            android:id="@+id/search_again"
+            style="@style/TvButton"
+            android:layout_marginTop="12dp"
+            android:text="@string/setup_search_again"
+            android:visibility="gone" />
+
+        <TextView
+            style="@style/TvBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="@string/setup_or_type" />
+
+        <EditText
+            android:id="@+id/address"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/input_bg"
+            android:hint="@string/setup_hint"
+            android:imeOptions="actionGo"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:nextFocusDown="@+id/connect"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:singleLine="true"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/ink_faint"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/setup_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textColor="@color/danger"
+            android:textSize="18sp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/connect"
+            style="@style/TvButton"
+            android:layout_marginTop="24dp"
+            android:nextFocusUp="@id/address"
+            android:text="@string/setup_connect" />
+    </LinearLayout>
+    </ScrollView>
+
+    <!-- The computer stopped answering after we had connected before. -->
+    <LinearLayout
+        android:id="@+id/offline"
+        android:layout_width="620dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            style="@style/TvTitle"
+            android:layout_width="wrap_content"
+            android:id="@+id/offline_title"
+            android:layout_height="wrap_content"
+            android:text="@string/error_title" />
+
+        <TextView
+            android:id="@+id/offline_body"
+            style="@style/TvBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/retry"
+                style="@style/TvButton"
+                android:text="@string/error_retry" />
+
+            <Button
+                android:id="@+id/change"
+                style="@style/TvButton"
+                android:layout_marginStart="16dp"
+                android:text="@string/change_address" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Full-screen video (the web page's fullscreen request) is shown here. -->
+    <FrameLayout
+        android:id="@+id/fullscreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:visibility="gone" />
+</FrameLayout>

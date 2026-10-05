@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Check, CircleCheck, Dumbbell, Folder, FolderX, Info, Loader, Minus, Moon, Palette, Plus, RefreshCw, Sparkles, X,
+  Check, CircleCheck, Dumbbell, Folder, FolderX, Info, Loader, MonitorSmartphone, Minus, Moon, Palette, Plus, RefreshCw, Sparkles, X,
 } from 'lucide-react';
 import AiSettingsSection from '../components/ai/AiSettingsSection';
+import { isTv } from '../lib/tv';
+import DevicesSection, { sharingBridge } from '../components/DevicesSection';
 import '../styles/settings.css';
 
 /**
@@ -31,6 +33,8 @@ const SETTINGS_TABS = [
   { id: 'workouts', Icon: Dumbbell },
   { id: 'appearance', Icon: Palette },
   { id: 'ai', Icon: Sparkles },
+  // Desktop app only: filtered out below anywhere else (see DevicesSection).
+  { id: 'devices', Icon: MonitorSmartphone },
   { id: 'about', Icon: Info },
 ] as const;
 type SettingsTab = typeof SETTINGS_TABS[number]['id'];
@@ -67,7 +71,13 @@ export default function Settings() {
   const [theme, setTheme] = useState('midnight');
   const [calendarView, setCalendarView] = useState<Layout>('grid');
   const [saved, setSaved] = useState<Saved | null>(null);
-  const [tab, setTab] = useState<SettingsTab>('workouts');
+  // Sharing can only be switched from the desktop app, so Devices exists only there.
+  const canShare = sharingBridge() !== null;
+  const tabs = SETTINGS_TABS.filter(({ id }) => id !== 'devices' || canShare);
+  // The desktop app reopens here (?tab=devices) after switching sharing restarts it.
+  const [tab, setTab] = useState<SettingsTab>(() =>
+    canShare && new URLSearchParams(window.location.search).get('tab') === 'devices' ? 'devices' : 'workouts'
+  );
   const [scanNote, setScanNote] = useState<{ text: string; ok: boolean } | null>(null);
   const [toast, setToast] = useState('');
   const toastTimer = useRef<number | undefined>(undefined);
@@ -228,7 +238,7 @@ export default function Settings() {
             layout together whichever tab is open. */}
         <div className="st-tabs-wrap">
           <div className="st-tabs" role="tablist">
-            {SETTINGS_TABS.map(({ id, Icon }) => (
+            {tabs.map(({ id, Icon }) => (
               <button
                 key={id}
                 type="button"
@@ -246,6 +256,8 @@ export default function Settings() {
 
         {tab === 'workouts' && (
           <div className="st-stack">
+            {/* Folders on the computer: chosen there, not with a TV remote. */}
+            {!isTv && (<>
             <section className="st-card">
               <header>
                 <h2>{t('settings.video_library_path')}</h2>
@@ -330,6 +342,7 @@ export default function Settings() {
                 </ul>
               )}
             </section>
+            </>)}
 
             <section className="st-card">
               <header>
@@ -420,6 +433,8 @@ export default function Settings() {
         {/* Optional AI integration. Saves through its own endpoint, so it is
             unaffected by (and does not affect) the shared Save. */}
         {tab === 'ai' && <AiSettingsSection />}
+
+        {tab === 'devices' && <DevicesSection />}
 
         {tab === 'about' && (
           <div className="st-stack">

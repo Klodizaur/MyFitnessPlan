@@ -5,6 +5,7 @@ import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import db from './db.js';
 import libraryRoutes from './routes/library.js';
 import planRoutes from './routes/plan.js';
@@ -413,7 +414,13 @@ fastify.register(externalRoutes, { prefix: '/api/external' });
 fastify.register(aiRoutes, { prefix: '/api/ai' });
 
 // Exposed so the UI shows the running version automatically.
-fastify.get('/api/version', async (_request, reply) => reply.send({ version: appVersion }));
+/**
+ * The computer's name, as the TV app lists it when it finds this server on the
+ * home network ("Klaudias MacBook Air" rather than just an address).
+ */
+const computerName = os.hostname().replace(/\.local$/i, '').replace(/[-_]+/g, ' ').trim();
+
+fastify.get('/api/version', async (_request, reply) => reply.send({ version: appVersion, name: computerName }));
 
 // Generic settings route
 fastify.get('/api/settings', async (request, reply) => {

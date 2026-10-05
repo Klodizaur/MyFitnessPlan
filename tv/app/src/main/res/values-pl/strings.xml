@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_title">Połącz z komputerem</string>
+    <string name="setup_body">Na komputerze otwórz MyFitnessPlan, przejdź do Ustawienia → Urządzenia i włącz udostępnianie. Telewizor znajdzie go wtedy tutaj.</string>
+    <string name="setup_searching">Szukanie MyFitnessPlan w sieci…</string>
+    <string name="setup_found">Wybierz komputer:</string>
+    <string name="setup_none_found">Nie znaleziono komputera. Sprawdź, czy udostępnianie jest włączone, a telewizor jest w tej samej sieci Wi-Fi, albo wpisz adres poniżej.</string>
+    <string name="setup_search_again">Szukaj ponownie</string>
+    <string name="setup_or_type">Albo wpisz adres z Ustawienia → Urządzenia:</string>
+    <string name="setup_hint">Na przykład 192.168.1.20 (zamiast kropek mogą być spacje)</string>
+    <string name="setup_connect">Połącz</string>
+    <string name="setup_connecting">Łączenie…</string>
+    <string name="setup_invalid">To nie wygląda na adres. Spróbuj czegoś w rodzaju 192.168.1.20:7777.</string>
+    <string name="setup_unreachable">Nie udało się połączyć z MyFitnessPlan pod adresem %1$s. Sprawdź, czy komputer jest włączony, MyFitnessPlan działa z włączonym udostępnianiem (Ustawienia → Urządzenia), a telewizor jest w tej samej sieci Wi-Fi.</string>
+    <string name="setup_not_app">Pod adresem %1$s coś odpowiada, ale to nie jest MyFitnessPlan. Sprawdź adres.</string>
+    <string name="error_title">Brak połączenia z komputerem</string>
+    <string name="error_body">MyFitnessPlan pod adresem %1$s nie odpowiada. Sprawdź, czy komputer jest włączony, a MyFitnessPlan działa z włączonym udostępnianiem (Ustawienia → Urządzenia).</string>
+    <string name="error_retry">Spróbuj ponownie</string>
+    <string name="outdated_title">Zaktualizuj MyFitnessPlan na komputerze</string>
+    <string name="outdated_body">MyFitnessPlan pod adresem %1$s jest zbyt stary dla aplikacji na telewizor. Zaktualizuj go na komputerze, a potem wybierz Spróbuj ponownie.</string>
+    <string name="change_address">Zmień adres</string>
+    <string name="exit_title">Zamknąć MyFitnessPlan?</string>
+    <string name="exit_confirm">Zamknij</string>
+    <string name="exit_cancel">Zostań</string>
+</resources>
