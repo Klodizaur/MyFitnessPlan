@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">MyFitnessPlan</string>
+    <string name="setup_title">Connect to your computer</string>
+    <string name="setup_body">On your computer, open MyFitnessPlan, go to Settings → Devices and turn sharing on. The TV then finds it here.</string>
+    <string name="setup_searching">Looking for MyFitnessPlan on your network…</string>
+    <string name="setup_found">Pick your computer:</string>
+    <string name="setup_none_found">No computer found. Check that sharing is on and the TV is on the same Wi-Fi, or type the address below.</string>
+    <string name="setup_search_again">Search again</string>
+    <string name="setup_or_type">Or type the address from Settings → Devices:</string>
+    <string name="setup_found_item" translatable="false">%1$s · %2$s</string>
+    <string name="setup_hint">For example 192.168.1.20 (spaces work instead of dots)</string>
+    <string name="setup_connect">Connect</string>
+    <string name="setup_connecting">Connecting…</string>
+    <string name="setup_invalid">That doesn\'t look like an address. Try something like 192.168.1.20:7777.</string>
+    <string name="setup_unreachable">Couldn\'t reach MyFitnessPlan at %1$s. Check that the computer is on, MyFitnessPlan is running with sharing on (Settings → Devices), and the TV is on the same Wi-Fi.</string>
+    <string name="setup_not_app">Something answered at %1$s, but it isn\'t MyFitnessPlan. Check the address.</string>
+    <string name="error_title">Can\'t reach your computer</string>
+    <string name="error_body">MyFitnessPlan at %1$s isn\'t answering. Check that the computer is on and MyFitnessPlan is running with sharing on (Settings → Devices).</string>
+    <string name="error_retry">Try again</string>
+    <string name="outdated_title">Update MyFitnessPlan on your computer</string>
+    <string name="outdated_body">The MyFitnessPlan at %1$s is too old for the TV app. Update it on your computer, then choose Try again.</string>
+    <string name="change_address">Change address</string>
+    <string name="exit_title">Leave MyFitnessPlan?</string>
+    <string name="exit_confirm">Exit</string>
+    <string name="exit_cancel">Stay</string>
+</resources>

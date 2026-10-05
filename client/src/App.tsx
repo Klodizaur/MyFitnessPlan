@@ -10,6 +10,8 @@ import Library from './pages/Library';
 import Album from './pages/Album';
 import AiCleanupProgress from './components/ai/AiCleanupProgress';
 import AppShell from './components/AppShell';
+import TvRouteSync from './components/TvRouteSync';
+import { isTv } from './lib/tv';
 import './styles/tokens.css';
 import './styles/shell.css';
 
@@ -49,6 +51,7 @@ function App() {
       {/* Renders nothing unless a bulk description clean-up is running, so a
           run started on an album keeps reporting across navigation. */}
       <AiCleanupProgress />
+      {isTv && <TvRouteSync />}
     </AppShell>
   );
 }

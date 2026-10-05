@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MyFitnessPlanTV" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar.Fullscreen">
+        <!-- See-through window: Fire TV draws video on a surface *behind* the
+             app window (the log shows AWV's SurfaceViewOverlayCore), so an opaque
+             window background paints over the picture. The native screens get
+             their colour from the root layout, which MainActivity clears only while
+             the player is open (setVideoOpen). -->
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:textColor">@color/ink</item>
+    </style>
+</resources>

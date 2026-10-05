@@ -1,0 +1,158 @@
+/**
+ * TV mode (Android TV app only — see lib/tv.ts). Loaded on the TV and nowhere
+ * else, and every rule is under html[data-tv] as a second guard.
+ *
+ * The WebView lays pages out at 960x540 CSS px on a 1080p screen (2x), so sizes
+ * here are in that space. Colours come from the theme tokens only.
+ */
+
+/* --- Focus: the remote's only pointer ------------------------------------------ */
+
+html[data-tv] :focus { outline: none; }
+/* Ink ring with an accent glow: the ink colour is the one guaranteed to stand
+   out against every theme's page, and it can't be mistaken for the accent
+   outline that marks "today". */
+html[data-tv] :focus-visible,
+html[data-tv] :focus {
+  outline: 3px solid var(--t-ink);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 8px var(--t-accent-soft);
+}
+/* Cards and cells read better lifted than ringed from far away. */
+html[data-tv] [data-tv-adopted]:focus,
+html[data-tv] .pl-card:focus,
+html[data-tv] .pl-active:focus {
+  transform: translateY(-2px);
+  transition: transform 0.12s ease;
+}
+
+/* --- Player: the video fills the TV ------------------------------------------------
+   The nav card steps aside and the theater takes the whole screen, the way the
+   desktop's fullscreen does. Today's workout and the details stay below it,
+   reached by pressing Down from the controls. */
+
+html.tv-player .rx > .rx-wrap:first-child { display: none; }
+html.tv-player .pv-page { max-width: none; padding: 0 0 32px; }
+html.tv-player .pv-stage { gap: 20px; }
+html.tv-player .pv-theater {
+  height: 100vh;
+  aspect-ratio: auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+html.tv-player .pv-today,
+html.tv-player .pv-info { margin: 0 32px; }
+
+/* Out of full screen (Back from the video): the ordinary player page, with
+   the video small enough that today's videos fit on the same screen. */
+html[data-tv]:not(.tv-player) .pv-page { padding-top: 16px; }
+html[data-tv]:not(.tv-player) .pv-theater { height: 58vh; aspect-ratio: auto; max-width: calc(58vh * 16 / 9); width: 100%; margin: 0 auto; }
+/* The small player shows a still: video only plays full screen on the TV. */
+html[data-tv] .pv-tv-still { position: absolute; inset: 0; z-index: 5; background: inherit; }
+html[data-tv] .pv-tv-still img { width: 100%; height: 100%; object-fit: cover; opacity: 0.85; }
+/* Too narrow for "Mark done" in the bar: it sits by today's videos, as on desktop. */
+html[data-tv]:not(.tv-player) .pv-ctrls .pv-primary { display: none; }
+html[data-tv]:not(.tv-player) .pv-today .pv-today-cta.pv-desk-only { display: flex; }
+
+/* Readable from the sofa: bigger type and targets than a mouse needs. */
+html[data-tv] .pv-top { padding: 20px 24px 40px; }
+html[data-tv] .pv-top-title { font-size: 22px; }
+html[data-tv] .pv-meta { font-size: 14px; }
+html[data-tv] .pv-round,
+html[data-tv] .pv-pill { height: 48px; }
+html[data-tv] .pv-round { width: 48px; }
+html[data-tv] .pv-pill { font-size: 16px; padding: 0 20px 0 16px; }
+html[data-tv] .pv-bar { padding: 36px 24px 18px; gap: 12px; }
+html[data-tv] .pv-ctrls { gap: 10px; }
+html[data-tv] .pv-ctrls button { position: relative; width: 48px; height: 48px; border-radius: 14px; }
+html[data-tv] .pv-ctrls button:first-child { width: 56px; height: 56px; }
+html[data-tv] .pv-ctrls button svg { width: 24px; height: 24px; }
+html[data-tv] .pv-ctrls button:first-child svg { width: 28px; height: 28px; }
+html[data-tv] .pv-ctrls .pv-speed { height: 40px; padding: 0 14px; font-size: 16px; }
+html[data-tv] .pv-clock { font-size: 17px; }
+html[data-tv] .pv-scrub-track { height: 6px; border-radius: 3px; }
+
+/* Icon buttons say what they do while focused — there is no hover tooltip. */
+html[data-tv] .pv-ctrls button[aria-label]:focus::after,
+html[data-tv] .pv-top .pv-round:focus::after {
+  content: attr(aria-label);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* Buttons at the right end label leftwards, so the label stays on screen. */
+html[data-tv] .pv-grow ~ button[aria-label]:focus::after { left: auto; right: 0; transform: none; }
+html[data-tv] .pv-top .pv-round { position: relative; }
+html[data-tv] .pv-top .pv-round:focus::after { bottom: auto; top: calc(100% + 12px); }
+
+/* The controls sit over the video: the ring must read on any picture. */
+html[data-tv] .pv-theater :focus {
+  outline-color: var(--t-accent);
+  box-shadow: 0 0 0 7px var(--t-overlay);
+}
+
+/* Rest countdown and "up next": the two things you act on mid-workout. */
+html[data-tv] .pv-rest-label { font-size: 16px; }
+html[data-tv] .pv-rest-time { font-size: 120px; }
+html[data-tv] .pv-rest-next { font-size: 20px; }
+html[data-tv] .pv-rest-skip { height: 52px; padding: 0 26px; font-size: 18px; }
+html[data-tv] .pv-upnext { max-width: 460px; bottom: 120px; right: 24px; }
+html[data-tv] .pv-upnext-eyebrow { font-size: 13px; }
+html[data-tv] .pv-upnext-title { font-size: 17px; }
+html[data-tv] .pv-upnext button { width: 52px; height: 52px; }
+html[data-tv] .pv-upnext .pv-upnext-x { width: 32px; height: 32px; }
+
+/* Loop builder: same panel, sized for a remote. */
+html[data-tv] .pv-loop-panel { width: 400px; gap: 16px; padding: 22px; }
+html[data-tv] .pv-loop-head h3 { font-size: 20px; }
+html[data-tv] .pv-loop-head button { width: 40px; height: 40px; }
+html[data-tv] .pv-loop-row span,
+html[data-tv] .pv-loop-field > span { font-size: 16px; }
+html[data-tv] .pv-loop-row strong { width: 36px; font-size: 22px; }
+html[data-tv] .pv-loop-row button { width: 44px; height: 44px; }
+html[data-tv] .pv-seg button { height: 40px; font-size: 15px; }
+html[data-tv] .pv-loop-hint { font-size: 14px; }
+html[data-tv] .pv-loop-go { height: 52px; font-size: 17px; }
+html[data-tv] .pv-loop-off { font-size: 15px; padding: 6px 10px; }
+
+/* Today's workout strip. */
+html[data-tv] .pv-today-sub { font-size: 15px; }
+html[data-tv] .pv-eyebrow { font-size: 13px; }
+html[data-tv] .pv-step { flex-basis: 200px; }
+html[data-tv] .pv-step-title { font-size: 15px; }
+html[data-tv] .pv-step-badge { font-size: 13px; height: 26px; }
+html[data-tv] .pv-step:focus { outline: none; box-shadow: none; }
+/* The NOW badge marks the current video; an outline too would read as focus. */
+html[data-tv] .pv-step.is-now .pv-step-img { outline: none; }
+html[data-tv] .pv-step.is-now:focus .pv-step-img { outline: 3px solid var(--t-ink); }
+html[data-tv] .pv-step:focus .pv-step-img { outline: 3px solid var(--t-ink); outline-offset: 3px; box-shadow: 0 0 0 8px var(--t-accent-soft); }
+html[data-tv] .pv-step:focus .pv-step-play { opacity: 1; transform: none; }
+html[data-tv] .pv-strip { padding-top: 8px; padding-bottom: 8px; }
+html[data-tv] .pv-primary { height: 52px; font-size: 17px; }
+/* The done button lives in the control bar on the TV (Player.tsx). */
+html[data-tv] .pv-today .pv-today-cta { display: none; }
+html[data-tv] .pv-ctrls .pv-primary { width: auto; height: 48px; padding: 0 20px; border-radius: 14px; font-size: 16px; }
+html[data-tv] .pv-ctrls .pv-primary--soft { background: var(--t-surface); color: var(--t-ink); }
+html[data-tv] .pv-ctrls .pv-primary svg { width: 20px; height: 20px; }
+/* The done button's "click to undo" shows on focus, as it does on hover. */
+html[data-tv] .pv-primary--done:focus:not(:disabled) .pv-lbl { display: none; }
+html[data-tv] .pv-primary--done:focus:not(:disabled) .pv-lbl-undo { display: inline; }
+html[data-tv] .pv-desc-text { font-size: 17px; }
+html[data-tv] .pv-link { font-size: 15px; }
+
+/* YouTube errors (embedding blocked, offline, unavailable): readable from across the room. */
+html[data-tv] .pv-notice { padding-top: 120px; gap: 20px; }
+html[data-tv] .pv-notice h2 { font-size: 34px; }
+html[data-tv] .pv-notice p { font-size: 22px; max-width: 720px; line-height: 1.4; }
+html[data-tv] .pv-notice .rx-btn { height: 56px; padding: 0 32px; font-size: 19px; }
+html[data-tv] .pv-notice-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; }
+html[data-tv] .player-youtube-error { font-size: 22px; }

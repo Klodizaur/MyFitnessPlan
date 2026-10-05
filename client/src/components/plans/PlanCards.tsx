@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Heart, HardDriveUpload, Image as ImageIcon, MoreHorizontal, Pencil, Play, Plus, Snowflake, Trash2, WifiOff } from 'lucide-react';
+import { isTv } from '../../lib/tv';
 
 /** What a card needs to know about a plan, already resolved by the page. */
 export interface PlanCardData {
@@ -175,13 +176,16 @@ export function ActivePlanCard(props: ActivePlanCardProps) {
             </span>
           )}
         </div>
-        <PlanMenu
-          className="pl-menu--cover"
-          items={[
-            { label: t('plans.change_cover'), icon: <ImageIcon size={16} />, run: props.onChangeCover },
-            { label: t('plans.backup_plan'), icon: <HardDriveUpload size={16} />, run: props.onBackup },
-          ]}
-        />
+        {/* Both of these need files from the computer: nothing to show on the TV. */}
+        {!isTv && (
+          <PlanMenu
+            className="pl-menu--cover"
+            items={[
+              { label: t('plans.change_cover'), icon: <ImageIcon size={16} />, run: props.onChangeCover },
+              { label: t('plans.backup_plan'), icon: <HardDriveUpload size={16} />, run: props.onBackup },
+            ]}
+          />
+        )}
       </div>
 
       <div className="pl-active-body">
@@ -200,10 +204,12 @@ export function ActivePlanCard(props: ActivePlanCardProps) {
         </div>
 
         <div className="pl-active-actions" onClick={e => e.stopPropagation()}>
-          <button type="button" className="pl-soft-btn" onClick={props.onEdit}>
-            <Pencil size={15} />
-            {t('plans.edit')}
-          </button>
+          {!isTv && (
+            <button type="button" className="pl-soft-btn" onClick={props.onEdit}>
+              <Pencil size={15} />
+              {t('plans.edit')}
+            </button>
+          )}
           <button type="button" className="pl-soft-btn" disabled={props.freezeBusy} onClick={props.onFreeze}>
             {frozen ? <Play size={15} /> : <Snowflake size={15} />}
             {frozen ? t('plans.resume') : t('plans.freeze')}
@@ -265,12 +271,15 @@ export function PlanCard({ plan, onOpen, onStart, onEdit, onChangeCover, onBacku
         <div className="pl-card-top">
           <div className="pl-card-name">{plan.name}</div>
           <PlanMenu
-            items={[
-              { label: t('plans.edit_plan'), icon: <Pencil size={16} />, run: onEdit },
-              { label: t('plans.change_cover'), icon: <ImageIcon size={16} />, run: onChangeCover },
-              { label: t('plans.backup_plan'), icon: <HardDriveUpload size={16} />, run: onBackup },
-              { label: t('plans.delete'), icon: <Trash2 size={16} />, danger: true, run: onDelete },
-            ]}
+            items={isTv
+              // On the TV: no builder, no files. Deleting still works there.
+              ? [{ label: t('plans.delete'), icon: <Trash2 size={16} />, danger: true, run: onDelete }]
+              : [
+                { label: t('plans.edit_plan'), icon: <Pencil size={16} />, run: onEdit },
+                { label: t('plans.change_cover'), icon: <ImageIcon size={16} />, run: onChangeCover },
+                { label: t('plans.backup_plan'), icon: <HardDriveUpload size={16} />, run: onBackup },
+                { label: t('plans.delete'), icon: <Trash2 size={16} />, danger: true, run: onDelete },
+              ]}
           />
         </div>
 

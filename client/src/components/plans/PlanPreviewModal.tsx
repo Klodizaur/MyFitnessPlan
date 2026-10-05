@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Calendar, Check, ChevronLeft, ChevronRight, Copy, LayoutGrid, List, Pencil, Play, Trash2, Upload, X } from 'lucide-react';
+import { isTv } from '../../lib/tv';
 import Modal from '../modal/Modal';
 import { TagRow } from '../library/LibraryCards';
 import { formatDuration, stripVideoExt, useVideoTags } from '../../lib/videoTags';
@@ -153,9 +154,10 @@ export default function PlanPreviewModal(props: Props) {
               </div>
             )}
             <div className="pp-hero-actions">
-              <button type="button" className="pp-act pp-act--edit" onClick={props.onEdit}><Pencil size={15} />{t('plans.edit')}</button>
+              {/* Edit opens the builder and Export saves a file: computer only. */}
+              {!isTv && <button type="button" className="pp-act pp-act--edit" onClick={props.onEdit}><Pencil size={15} />{t('plans.edit')}</button>}
               <button type="button" className="pp-act" onClick={props.onDuplicate} title={t('plans.duplicate')} aria-label={t('plans.duplicate')}><Copy size={16} /><span>{t('plans.duplicate')}</span></button>
-              <button type="button" className="pp-act" onClick={props.onExport} title={t('transfer.export_btn')} aria-label={t('transfer.export_btn')}><Upload size={16} /><span>{t('transfer.export_btn')}</span></button>
+              {!isTv && <button type="button" className="pp-act" onClick={props.onExport} title={t('transfer.export_btn')} aria-label={t('transfer.export_btn')}><Upload size={16} /><span>{t('transfer.export_btn')}</span></button>}
               <span className="pp-grow" />
               <button type="button" className="pp-act pp-act--danger" onClick={props.onDelete} title={t('plans.delete')} aria-label={t('plans.delete')}><Trash2 size={16} /><span>{t('plans.delete')}</span></button>
             </div>

@@ -1,0 +1,10 @@
+.gradle/
+build/
+local.properties
+# Your release signing key and its passwords: never commit these.
+keystore.properties
+*.jks
+*.keystore
+.idea/
+*.iml
+.kotlin/

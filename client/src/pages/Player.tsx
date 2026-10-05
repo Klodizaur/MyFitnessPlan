@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Check, HardDrive, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipForward, Volume1, Volume2, VolumeX, X } from 'lucide-react';
+import { Check, HardDrive, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Volume1, Volume2, VolumeX, X } from 'lucide-react';
 import { useMetaLabels } from '../lib/labels';
 import { formatDuration, stripVideoExt, useVideoTags } from '../lib/videoTags';
 import type { Video } from '../types/video';
@@ -16,10 +16,30 @@ import { canFullscreen, enterFullscreen, exitFullscreen, fullscreenElement, onFu
 import YouTubeGlyph from '../components/icons/YouTubeGlyph';
 import YouTubeEmbed from '../components/YouTubeEmbed';
 import LoopControl, { formatRest } from '../components/LoopControl';
+import { addTvBackHandler, addTvKeyInterceptor, canOpenYouTubeApp, isTv, openYouTubeApp, tvKeepScreenOn, tvVideoOpen } from '../lib/tv';
 
 type Step = { id: string; title: string; thumbnail: string | null; duration: number; done: boolean };
 
 const SPEEDS = [1, 1.25, 1.5];
+
+/**
+ * TV mode: move the remote's focus to the rest countdown's Skip the moment it
+ * appears — during a rest it is the only thing to do — and back to Play/Pause
+ * when the rest ends. (Deliberately not done for "up next": it shows in a
+ * video's last seconds, and OK must still pause then.)
+ * Module-level so React calls it once per mount, not on every render.
+ */
+const focusRestSkipOnTv = (el: HTMLElement | null) => {
+  if (!isTv) return;
+  if (el) {
+    el.focus({ preventScroll: true });
+    return;
+  }
+  requestAnimationFrame(() => {
+    if (document.activeElement && document.activeElement !== document.body) return;
+    document.querySelector<HTMLElement>('.pv-theater [data-tv-default]')?.focus({ preventScroll: true });
+  });
+};
 
 export default function Player() {
   const { videoId, workoutId } = useParams();
@@ -57,6 +77,9 @@ export default function Player() {
     }
   });
   const [error, setError] = useState<string | null>(null);
+  // Why a YouTube video failed (embed_blocked, offline, unavailable), for the
+  // TV's way out of it.
+  const [errorReason, setErrorReason] = useState<string | null>(null);
   // External videos have no relative_path, so "has a path" can't double as
   // "finished loading" any more.
   const [isLoaded, setIsLoaded] = useState(false);
@@ -194,8 +217,11 @@ export default function Player() {
     return () => { cancelled = true; };
   }, [videoId, isExternal, isLoaded]);
 
+  // On the TV, moving between a workout's videos replaces the entry, so the
+  // remote's Back leaves the player rather than stepping through every video.
+  const partNav = isTv ? { replace: true } : undefined;
   const goToNext = () => {
-    if (nextVideoId) navigate(`/player/${nextVideoId}/${workoutId}`);
+    if (nextVideoId) navigate(`/player/${nextVideoId}/${workoutId}`, partNav);
   };
 
   // Looping is per-video: switching videos drops the count and any pending rest
@@ -223,6 +249,12 @@ export default function Player() {
     setTime(0);
     setDuration(0);
     setPlaying(false);
+    // The TV's error screen can move on to the next video, which must not
+    // inherit this one's error.
+    if (isTv) {
+      setError(null);
+      setErrorReason(null);
+    }
   }, [videoId]);
 
   const restartVideo = () => {
@@ -310,6 +342,12 @@ export default function Player() {
   // resting, with the loop panel open, or with the pointer over them. A YouTube video
   // is left alone: its frame swallows the pointer events we'd need to wake up again.
   const [idle, setIdle] = useState(false);
+  // TV: the video starts filling the screen. Back steps down to the normal
+  // player page (video, today's videos, details) instead of leaving; the
+  // full-screen button goes back up. A second Back leaves the player.
+  const [tvFull, setTvFull] = useState(true);
+  const tvFullRef = useRef(true);
+  tvFullRef.current = tvFull;
   const idleTimer = useRef<number | undefined>(undefined);
   const idleRef = useRef(false);
   const wasIdleOnPress = useRef(false);
@@ -317,12 +355,17 @@ export default function Player() {
   const restingRef = useRef(false);
   restingRef.current = restLeft !== null;
   const showIdle = (value: boolean) => { idleRef.current = value; setIdle(value); };
+  // TV mode is always full screen and has no pointer, so the controls hide
+  // there too — for YouTube as well, whose frame no longer swallows anything.
+  const playingRef = useRef(false);
+  playingRef.current = playing;
   const wake = () => {
     showIdle(false);
     window.clearTimeout(idleTimer.current);
-    if (!isFullscreen || isExternal) return;
+    if (isTv ? !tvFull : !isFullscreen || isExternal) return;
     idleTimer.current = window.setTimeout(() => {
-      if (overControls.current || restingRef.current || videoRef.current?.paused) return;
+      const paused = isExternal ? !playingRef.current : videoRef.current?.paused;
+      if (overControls.current || restingRef.current || paused) return;
       if (theaterRef.current?.querySelector('.pv-loop-panel')) return;
       showIdle(true);
     }, 2800);
@@ -332,7 +375,7 @@ export default function Player() {
     wake();
     return () => window.clearTimeout(idleTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFullscreen, isExternal, playing, restLeft]);
+  }, [isFullscreen, isExternal, playing, restLeft, tvFull]);
   useEffect(() => {
     const onKey = () => wake();
     window.addEventListener('keydown', onKey);
@@ -384,6 +427,115 @@ export default function Player() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isExternal]);
+
+  // --- TV mode -------------------------------------------------------------
+  // The remote's media buttons, read through a ref so they always act on the
+  // current video and workout.
+  const tvActions = useRef({ toggle: () => {}, play: () => {}, pause: () => {}, seekBy: (_s: number) => {}, next: () => {}, prev: () => {} });
+  useEffect(() => {
+    if (!isTv) return;
+    const onKey = (e: KeyboardEvent) => {
+      const a = tvActions.current;
+      const act: Record<string, () => void> = {
+        MediaPlayPause: a.toggle,
+        MediaPlay: a.play,
+        MediaPause: a.pause,
+        MediaFastForward: () => a.seekBy(10),
+        MediaRewind: () => a.seekBy(-10),
+        MediaTrackNext: a.next,
+        MediaTrackPrevious: a.prev,
+      };
+      if (act[e.key]) { e.preventDefault(); act[e.key](); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // With the controls hidden, the first press only brings them back — nobody
+  // wants OK to pause a video they can't see the controls of.
+  useEffect(() => {
+    if (!isTv) return;
+    return addTvKeyInterceptor(() => {
+      if (!idleRef.current) return false;
+      wake();
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExternal]);
+
+  // The TV app keeps the screen awake while a workout runs, not while paused.
+  useEffect(() => {
+    tvKeepScreenOn(playing || restLeft !== null);
+  }, [playing, restLeft]);
+  useEffect(() => () => tvKeepScreenOn(false), []);
+  useEffect(() => {
+    tvVideoOpen(true);
+    return () => tvVideoOpen(false);
+  }, []);
+
+  // Full screen on the TV: the page drops the nav and fills the screen with the
+  // video (tv.css). Out of full screen it is the ordinary player page.
+  useEffect(() => {
+    if (!isTv || !tvFull) return;
+    document.documentElement.classList.add('tv-player');
+    return () => document.documentElement.classList.remove('tv-player');
+  }, [tvFull]);
+
+  // On the TV a video only ever plays full screen: Fire TV can't show the
+  // picture in the small player (it draws video behind the page, and only the
+  // full-screen hole lines up). So stepping down pauses it, and anything that
+  // starts playback again (Play, a video picked from the strip, the end of a
+  // rest) goes back up.
+  const tvMinimizedAt = useRef(0);
+  useEffect(() => {
+    if (!isTv) return;
+    return addTvBackHandler(() => {
+      if (!tvFullRef.current) return false;
+      tvMinimizedAt.current = Date.now();
+      if (ytPlayerRef.current) ytPlayerRef.current.pauseVideo?.();
+      else videoRef.current?.pause();
+      setPlaying(false);
+      setTvFull(false);
+      return true;
+    });
+  }, []);
+  useEffect(() => {
+    // The grace period covers YouTube, which reports "playing" for a moment
+    // after being paused.
+    if (isTv && playing && !tvFull && Date.now() - tvMinimizedAt.current > 1500) setTvFull(true);
+  }, [playing, tvFull]);
+
+  // Stepping out of full screen lands on the current video in today's strip,
+  // ready to pick another; with no strip, on the button to go back up.
+  // Going back up to full screen puts focus on Play/Pause (the button pressed
+  // to get there is gone).
+  const tvFullMounted = useRef(false);
+  useEffect(() => {
+    if (!isTv) return;
+    if (!tvFullMounted.current) { tvFullMounted.current = true; return; }
+    if (tvFull) requestAnimationFrame(() => document.querySelector<HTMLElement>('.pv-theater [data-tv-default]')?.focus({ preventScroll: true }));
+  }, [tvFull]);
+  useEffect(() => {
+    if (!isTv || tvFull) return;
+    requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>('.pv-step.is-now') || document.querySelector<HTMLElement>('.pv-tv-full');
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: 'center' });
+    });
+  }, [tvFull]);
+
+  // YouTube reports nothing by itself; poll it so our controls can draw it.
+  useEffect(() => {
+    if (!isTv || !isExternal) return;
+    const id = window.setInterval(() => {
+      const yt = ytPlayerRef.current;
+      if (!yt?.getCurrentTime) return;
+      setTime(yt.getCurrentTime() || 0);
+      setDuration(yt.getDuration?.() || 0);
+      setPlaying(yt.getPlayerState?.() === 1);
+    }, 500);
+    return () => window.clearInterval(id);
+  }, [isExternal, videoId]);
 
   // How many times through the video the user actually got, counting the pass
   // in progress (but not one that hasn't started — during rest the pass that
@@ -440,7 +592,20 @@ export default function Player() {
       <div className="pv-page pv-notice">
         <h2>{t('player.error_title')}</h2>
         <p>{error}</p>
-        <button onClick={() => navigate(-1)} className="rx-btn">{t('player.back')}</button>
+        {isTv ? (
+          // A workout shouldn't dead-end on one video that won't play here.
+          <div className="pv-notice-actions">
+            {errorReason === 'embed_blocked' && externalId && canOpenYouTubeApp() && (
+              <button type="button" onClick={() => openYouTubeApp(externalId)} className="rx-btn rx-btn--primary">{t('player.tv_open_youtube')}</button>
+            )}
+            {nextVideoId && (
+              <button type="button" onClick={goToNext} className="rx-btn" data-tv-default="">{t('player.tv_skip_video')}</button>
+            )}
+            <button type="button" onClick={() => navigate(-1)} className="rx-btn">{t('player.back')}</button>
+          </div>
+        ) : (
+          <button onClick={() => navigate(-1)} className="rx-btn">{t('player.back')}</button>
+        )}
       </div>
     );
   }
@@ -457,13 +622,28 @@ export default function Player() {
   const nextStep = partIndex >= 0 && partIndex < steps.length - 1 ? steps[partIndex + 1] : null;
   const inWorkout = partIndex >= 0 && !standalone;
 
+  // The YouTube branches only run on the TV, the one place our controls sit on
+  // top of a YouTube video.
+  const yt = isExternal ? ytPlayerRef.current : null;
   const togglePlay = () => {
+    if (yt) {
+      if (restLeft !== null) return;
+      if (yt.getPlayerState?.() === 1) yt.pauseVideo(); else yt.playVideo();
+      return;
+    }
     const el = videoRef.current;
     if (!el || restLeft !== null) return;
     if (el.paused || el.ended) el.play().catch(() => {});
     else el.pause();
   };
   const seekTo = (seconds: number) => {
+    if (yt) {
+      if (!duration) return;
+      const to = Math.max(0, Math.min(duration, seconds));
+      yt.seekTo?.(to, true);
+      setTime(to);
+      return;
+    }
     const el = videoRef.current;
     if (!el || !duration) return;
     el.currentTime = Math.max(0, Math.min(duration, seconds));
@@ -473,6 +653,7 @@ export default function Player() {
     const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length];
     setRate(next);
     if (videoRef.current) videoRef.current.playbackRate = next;
+    yt?.setPlaybackRate?.(next);
   };
   const toggleMute = () => {
     // Parked at zero, the speaker means "let me hear it", not "mute".
@@ -510,6 +691,19 @@ export default function Player() {
     const sec = String(total % 60).padStart(2, '0');
     return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
   };
+  const prevStep = inWorkout && partIndex > 0 ? steps[partIndex - 1] : null;
+  const goToStep = (id: string) => navigate(`/player/${id}/${workoutId}`, partNav);
+  tvActions.current = {
+    toggle: togglePlay,
+    play: () => { if (yt) yt.playVideo?.(); else videoRef.current?.play().catch(() => {}); },
+    pause: () => { if (yt) yt.pauseVideo?.(); else videoRef.current?.pause(); },
+    seekBy: s => seekTo(time + s),
+    next: () => { if (nextStep) goToStep(nextStep.id); },
+    prev: () => { if (prevStep) goToStep(prevStep.id); },
+  };
+  // Our controls: always for a local file; for YouTube only on the TV, where
+  // YouTube's own controls can't be reached with a remote.
+  const ownControls = !isYouTube || isTv;
   const showUpNext = Boolean(nextStep) && !upNextHidden && restLeft === null && (loops === 0 || passesDone >= loops) && (isDone || (loops === 0 && duration > 0 && duration - time <= 15));
 
   // The bar under the video: today's tally and the one button that moves you on.
@@ -573,7 +767,8 @@ export default function Player() {
                 externalId={externalId}
                 onEnded={handleEnded}
                 onReady={player => { ytPlayerRef.current = player; }}
-                onError={reason => setError(t(`player.youtube_error_${reason}`))}
+                onError={reason => { setErrorReason(reason); setError(t(`player.youtube_error_${reason}`)); }}
+                ownControls={isTv}
               />
             ) : (
               <div className="player-youtube-error">{t('player.youtube_error_unavailable')}</div>
@@ -600,7 +795,7 @@ export default function Player() {
               onError={() => setError('Could not play this video. The file may be missing or use an unsupported format.')}
             />
           )}
-          {!isYouTube && (
+          {ownControls && (
             <div
               className="pv-hit"
               onClick={() => {
@@ -648,7 +843,14 @@ export default function Player() {
             />
           </div>
 
-          {!isYouTube && !playing && restLeft === null && !showUpNext && (
+          {/* TV, out of full screen: a still instead of the (paused, unshowable) video. */}
+          {isTv && !tvFull && (
+            <div className="pv-tv-still">
+              {video?.thumbnail_path ? <img src={`/thumbnails/${video.thumbnail_path}`} alt="" /> : null}
+            </div>
+          )}
+
+          {ownControls && !playing && restLeft === null && !showUpNext && (
             <button type="button" className="pv-bigplay" onClick={togglePlay} aria-label={t('player.play')}>
               <Play size={32} />
             </button>
@@ -670,7 +872,7 @@ export default function Player() {
                   ? t('player.rest_next_loop', { current: passesDone + 1, total: loops })
                   : t('player.rest_next_video')}
               </span>
-              <button type="button" className="pv-rest-skip" onClick={endRest}>
+              <button type="button" className="pv-rest-skip" onClick={endRest} ref={focusRestSkipOnTv}>
                 <SkipForward size={15} />{t('player.rest_skip')}
               </button>
             </div>
@@ -688,7 +890,7 @@ export default function Player() {
             </div>
           )}
 
-          {!isYouTube && (
+          {ownControls && (
             <div className="pv-bar" data-player-ui onPointerEnter={() => { overControls.current = true; }} onPointerLeave={() => { overControls.current = false; }}>
               <div
                 className="pv-scrub"
@@ -711,15 +913,24 @@ export default function Player() {
                 </div>
               </div>
               <div className="pv-ctrls">
-                <button type="button" onClick={togglePlay} aria-label={t(playing ? 'player.pause' : 'player.play')}>
+                <button type="button" onClick={togglePlay} aria-label={t(playing ? 'player.pause' : 'player.play')} {...(isTv ? { 'data-tv-default': '' } : {})}>
                   {playing ? <Pause size={22} /> : <Play size={22} />}
                 </button>
                 <button type="button" onClick={() => seekTo(time - 10)} aria-label={t('player.back_10')}><RotateCcw size={18} /></button>
                 <button type="button" onClick={() => seekTo(time + 10)} aria-label={t('player.forward_10')}><RotateCw size={18} /></button>
+                {/* On the TV the workout's videos are a button press away, not a scroll. */}
+                {isTv && prevStep && (
+                  <button type="button" onClick={() => goToStep(prevStep.id)} aria-label={t('player.tv_previous_part', { n: partIndex })}><SkipBack size={18} /></button>
+                )}
+                {isTv && nextStep && (
+                  <button type="button" onClick={() => goToStep(nextStep.id)} aria-label={t('player.tv_next_part', { n: partIndex + 2 })}><SkipForward size={18} /></button>
+                )}
                 <span className="pv-clock">{clock(time)} / {clock(duration)}</span>
                 <span className="pv-grow" />
+                {/* On the TV, finishing a part is a button on the controls, not a scroll away. */}
+                {isTv && primaryButton}
                 <button type="button" className="pv-speed" onClick={cycleSpeed} aria-label={t('player.speed')}>{rate}×</button>
-                <div className="pv-vol pv-desk">
+                {!isTv && <div className="pv-vol pv-desk">
                   <button type="button" onClick={toggleMute} aria-label={t(silent ? 'player.unmute' : 'player.mute')}>
                     {silent ? <VolumeX size={18} /> : volume < 0.5 ? <Volume1 size={18} /> : <Volume2 size={18} />}
                   </button>
@@ -734,8 +945,13 @@ export default function Player() {
                     style={{ ['--pv-fill' as string]: `${(muted ? 0 : volume) * 100}%` }}
                     onChange={e => changeVolume(Number(e.target.value))}
                   />
-                </div>
-                {fullscreenAvailable && (
+                </div>}
+                {isTv && !tvFull && (
+                  <button type="button" className="pv-tv-full" onClick={() => setTvFull(true)} aria-label={t('player.fullscreen_enter')}>
+                    <Maximize size={18} />
+                  </button>
+                )}
+                {fullscreenAvailable && !isTv && (
                   <button type="button" onClick={toggleFullscreen} aria-label={t(isFullscreen ? 'player.fullscreen_exit' : 'player.fullscreen_enter')}>
                     {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
                   </button>
@@ -765,7 +981,7 @@ export default function Player() {
                 {steps.map((s, i) => {
                   const current = s.id === videoId;
                   return (
-                    <button key={s.id} type="button" className={`pv-step${current ? ' is-now' : ''}${s.done && !current ? ' is-done' : ''}`} onClick={() => { if (!current) navigate(`/player/${s.id}/${workoutId}`); }} aria-current={current ? 'true' : undefined}>
+                    <button key={s.id} type="button" className={`pv-step${current ? ' is-now' : ''}${s.done && !current ? ' is-done' : ''}`} onClick={() => { if (!current) goToStep(s.id); }} aria-current={current ? 'true' : undefined}>
                       <span className="pv-step-img">
                         {s.thumbnail ? <img src={`/thumbnails/${s.thumbnail}`} alt="" loading="lazy" /> : null}
                         <span className={`pv-step-badge${s.done ? ' is-done' : current ? ' is-now' : ''}`}>

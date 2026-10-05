@@ -74,6 +74,9 @@ let devProc = null;          // DEV: `npm run dev` child (process group)
 let serverChild = null;      // PACKAGED: utilityProcess running the compiled server
 let serverState = 'stopped'; // 'stopped' | 'starting' | 'running'
 let reusedExternal = false;  // DEV: attached to an already-running instance
+// Where to reopen the window after a server restart ('' = the app's start page).
+// Set when sharing is switched from Settings, so the page comes back to it.
+let reopenPath = '';
 let currentPort = null;      // PACKAGED: the port the window loads from
 let logStream = null;
 let shareOnNetwork = false;  // serve to other devices on the LAN (tray toggle)
@@ -242,7 +245,10 @@ async function startServer() {
     const hadWindow = !!mainWindow;
     openApp();
     // After a restart the port may have changed; repoint the existing window.
-    if (hadWindow && mainWindow) mainWindow.loadURL(currentUrl());
+    if (hadWindow && mainWindow) {
+      mainWindow.loadURL(currentUrl().replace(/\/$/, '') + '/' + reopenPath);
+      reopenPath = '';
+    }
   } else {
     serverState = 'stopped';
     updateTray();
@@ -650,7 +656,7 @@ function openApp() {
  * so the change only takes effect on a restart — which this does, rather than
  * leaving the tray claiming something the running server is not doing.
  */
-async function setShareOnNetwork(enabled) {
+async function setShareOnNetwork(enabled, { fromSettings = false } = {}) {
   if (enabled === shareOnNetwork) return;
   shareOnNetwork = enabled;
   saveConfig({ shareOnNetwork: enabled });
@@ -670,8 +676,30 @@ async function setShareOnNetwork(enabled) {
 
   if (serverState === 'running' || serverState === 'starting') await restartServer();
   updateTray();
-  if (enabled && serverState === 'running') await showShareAddress();
+  // Settings shows the address and QR code itself; the dialog is for the tray.
+  if (enabled && serverState === 'running' && !fromSettings) await showShareAddress();
 }
+
+/** What Settings → Devices shows: the switch, and the address once it's live. */
+function sharingState() {
+  const running = serverState === 'running';
+  return {
+    enabled: shareOnNetwork,
+    running,
+    url: shareOnNetwork && running ? shareUrl() : null,
+    // Dev only: attached to a server started elsewhere, which can't be rebound.
+    external: reusedExternal,
+  };
+}
+
+ipcMain.handle('sharing-get', () => sharingState());
+ipcMain.handle('sharing-set', async (_event, enabled) => {
+  // The restart reloads the window; bring it back to Settings → Devices.
+  reopenPath = 'settings?tab=devices';
+  await setShareOnNetwork(Boolean(enabled), { fromSettings: true });
+  reopenPath = '';
+  return sharingState();
+});
 
 /**
  * Show the address to type on a phone or tablet, with the caveats that actually

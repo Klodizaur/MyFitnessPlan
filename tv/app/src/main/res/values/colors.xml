@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The web interface's Pastel Orange theme (client/src/styles/tokens.css), the
+     app's default, so the native screens match what loads after them. -->
+<resources>
+    <color name="page">#FFF5EC</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="border">#F3DCC7</color>
+    <color name="ink">#6B2410</color>
+    <color name="ink_muted">#9A5A3A</color>
+    <color name="ink_faint">#B07A5E</color>
+    <color name="on_ink">#FFF5EC</color>
+    <color name="accent">#F08A4B</color>
+    <color name="danger">#B3261E</color>
+</resources>
