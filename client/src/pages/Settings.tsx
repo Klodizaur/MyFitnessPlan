@@ -348,7 +348,7 @@ export default function Settings() {
                 onClick={() => setTab(id)}
               >
                 <Icon size={15} />
-                {t(`settings.tab_${id}`)}
+                <span>{t(`settings.tab_${id}`)}</span>
               </button>
             ))}
           </div>

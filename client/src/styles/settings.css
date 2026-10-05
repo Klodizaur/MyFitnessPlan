@@ -255,9 +255,19 @@ select.st-input { padding: 0 12px; cursor: pointer; }
   .st-wrap { padding-top: 4px; }
   .st-title { font-size: 32px; }
   .st-tabs-wrap { top: var(--rx-stick); }
-  /* Four labelled tabs don't fit beside their icons on a phone. */
-  .st-tabs button { padding: 9px 8px; }
-  .st-tabs button svg { display: none; }
+  /* On a phone each tab is an icon over a small label, so they all fit. */
+  .st-tabs button {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    padding: 7px 2px 6px;
+    font-size: 10.5px;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+  .st-tabs button svg { width: 18px; height: 18px; flex: none; }
+  .st-tabs button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .st-card { padding: 16px; }
   .st-card--inline { flex-direction: column; align-items: stretch; }
   .st-row { flex-wrap: wrap; }
