@@ -526,6 +526,11 @@
   text-overflow: ellipsis;
 }
 
+.lib-video-meta--line { display: flex; align-items: center; gap: 4px; }
+.lib-video-meta--line > * { flex-shrink: 0; }
+/* A long folder path gives way first; the date stays readable. */
+.lib-video-meta--line .lib-video-meta-folder { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
+
 .lib-tags { gap: 4px; margin-top: 6px; }
 
 /* Hover, matching the folders: the thumbnail lifts, the picture eases in, a play
@@ -817,7 +822,9 @@
   transition: left 0.15s;
 }
 
-.lib-scope-track.is-on .lib-scope-knob { left: 16px; }
+/* The knob takes the button's text colour when on: in dark mode the "on" track
+   is pale, and a white knob on it read as off. */
+.lib-scope-track.is-on .lib-scope-knob { left: 16px; background: var(--t-on-btn); }
 
 /* --- Filters sheet --------------------------------------------------------------
    A right-hand panel on desktop, a bottom sheet on a phone. */
@@ -967,4 +974,20 @@
     top: 12%;
     border-radius: 24px 24px 0 0;
   }
+}
+
+/* Recently added: one row of the newest videos that scrolls sideways, so the
+   folders stay near the top however big the library gets. */
+.lib-recent {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px 0 6px;
+}
+.lib-recent::-webkit-scrollbar { display: none; }
+.lib-recent > .lib-video-item { flex: 0 0 220px; min-width: 0; }
+@media (max-width: 767px) {
+  .lib-recent { margin: 0 -16px; padding-left: 16px; padding-right: 16px; gap: 12px; }
+  .lib-recent > .lib-video-item { flex-basis: 160px; }
 }

@@ -55,15 +55,28 @@ function isPlanComplete(planId: string): { complete: boolean; workoutCount: numb
  * finished after all. Only un-marking does that — editing a plan also clears its
  * marks, but that must not erase a plan you genuinely completed, and edits never
  * come through here.
+ *
+ * A plan can be finished more than once, and each finish is its own record. A
+ * record belongs to the run of marks that produced it: the current run starts at
+ * the oldest mark the plan still has, so a finish recorded before the marks were
+ * last cleared is an earlier run — never matched here, never deleted by an
+ * un-mark now, and no reason to skip recording this one.
  */
 async function syncPlanCompletion(planId: string, completedDate: string): Promise<void> {
   const plan = db.prepare('SELECT id, name, start_date FROM workout_plans WHERE id = ?').get(planId) as any;
   if (!plan) return;
 
   const { complete, workoutCount } = isPlanComplete(planId);
-  const existing = db.prepare(
-    'SELECT id FROM plan_completions WHERE plan_id = ? ORDER BY finished_at DESC LIMIT 1'
-  ).get(planId) as { id: string } | undefined;
+  const runStart = (db.prepare(`
+    SELECT MIN(h.completed_at) AS start FROM history h
+    JOIN workouts w ON w.id = h.workout_id
+    WHERE w.plan_id = ?
+  `).get(planId) as { start: string | null } | undefined)?.start ?? null;
+  const existing = runStart
+    ? db.prepare(
+      'SELECT id FROM plan_completions WHERE plan_id = ? AND finished_at >= ? ORDER BY finished_at DESC LIMIT 1'
+    ).get(planId, runStart) as { id: string } | undefined
+    : undefined;
 
   if (!complete) {
     if (existing) db.prepare('DELETE FROM plan_completions WHERE id = ?').run(existing.id);

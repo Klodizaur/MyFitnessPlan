@@ -264,6 +264,52 @@ export function MixChart({ segments, chart, total }: { segments: Segment[]; char
 
 /* --- Plans ----------------------------------------------------------------------------- */
 
+export type CloudKind = 'type' | 'body' | 'gear' | 'folder';
+export interface CloudItem { key: string; label: string; value: number; kind: CloudKind }
+
+const CLOUD_KINDS: CloudKind[] = ['type', 'body', 'gear', 'folder'];
+
+/** Most words the cloud shows; past this it stops reading as a cloud. */
+const CLOUD_MAX = 40;
+
+/**
+ * Workout types, body parts, equipment and folders as a word cloud: the more
+ * workouts with one, the bigger it's drawn. Alphabetical, the way a cloud is
+ * read. Each word is a chip in the colours that kind of tag has everywhere
+ * else in the app, so the kinds tell apart at a glance; folders are plain.
+ * Size goes by the square root of the count so one favourite doesn't shrink
+ * everything else to nothing.
+ */
+export function TagCloud({ items }: { items: CloudItem[] }) {
+  const { t } = useTranslation();
+  if (items.length === 0) return <p className="lg-empty">{t('profile.cloud_empty')}</p>;
+
+  const shown = [...items].sort((a, b) => b.value - a.value).slice(0, CLOUD_MAX)
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+  const max = shown.reduce((m, i) => Math.max(m, i.value), 1);
+  const size = (value: number) => Math.round(13 + Math.sqrt(value / max) * 17);
+
+  return (
+    <>
+      <ul className="lg-cloud">
+        {shown.map(item => {
+          const title = `${item.label} · ${t('profile.cloud_count', { count: item.value })}`;
+          return (
+            <li key={item.key} className={`lg-cloud-word lg-cloud-word--${item.kind}`} style={{ fontSize: size(item.value) }} title={title} aria-label={title}>
+              {item.label}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="lg-cloud-legend">
+        {CLOUD_KINDS.filter(kind => shown.some(i => i.kind === kind)).map(kind => (
+          <span key={kind}><i className={`lg-cloud-key lg-cloud-word--${kind}`} />{t(`profile.cloud_${kind}`)}</span>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function PlansPanel({ started, finished, onForget }: { started: PlanProgress[]; finished: FinishedPlan[]; onForget: (id: string) => void }) {
   const { t, i18n } = useTranslation();
   if (started.length === 0 && finished.length === 0) return null;

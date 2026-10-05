@@ -9,7 +9,7 @@ import {
 import { EMPTY_LENGTH, isLengthActive, LengthRange, matchesLength, matchesQuery, matchesSource, matchesTags, useFilterMatchMode, SourceFilter } from '../lib/filters';
 import { useLengthLabel } from '../components/library/LengthFilter';
 import { useMetaLabels } from '../lib/labels';
-import { albumKeyForVideo, FAVORITES_ALBUM_KEY, isExternalAlbumKey, toAlbumRouteParam } from '../lib/paths';
+import { albumKeyForVideo, FAVORITES_ALBUM_KEY, isExternalAlbumKey, isExternalVideo, toAlbumRouteParam } from '../lib/paths';
 import { toggleVideoFavorite } from '../lib/favorites';
 import { ImportResult, useDescriptionProgress, useImportAvailable } from '../lib/externalImport';
 import { useIsMobile } from '../lib/useIsMobile';
@@ -17,11 +17,11 @@ import VideoDetailsModal from '../components/VideoDetailsModal';
 import YouTubeImportModal from '../components/YouTubeImportModal';
 import { Video } from '../types/video';
 import '../styles/library.css';
+import { compareAdded, naturalCompare, sortVideos } from '../lib/videoSort';
+import { timeAgo } from '../lib/dates';
 
 const PAGE = 24;
-
-const naturalCompare = (a: string, b: string) =>
-  a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+const RECENT_COUNT = 6;
 
 /**
  * Library index: the folders and imported albums, with search and filters.
@@ -31,7 +31,7 @@ const naturalCompare = (a: string, b: string) =>
  * a search for "arms" could mean either.
  */
 export default function Library() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const labels = useMetaLabels();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -51,6 +51,9 @@ export default function Library() {
   const [matchMode, setMatchMode] = useFilterMatchMode();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE);
+  // Every video listed under the folders, the way an album's "Include
+  // subfolders" does — without having to search for something first.
+  const [showAll, setShowAll] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [justImported, setJustImported] = useState(false);
 
@@ -96,6 +99,12 @@ export default function Library() {
       map.set(key, arr);
     }
 
+    const addedRange = new Map<string, { newest?: string; oldest?: string }>();
+    for (const [key, vids] of map) {
+      const dates = vids.map(v => v.added_at).filter((d): d is string => Boolean(d)).sort();
+      addedRange.set(key, { oldest: dates[0], newest: dates[dates.length - 1] });
+    }
+
     const result: FolderItem[] = Array.from(map.entries()).map(([key, vids]) => {
       const stored = localStorage.getItem(`albumImage:${key}`);
       return {
@@ -111,6 +120,9 @@ export default function Library() {
 
     if (sort === 'size') result.sort((a, b) => b.count - a.count);
     else if (sort === 'small') result.sort((a, b) => a.count - b.count);
+    // A folder is as new as its newest video, and as old as its oldest one.
+    else if (sort === 'newest') result.sort((a, b) => compareAdded(addedRange.get(a.key)?.newest, addedRange.get(b.key)?.newest, true));
+    else if (sort === 'oldest') result.sort((a, b) => compareAdded(addedRange.get(a.key)?.oldest, addedRange.get(b.key)?.oldest, false));
     else result.sort((a, b) => naturalCompare(a.title, b.title));
     if (sort === 'za') result.reverse();
     // Imported playlists group together after the user's own folders.
@@ -143,18 +155,27 @@ export default function Library() {
     [albums, trimmedQuery]
   );
 
-  /** Videos are only listed once something is being searched or filtered for. */
+  /** Videos are listed once something is searched or filtered for, or on request. */
+  const listVideos = isFiltering || showAll;
   const matchingVideos = useMemo(() => {
-    if (!isFiltering) return [];
+    if (!listVideos) return [];
     const found = filteredVideos.filter(v =>
       matchesQuery([v.filename, v.description], trimmedQuery));
-    const sorted = [...found];
-    if (sort === 'size') sorted.sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0));
-    else if (sort === 'small') sorted.sort((a, b) => (a.duration_seconds || 0) - (b.duration_seconds || 0));
-    else sorted.sort((a, b) => naturalCompare(a.filename, b.filename));
-    if (sort === 'za') sorted.reverse();
-    return sorted;
-  }, [filteredVideos, isFiltering, trimmedQuery, sort]);
+    return sortVideos(found, sort);
+  }, [filteredVideos, listVideos, trimmedQuery, sort]);
+
+  /** Where a video lives: its playlist for an import, else its folder path (none for loose files). */
+  const folderLabel = (video: Video): string | undefined => {
+    if (isExternalVideo(video)) return video.external_playlist_title || t('library.untitled_playlist');
+    const dirs = (video.relative_path || '').split('/').slice(0, -1);
+    return dirs.length ? dirs.join(' / ') : undefined;
+  };
+
+  /** The newest few, above the folders. Follows the source switch. */
+  const recentVideos = useMemo(
+    () => sortVideos(filteredVideos.filter(v => v.added_at), 'newest').slice(0, RECENT_COUNT),
+    [filteredVideos]
+  );
 
   const shown = matchingVideos.slice(0, limit);
   const left = matchingVideos.length - shown.length;
@@ -235,14 +256,47 @@ export default function Library() {
       />
 
       <div className="rx-wrap lib-body">
+        {!isFiltering && recentVideos.length > 0 && (
+          <section>
+            <div className="lib-section-head">
+              <h2>{t('dashboard.recently_added')}</h2>
+            </div>
+            <div className="lib-recent">
+              {recentVideos.map(video => (
+                <VideoGridCard
+                  key={video.id}
+                  video={video}
+                  meta={folderLabel(video)}
+                  note={timeAgo(video.added_at!, i18n.language)}
+                  onOpen={() => setDetailsVideo(video)}
+                  onPlay={() => navigate(`/player/${video.id}`)}
+                  onInfo={() => setDetailsVideo(video)}
+                  onFavorite={() => toggleVideoFavorite(video, setVideos)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {(visibleFolders.length > 0 || showAddYouTube) && (
           <section>
-            {isFiltering && (
-              <div className="lib-section-head">
-                <h2>{t('library.folders')}</h2>
-                <span className="lib-section-count">{visibleFolders.length}</span>
-              </div>
-            )}
+            <div className="lib-section-head">
+              <h2>{t('library.folders')}</h2>
+              <span className="lib-section-count">{visibleFolders.length}</span>
+              {!isFiltering && (
+                <button
+                  type="button"
+                  className="lib-scope"
+                  aria-pressed={showAll}
+                  onClick={() => { setShowAll(v => !v); setLimit(PAGE); }}
+                >
+                  <span className={`lib-scope-track${showAll ? ' is-on' : ''}`}>
+                    <span className="lib-scope-knob" />
+                  </span>
+                  {t('library.show_all_videos')}
+                </button>
+              )}
+            </div>
 
             {effectiveView === 'grid' ? (
               <div className="lib-grid">
@@ -265,10 +319,10 @@ export default function Library() {
           </section>
         )}
 
-        {isFiltering && (
+        {listVideos && (
           <section>
             <div className="lib-section-head">
-              <h2>{t('library.matching_videos')}</h2>
+              <h2>{isFiltering ? t('library.matching_videos') : t('library.all_videos')}</h2>
               <span className="lib-section-count">{matchingVideos.length}</span>
             </div>
 
@@ -283,7 +337,8 @@ export default function Library() {
                   <VideoGridCard
                     key={video.id}
                     video={video}
-                    meta={video.relative_path ? video.relative_path.split('/').slice(0, -1).join(' / ') : undefined}
+                    meta={folderLabel(video)}
+                    note={video.added_at ? timeAgo(video.added_at, i18n.language) : undefined}
                     onOpen={() => setDetailsVideo(video)}
                     onPlay={() => navigate(`/player/${video.id}`)}
                     onInfo={() => setDetailsVideo(video)}
@@ -297,7 +352,8 @@ export default function Library() {
                   <VideoListRow
                     key={video.id}
                     video={video}
-                    meta={video.relative_path ? video.relative_path.split('/').slice(0, -1).join(' / ') : undefined}
+                    meta={folderLabel(video)}
+                    note={video.added_at ? timeAgo(video.added_at, i18n.language) : undefined}
                     onOpen={() => setDetailsVideo(video)}
                     onPlay={() => navigate(`/player/${video.id}`)}
                     onInfo={() => setDetailsVideo(video)}

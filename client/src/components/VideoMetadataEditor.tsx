@@ -147,7 +147,8 @@ export function VideoEditForm({ video, onCancel, onSaved }: { video: Video; onCa
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
-      onSaved(data);
+      // Keep what the edit response doesn't carry (the completion count).
+      onSaved({ ...video, ...data });
     } catch (err: any) {
       setError(err.message || 'Failed to save');
     } finally {

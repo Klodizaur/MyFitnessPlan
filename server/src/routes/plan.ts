@@ -94,7 +94,9 @@ function normalizeDescription(raw: unknown): string | null {
  * workout — an infinite loop in the schedule builder — so it is rejected here
  * rather than stored.
  */
-const MAX_PATTERN_DAYS = 14;
+// Up to 12 weeks, so a plan can have a week-by-week rhythm (the plan builder's
+// longest option); a plain repeating cycle is kept to 28 days in the client.
+const MAX_PATTERN_DAYS = 84;
 
 function normalizePattern(raw: unknown): string | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
@@ -429,6 +431,12 @@ export default async function (fastify: FastifyInstance) {
     // offline, which the Plans page warns about on the card.
     const externalVideoIds = new Set(videos.filter(v => (v.source || 'local') !== 'local').map(v => v.id));
 
+    // Times each plan has been finished, from the durable record.
+    const finishes = new Map(
+      (db.prepare('SELECT plan_id, COUNT(*) AS n FROM plan_completions WHERE plan_id IS NOT NULL GROUP BY plan_id')
+        .all() as { plan_id: string; n: number }[]).map(r => [r.plan_id, r.n])
+    );
+
     const enriched = plans.map(plan => {
       const planWorkouts = workouts.filter(w => w.plan_id === plan.id);
       const equipmentSet = new Set<string>();
@@ -449,6 +457,7 @@ export default async function (fastify: FastifyInstance) {
         workout_count: planWorkouts.length,
         equipment: Array.from(equipmentSet),
         has_external: hasExternal,
+        completion_count: finishes.get(plan.id) || 0,
       };
     });
 

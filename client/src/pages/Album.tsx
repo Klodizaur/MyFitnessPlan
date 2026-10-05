@@ -17,10 +17,10 @@ import { notify } from '../lib/notify';
 import { confirmDialog } from '../lib/confirm';
 import { useAiAvailable } from '../lib/useAiAvailable';
 import { Video } from '../types/video';
+import { naturalCompare, sortVideos } from '../lib/videoSort';
+import { timeAgo } from '../lib/dates';
 
 const PAGE = 24;
-
-const naturalCompare = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
 export default function Album() {
   const { albumId } = useParams();
@@ -50,7 +50,7 @@ export default function Album() {
   const location = useLocation();
   const [matchMode, setMatchMode] = useFilterMatchMode();
   const labels = useMetaLabels();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Optional AI description clean-up for the whole album.
   const aiAvailable = useAiAvailable();
 
@@ -147,11 +147,7 @@ export default function Album() {
     if (!matchesLength(v.duration_seconds, selectedLength)) return false;
     return true;
   });
-  const sorted = [...filtered];
-  if (sortMode === 'size') sorted.sort((a, b) => (b.duration_seconds || 0) - (a.duration_seconds || 0));
-  else if (sortMode === 'small') sorted.sort((a, b) => (a.duration_seconds || 0) - (b.duration_seconds || 0));
-  else sorted.sort((a, b) => naturalCompare(a.filename, b.filename));
-  if (sortMode === 'za') sorted.reverse();
+  const sorted = sortVideos(filtered, sortMode);
 
   // Held in state, not read from localStorage during render: writing to storage
   // alone doesn't re-render, so a newly picked cover wouldn't appear until the
@@ -476,6 +472,8 @@ export default function Album() {
                 { value: 'za', label: t('library.sort_za') },
                 { value: 'size', label: t('library.sort_longest') },
                 { value: 'small', label: t('library.sort_shortest') },
+                { value: 'newest', label: t('library.sort_newest') },
+                { value: 'oldest', label: t('library.sort_oldest') },
               ]}
             />
 
@@ -510,6 +508,7 @@ export default function Album() {
                   key={video.id}
                   video={video}
                   meta={relMeta(video)}
+                  note={video.added_at ? timeAgo(video.added_at, i18n.language) : undefined}
                   onOpen={() => setDetailsVideo(video)}
                   onPlay={() => navigate(`/player/${video.id}`)}
                   onInfo={() => setDetailsVideo(video)}
@@ -524,6 +523,7 @@ export default function Album() {
                   key={video.id}
                   video={video}
                   meta={relMeta(video)}
+                  note={video.added_at ? timeAgo(video.added_at, i18n.language) : undefined}
                   onOpen={() => setDetailsVideo(video)}
                   onMenu={() => setDetailsVideo(video)}
                   onPlay={() => navigate(`/player/${video.id}`)}

@@ -1,7 +1,8 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Heart, HardDriveUpload, Image as ImageIcon, MoreHorizontal, Pencil, Play, Plus, Snowflake, Trash2, WifiOff } from 'lucide-react';
+import { Eye, Heart, HardDriveUpload, Image as ImageIcon, MoreHorizontal, Pencil, Play, Plus, Snowflake, Trash2, WifiOff } from 'lucide-react';
 import { isTv } from '../../lib/tv';
+import { CompletedBadge } from '../library/LibraryCards';
 
 /** What a card needs to know about a plan, already resolved by the page. */
 export interface PlanCardData {
@@ -14,6 +15,8 @@ export interface PlanCardData {
   equipment: string[];
   hasExternal: boolean;
   favorite: boolean;
+  /** Times the whole plan has been finished. */
+  completions: number;
 }
 
 function PlanCover({ plan, className, onFavorite }: { plan: PlanCardData; className: string; onFavorite?: () => void }) {
@@ -25,6 +28,7 @@ function PlanCover({ plan, className, onFavorite }: { plan: PlanCardData; classN
       ) : (
         <img src="/logo.png" alt="" className="pl-cover-logo" />
       )}
+      <CompletedBadge count={plan.completions} labelKey="plans.finished_times" />
       {onFavorite && (
         <button
           type="button"
@@ -176,11 +180,13 @@ export function ActivePlanCard(props: ActivePlanCardProps) {
             </span>
           )}
         </div>
-        {/* Both of these need files from the computer: nothing to show on the TV. */}
+        {/* Cover and backup need files from the computer, so there's no menu on the
+            TV, where selecting the card opens the plan anyway. */}
         {!isTv && (
           <PlanMenu
             className="pl-menu--cover"
             items={[
+              { label: t('plans.view_plan'), icon: <Eye size={16} />, run: props.onOpen },
               { label: t('plans.change_cover'), icon: <ImageIcon size={16} />, run: props.onChangeCover },
               { label: t('plans.backup_plan'), icon: <HardDriveUpload size={16} />, run: props.onBackup },
             ]}
@@ -275,6 +281,9 @@ export function PlanCard({ plan, onOpen, onStart, onEdit, onChangeCover, onBacku
               // On the TV: no builder, no files. Deleting still works there.
               ? [{ label: t('plans.delete'), icon: <Trash2 size={16} />, danger: true, run: onDelete }]
               : [
+                // Tapping the card opens it too, but that isn't obvious, so the
+                // menu says so.
+                { label: t('plans.view_plan'), icon: <Eye size={16} />, run: onOpen },
                 { label: t('plans.edit_plan'), icon: <Pencil size={16} />, run: onEdit },
                 { label: t('plans.change_cover'), icon: <ImageIcon size={16} />, run: onChangeCover },
                 { label: t('plans.backup_plan'), icon: <HardDriveUpload size={16} />, run: onBackup },

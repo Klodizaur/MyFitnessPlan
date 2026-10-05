@@ -16,14 +16,15 @@ import type { ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowLeft, ArrowRight, Ban, Check, Dumbbell, FileVideo, Folder, Library, Minus, Moon, PartyPopper, Plus,
+  ArrowLeft, ArrowRight, Ban, Check, FileVideo, Folder, Library, Minus, PartyPopper, Plus,
   RotateCcw, Shuffle, SignalHigh, SignalLow, SignalMedium, Sparkles, X,
 } from 'lucide-react';
 import { EQUIPMENT_ITEMS } from '../../lib/equipment';
 import { BODY_PARTS, INTENSITIES, TRAINING_TYPES } from '../../lib/metadata';
 import { useMetaLabels } from '../../lib/labels';
 import { albumKeyForVideo, isExternalAlbumKey } from '../../lib/paths';
-import { DEFAULT_PATTERN, isUsablePattern } from '../WorkoutPatternPicker';
+import { DEFAULT_PATTERN } from '../WorkoutPatternPicker';
+import RhythmEditor from '../builder/RhythmEditor';
 import { BuilderWeek, createWeek } from '../../lib/builderModel';
 import { Video } from '../../types/video';
 import '../../styles/aiplan.css';
@@ -167,6 +168,10 @@ export default function AiPlanModal({ open, onClose, onGenerated, onSaved }: Pro
   // Off by default: a drafted plan follows the rhythm from Settings unless the
   // user deliberately gives this one its own.
   const [patternCustom, setPatternCustom] = useState(false);
+  const [patternByWeek, setPatternByWeek] = useState(false);
+  // The rhythm from Settings, restored when a custom one is switched back off
+  // so the pacing hint follows what the plan will actually use.
+  const [globalPattern, setGlobalPattern] = useState<number[]>(DEFAULT_PATTERN);
   const [maxMinutes, setMaxMinutes] = useState(45);
   const [equipment, setEquipment] = useState<string[]>([]);
   const [trainingTypes, setTrainingTypes] = useState<string[]>([]);
@@ -196,6 +201,7 @@ export default function AiPlanModal({ open, onClose, onGenerated, onSaved }: Pro
       .then(data => {
         if (Array.isArray(data?.workout_pattern) && data.workout_pattern.some((d: number) => d)) {
           setWorkoutPattern(data.workout_pattern);
+          setGlobalPattern(data.workout_pattern);
         }
       })
       .catch(() => { /* keep the built-in default */ });
@@ -482,60 +488,18 @@ export default function AiPlanModal({ open, onClose, onGenerated, onSaved }: Pro
         </div>
 
         <div className="ai-field">
-          <div className="ai-rhythm-head">
-            <div className="ai-rhythm-title">{t('plans.builder_pattern')}</div>
-            <div className="rx-seg">
-              <button type="button" className={!patternCustom ? 'is-on' : ''} onClick={() => setPatternCustom(false)}>
-                {t('plans.pattern_default')}
-              </button>
-              <button type="button" className={patternCustom ? 'is-on' : ''} onClick={() => setPatternCustom(true)}>
-                {t('plans.pattern_custom')}
-              </button>
-            </div>
-          </div>
-          <div className={`ai-rhythm${patternCustom ? '' : ' is-locked'}`}>
-            {workoutPattern.map((value, index) => (
-              <button
-                key={index}
-                type="button"
-                className={`ai-rhythm-day${value ? ' is-work' : ''}`}
-                disabled={!patternCustom}
-                onClick={() => {
-                  const next = workoutPattern.map((v, i) => (i === index ? (v ? 0 : 1) : v));
-                  // A rhythm with no training day could never place a workout.
-                  if (isUsablePattern(next)) setWorkoutPattern(next);
-                }}
-              >
-                <span>{index + 1}</span>
-                {value ? <Dumbbell size={17} /> : <Moon size={17} />}
-              </button>
-            ))}
-          </div>
-          {/* The cycle can grow or shrink, so a plan isn't stuck with a seven-day week. */}
-          <div className="pb-cycle">
-            <span>{t('settings.workout_days_in_every', { count: patternWorkoutDays })}</span>
-            <div className="pb-stepper">
-              <button
-                type="button"
-                aria-label={t('settings.remove_day')}
-                disabled={!patternCustom || workoutPattern.length <= 1 || !workoutPattern.slice(0, -1).some(v => v === 1)}
-                onClick={() => setWorkoutPattern(workoutPattern.slice(0, -1))}
-              >
-                <Minus size={15} />
-              </button>
-              <span>{workoutPattern.length}</span>
-              <button
-                type="button"
-                aria-label={t('settings.add_day')}
-                disabled={!patternCustom || workoutPattern.length >= 14}
-                onClick={() => setWorkoutPattern([...workoutPattern, 1])}
-              >
-                <Plus size={15} />
-              </button>
-            </div>
-            <span>{t('settings.days_unit')}</span>
-          </div>
-          <p className="ai-note">{t('ai.pattern_hint')}</p>
+          <RhythmEditor
+            custom={patternCustom}
+            onCustom={next => {
+              setPatternCustom(next);
+              if (!next) setWorkoutPattern(globalPattern);
+            }}
+            byWeek={patternByWeek}
+            onByWeek={setPatternByWeek}
+            pattern={workoutPattern}
+            onPattern={setWorkoutPattern}
+            hint={<p className="ai-note">{t('ai.pattern_hint')}</p>}
+          />
         </div>
       </div>
     ),

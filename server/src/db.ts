@@ -225,6 +225,44 @@ if (!codecInfo.some((c: any) => c.name === 'codec_probed')) {
   db.exec('ALTER TABLE videos ADD COLUMN codec_probed INTEGER DEFAULT 0');
 }
 
+// When a local file appeared on this computer (its creation date), for the
+// dashboard's "Recently added". `added_at` can't do that job: it's when the scan
+// first saw the file, and a first scan stamps the whole library with the same
+// minute. Set by the scan; existing rows are filled in from disk just below.
+if (!codecInfo.some((c: any) => c.name === 'file_created_at')) {
+  db.exec('ALTER TABLE videos ADD COLUMN file_created_at TEXT');
+}
+
+/**
+ * A file's creation date as ISO text, or null when it can't be read (the file
+ * moved, or its drive is unplugged). Filesystems that don't record one report
+ * 0, so the last-modified time stands in there.
+ */
+export function fileCreatedAt(filepath: string): string | null {
+  try {
+    const stat = fs.statSync(filepath);
+    const ms = stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs;
+    return new Date(ms).toISOString();
+  } catch {
+    return null;
+  }
+}
+
+// Backfill once per start for files the scan hasn't dated yet. Only stats files,
+// so it's quick, and anything unreachable is just left for the next scan.
+{
+  const undated = db.prepare(
+    "SELECT id, filepath FROM videos WHERE file_created_at IS NULL AND (source IS NULL OR source = 'local')"
+  ).all() as { id: string; filepath: string }[];
+  const setDate = db.prepare('UPDATE videos SET file_created_at = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const row of undated) {
+      const created = fileCreatedAt(row.filepath);
+      if (created) setDate.run(created, row.id);
+    }
+  })();
+}
+
 const planInfo = db.pragma("table_info('workout_plans')") as any[];
 const hasBackgroundImage = planInfo.some(col => col.name === 'background_image');
 if (!hasBackgroundImage) {

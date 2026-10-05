@@ -4,7 +4,7 @@ import { Check, ChevronDown, ChevronRight, HardDriveUpload, ListPlus, Plus, Sear
 import { useMetaLabels } from '../lib/labels';
 import { isTv } from '../lib/tv';
 import { ImportResult, useImportAvailable } from '../lib/externalImport';
-import { BuilderWeek, createWeek, createInitialBuilderWeeks, workoutSlots } from '../lib/builderModel';
+import { BuilderWeek, createWeek, createInitialBuilderWeeks, isWeeklyPattern } from '../lib/builderModel';
 import { useAiAvailable } from '../lib/useAiAvailable';
 import YouTubeImportModal from '../components/YouTubeImportModal';
 import AiPlanModal, { AiPlanResult } from '../components/ai/AiPlanModal';
@@ -55,6 +55,8 @@ interface Plan {
   is_favorite?: number;
   /** True when the plan contains videos that stream instead of playing offline. */
   has_external?: boolean;
+  /** Times the whole plan has been finished. */
+  completion_count?: number;
 }
 
 /** A video resolved by `GET /api/plan/:id`. */
@@ -148,6 +150,9 @@ export default function Plans() {
   // so changing the global rhythm later still moves these plans with it. Only
   // an explicit override is saved onto the plan.
   const [builderPatternCustom, setBuilderPatternCustom] = useState(false);
+  // Week-by-week: the plan's own rhythm is edited as whole weeks that can each
+  // differ. Same stored shape (one flat cycle), so this is only how it's edited.
+  const [builderPatternByWeek, setBuilderPatternByWeek] = useState(false);
   const [builderStartDate, setBuilderStartDate] = useState(localDateString());
   // Either a preset key, '' for none, or 'custom' while the free-text field is open.
   const [builderCategory, setBuilderCategory] = useState('');
@@ -416,6 +421,7 @@ export default function Plans() {
       setPlanDescription(plan.description || '');
       const planPattern = parsePlanPattern(plan.workout_pattern);
       setBuilderPatternCustom(planPattern !== null);
+      setBuilderPatternByWeek(planPattern !== null && isWeeklyPattern(planPattern));
       setBuilderPattern(planPattern || globalPattern);
       setBuilderStartDate(plan.start_date);
       const existingCategory = plan.category?.trim() || '';
@@ -451,6 +457,7 @@ export default function Plans() {
     setPlanDescription(result.summary || '');
     // The draft was paced for this rhythm, so the plan should be saved with it.
     setBuilderPatternCustom(result.workoutPattern !== null);
+    setBuilderPatternByWeek(result.workoutPattern !== null && isWeeklyPattern(result.workoutPattern));
     setBuilderPattern(result.workoutPattern || globalPattern);
     setBuilderStartDate(localDateString());
     setBuilderCategory('');
@@ -583,6 +590,7 @@ export default function Plans() {
       setPlanDescription('');
       setBuilderPattern(globalPattern);
       setBuilderPatternCustom(false);
+      setBuilderPatternByWeek(false);
       setBuilderCategory('');
       setBuilderCustomCategory('');
       setBuilderWeeks(createInitialBuilderWeeks());
@@ -600,6 +608,7 @@ export default function Plans() {
     setPlanDescription('');
     setBuilderPattern(globalPattern);
     setBuilderPatternCustom(false);
+    setBuilderPatternByWeek(false);
     setBuilderCategory('');
     setBuilderCustomCategory('');
     setBuilderWeeks(createInitialBuilderWeeks());
@@ -800,6 +809,7 @@ export default function Plans() {
     equipment: (plan.equipment || []).map(id => labels.equipment(id)),
     hasExternal: Boolean(plan.has_external),
     favorite: plan.is_favorite === 1,
+    completions: plan.completion_count ?? 0,
   });
 
   const startPlan = plans.find(p => p.id === startPlanId) || null;
@@ -1035,7 +1045,7 @@ export default function Plans() {
           done={doneByPlan[detailsPlan.id] ?? 0}
           days={detailsDays}
           loading={detailsLoading}
-          perWeek={workoutSlots(parsePlanPattern(detailsPlan.workout_pattern) ?? globalPattern)}
+          pattern={parsePlanPattern(detailsPlan.workout_pattern) ?? globalPattern}
           needsInternet={Boolean(detailsPlan.has_external)}
           defaultDate={activationDate}
           onClose={closePlanDetails}
@@ -1117,6 +1127,8 @@ export default function Plans() {
             setBuilderPatternCustom(next);
             if (!next) setBuilderPattern(globalPattern);
           }}
+          patternByWeek={builderPatternByWeek}
+          onPatternByWeek={setBuilderPatternByWeek}
           pattern={builderPattern}
           onPattern={setBuilderPattern}
           weeks={builderWeeks}

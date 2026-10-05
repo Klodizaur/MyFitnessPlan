@@ -7,6 +7,7 @@ import {
 import AiSettingsSection from '../components/ai/AiSettingsSection';
 import { isTv } from '../lib/tv';
 import DevicesSection, { sharingBridge } from '../components/DevicesSection';
+import { announceSettingsSaved } from '../lib/settingsEvents';
 import '../styles/settings.css';
 
 /**
@@ -169,6 +170,7 @@ export default function Settings() {
         body: JSON.stringify({ directory })
       });
       const data = await res.json();
+      if (!data.error) announceSettingsSaved();
       if (data.error) setScanNote({ text: `Error: ${data.error}`, ok: false });
       else if (data.skippedCleanup) {
         // The scan couldn't see the whole folder, so nothing was removed from
@@ -198,6 +200,7 @@ export default function Settings() {
       });
       if (!res.ok) throw new Error('failed');
       setSaved({ pattern, excludePaths, theme, calendarView });
+      announceSettingsSaved();
       document.body.setAttribute('data-theme', theme);
       flash(t('settings.settings_saved'));
     } catch {

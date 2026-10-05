@@ -6,7 +6,7 @@ import { useMetaLabels } from '../lib/labels';
 import AddLogEntryModal from '../components/AddLogEntryModal';
 import VideoMetadataEditor from '../components/VideoMetadataEditor';
 import {
-  ActivityCalendar, JournalGroup, MixChart, PlansPanel, RestGap, StatsBand,
+  ActivityCalendar, CloudItem, JournalGroup, MixChart, PlansPanel, RestGap, StatsBand, TagCloud,
 } from '../components/log/LogParts';
 import {
   FinishedPlan, LogEntry, LogGroup, PlanProgress, formatDuration, groupEntries, pad, toDateStr,
@@ -191,6 +191,23 @@ export default function Profile() {
       .map(([key, value]) => ({ label: labelFor(key), value }));
   }, [rangeEntries, dimension, labels]);
   const totalTagged = segments.reduce((s, x) => s + x.value, 0);
+
+  /** Types, body parts, equipment and folders, counted per logged workout over the same range. */
+  const cloudItems = useMemo<CloudItem[]>(() => {
+    const counts = new Map<string, CloudItem>();
+    const add = (key: string, label: string, kind: CloudItem['kind']) => {
+      const item = counts.get(key) || { key, label, value: 0, kind };
+      item.value += 1;
+      counts.set(key, item);
+    };
+    for (const e of rangeEntries) {
+      for (const v of e.trainingType || []) add(`type:${v}`, labels.trainingType(v), 'type');
+      for (const v of e.bodyParts || []) add(`body:${v}`, labels.bodyPart(v), 'body');
+      for (const eq of e.equipment || []) add(`gear:${eq}`, labels.equipment(eq), 'gear');
+      if (e.folder) add(`folder:${e.folder}`, e.folder, 'folder');
+    }
+    return Array.from(counts.values());
+  }, [rangeEntries, labels]);
 
   // --- Actions ----------------------------------------------------------------------------------
   const saveNotes = async (ids: string[], notes: string) => {
@@ -417,6 +434,14 @@ export default function Profile() {
           </div>
         </div>
         <MixChart segments={segments} chart={chart} total={totalTagged} />
+      </section>
+
+      <section className="lg-mix">
+        <div className="lg-mix-head">
+          <h2>{t('profile.cloud_heading')}</h2>
+          <span className="lg-cloud-range">{t(`profile.range_${range}`)}</span>
+        </div>
+        <TagCloud items={cloudItems} />
       </section>
 
       <PlansPanel started={startedPlans} finished={finishedPlans} onForget={forgetFinished} />

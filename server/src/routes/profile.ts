@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import db from '../db.js';
+import { logVideoResolver } from './library.js';
 
 function parseJsonArray(value: unknown): string[] {
   if (typeof value !== 'string' || !value) return [];
@@ -11,12 +12,34 @@ function parseJsonArray(value: unknown): string[] {
   }
 }
 
+function folderName(row: { relative_path?: string | null; source?: string | null; external_playlist_title?: string | null }): string | null {
+  if ((row.source || 'local') !== 'local') return row.external_playlist_title || null;
+  const parts = (row.relative_path || '').split(/[\\/]/).filter(Boolean);
+  return parts.length > 1 ? parts[0] : null;
+}
+
 export default async function (fastify: FastifyInstance) {
   // Persistent workout history for the Profile page.
   // workout_log rows are denormalized snapshots (so names survive plan edits/deletes),
   // while metadata tags (training type, body parts, intensity, equipment) are joined
   // LIVE from the videos table so the activity summary reflects the latest tagging.
   fastify.get('/history', async (_request, reply) => {
+    // Which video each entry is about, including entries logged before the
+    // library was rebuilt under new IDs — those are matched by filename, so
+    // their tags and folder still count towards the breakdown.
+    const resolve = logVideoResolver(db.prepare('SELECT id, filename FROM videos').all() as { id: string; filename: string }[]);
+    const logRefs = db.prepare('SELECT id, video_id, video_filename FROM workout_log').all() as
+      { id: string; video_id: string | null; video_filename: string | null }[];
+    db.exec('CREATE TEMP TABLE IF NOT EXISTS video_match (log_id TEXT PRIMARY KEY, video_id TEXT)');
+    db.exec('DELETE FROM temp.video_match');
+    const addMatch = db.prepare('INSERT INTO temp.video_match (log_id, video_id) VALUES (?, ?)');
+    db.transaction(() => {
+      for (const ref of logRefs) {
+        const id = resolve(ref.video_id, ref.video_filename);
+        if (id) addMatch.run(ref.id, id);
+      }
+    })();
+
     const rows = db.prepare(`
       SELECT
         l.id,
@@ -32,12 +55,16 @@ export default async function (fastify: FastifyInstance) {
         l.notes,
         l.loop_count,
         v.duration_seconds,
+        v.relative_path,
+        v.source,
+        v.external_playlist_title,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.training_type ELSE v.training_type END AS training_type,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.body_parts    ELSE v.body_parts    END AS body_parts,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.intensity     ELSE v.intensity     END AS intensity,
         CASE WHEN l.is_manual = 1 AND l.video_id IS NULL THEN l.equipment     ELSE v.equipment     END AS equipment
       FROM workout_log l
-      LEFT JOIN videos v ON v.id = l.video_id
+      LEFT JOIN video_match m ON m.log_id = l.id
+      LEFT JOIN videos v ON v.id = m.video_id
       ORDER BY l.completed_date DESC, l.completed_at DESC
     `).all() as any[];
 
@@ -63,6 +90,9 @@ export default async function (fastify: FastifyInstance) {
       bodyParts: parseJsonArray(r.body_parts),
       intensity: r.intensity || null,
       equipment: parseJsonArray(r.equipment),
+      // The Library folder the video lives in: a playlist's name for an import,
+      // else the top-level folder. Null for loose videos and manual entries.
+      folder: folderName(r),
     }));
 
     return reply.send({ entries });

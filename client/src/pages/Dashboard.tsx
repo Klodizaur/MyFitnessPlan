@@ -2,10 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, RotateCcw, ChevronLeft, ChevronRight, Check, Moon } from 'lucide-react';
 import YouTubeGlyph from '../components/icons/YouTubeGlyph';
+import { CompletedBadge } from '../components/library/LibraryCards';
 import { useTranslation } from 'react-i18next';
 import { albumKeyForVideo, isExternalAlbumKey, toAlbumRouteParam } from '../lib/paths';
-import { useToday } from '../lib/dates';
+import { timeAgo, useToday } from '../lib/dates';
+import { Video } from '../types/video';
 import '../styles/dashboard.css';
+
+/** How many of the newest videos the "Recently added" strip shows. */
+const RECENT_COUNT = 8;
 
 interface ScheduleDay {
   date: string;
@@ -51,6 +56,7 @@ export default function Dashboard() {
   const [planIndex, setPlanIndex] = useState(0);
   const today = useToday();
   const [libraryPreview, setLibraryPreview] = useState<{ key: string; title: string; cover?: string | null; count: number; isExternal: boolean }[]>([]);
+  const [recentVideos, setRecentVideos] = useState<Video[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -96,6 +102,14 @@ export default function Dashboard() {
     fetch('/api/library/videos')
       .then(r => r.json())
       .then((data: any[]) => {
+        // Newest arrivals first: a file's creation date on disk, or when an
+        // imported video was added. Videos without a date sort last.
+        setRecentVideos(
+          (data || [])
+            .filter((v: Video) => v.added_at)
+            .sort((a: Video, b: Video) => (b.added_at! < a.added_at! ? -1 : b.added_at! > a.added_at! ? 1 : 0))
+            .slice(0, RECENT_COUNT)
+        );
         const map = new Map<string, any[]>();
         for (const v of data || []) {
           // Group the way the Library does. Grouping by folder path instead
@@ -433,6 +447,41 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+
+      {recentVideos.length > 0 && (
+        <section>
+          <div className="dash-section-head">
+            <h3 className="rx-section-title">{t('dashboard.recently_added')}</h3>
+            <button type="button" className="rx-link" onClick={() => navigate('/library')}>
+              {t('nav.library')}
+            </button>
+          </div>
+          <div className="dash-recent">
+            {recentVideos.map(video => (
+              <button
+                type="button"
+                key={video.id}
+                className="dash-recent-item"
+                onClick={() => navigate(`/player/${video.id}`)}
+              >
+                <span className="dash-album-cover">
+                  {video.thumbnail_path
+                    ? <img src={thumbUrl(video.thumbnail_path)!} alt="" loading="lazy" />
+                    : <span className="dash-album-noimg" />}
+                  <CompletedBadge count={video.completed_count} />
+                  {video.source === 'youtube' && (
+                    <span className="rx-yt-badge" title={t('library.external_needs_internet')}>
+                      <YouTubeGlyph size={14} />
+                    </span>
+                  )}
+                </span>
+                <span className="dash-recent-title rx-clamp-2">{stripExt(video.filename)}</span>
+                <span className="dash-album-count rx-muted">{timeAgo(video.added_at!, i18n.language)}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

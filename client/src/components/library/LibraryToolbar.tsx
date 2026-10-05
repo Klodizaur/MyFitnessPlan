@@ -4,7 +4,8 @@ import { SourceFilter } from '../../lib/filters';
 
 /** 'size' and 'small' are the two ends of the same axis: most/fewest videos at
  *  the index, longest/shortest runtime inside a folder. */
-export type LibrarySort = 'az' | 'za' | 'size' | 'small';
+export type { VideoSort as LibrarySort } from '../../lib/videoSort';
+import type { VideoSort as LibrarySort } from '../../lib/videoSort';
 export type LibraryView = 'grid' | 'list';
 
 export interface ActiveChip {
@@ -130,6 +131,8 @@ export default function LibraryToolbar({
                 { value: 'za', label: t('library.sort_za') },
                 { value: 'size', label: sizeLabel || '' },
                 { value: 'small', label: smallLabel || '' },
+                { value: 'newest', label: t('library.sort_newest') },
+                { value: 'oldest', label: t('library.sort_oldest') },
               ]}
             />
           )}

@@ -26,4 +26,11 @@ export type Video = {
   external_playlist_id?: string | null;
   /** Album display name, seeded from the playlist and user-editable. */
   external_playlist_title?: string | null;
+  /**
+   * When the video arrived, as ISO text: a local file's creation date on disk,
+   * or when an imported video was added to the app.
+   */
+  added_at?: string | null;
+  /** Times this video has been completed, from the workout log. */
+  completed_count?: number;
 };

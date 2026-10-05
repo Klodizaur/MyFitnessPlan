@@ -118,29 +118,6 @@
 .ai-stepper-value { min-width: 64px; text-align: center; font-size: 40px; font-weight: 700; letter-spacing: -0.02em; }
 .ai-stepper .ai-note { font-size: 14px; }
 
-/* Rhythm */
-.ai-rhythm-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.ai-rhythm-title { flex: 1; font-size: 16px; font-weight: 700; white-space: nowrap; }
-.ai-rhythm { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-.ai-rhythm.is-locked { opacity: 0.6; }
-.ai-rhythm-day {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 0;
-  border: 1px solid var(--t-border);
-  border-radius: 12px;
-  background: var(--t-surface);
-  color: var(--t-ink-faint);
-  font-family: inherit;
-  cursor: pointer;
-}
-.ai-rhythm-day span { font-size: 11px; font-weight: 700; }
-.ai-rhythm-day:disabled { cursor: default; }
-.ai-rhythm-day.is-work { background: var(--t-band-even); border-color: var(--t-accent-soft); color: var(--t-ink); }
-.ai-rhythm-summary { font-size: 14px; font-weight: 700; }
-
 /* Session length */
 .ai-minutes { display: flex; align-items: baseline; gap: 10px; }
 .ai-minutes-value { font-size: 44px; font-weight: 700; letter-spacing: -0.02em; }

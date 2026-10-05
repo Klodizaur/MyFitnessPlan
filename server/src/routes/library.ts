@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import db from '../db.js';
+import db, { fileCreatedAt } from '../db.js';
 import fs from 'fs';
 import path from 'path';
 import { nanoid } from 'nanoid';
@@ -78,7 +78,7 @@ function parseTrainingTypes(raw: string | null | undefined): string[] {
 
 /** Columns every endpoint needs to build a client-shaped video object. */
 export const VIDEO_COLUMNS =
-  'id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds, source, external_id, external_url, external_playlist_id, external_playlist_title, is_favorite';
+  'id, filename, relative_path, thumbnail_path, description, equipment, training_type, body_parts, intensity, duration_seconds, source, external_id, external_url, external_playlist_id, external_playlist_title, is_favorite, added_at, file_created_at';
 
 export function formatVideoRow(row: {
   id: string;
@@ -97,6 +97,8 @@ export function formatVideoRow(row: {
   external_playlist_id?: string | null;
   external_playlist_title?: string | null;
   is_favorite?: number | null;
+  added_at?: string | null;
+  file_created_at?: string | null;
 }) {
   return {
     id: row.id,
@@ -117,7 +119,48 @@ export function formatVideoRow(row: {
     external_playlist_id: row.external_playlist_id || null,
     external_playlist_title: row.external_playlist_title || null,
     is_favorite: row.is_favorite === 1,
+    // When the video arrived: a local file's creation date, else when it was
+    // added to the app (imports, or a file whose date couldn't be read).
+    // `added_at` is SQLite's UTC "YYYY-MM-DD HH:MM:SS"; both go out as ISO.
+    added_at: row.file_created_at || (row.added_at ? `${row.added_at.replace(' ', 'T')}Z` : null),
   };
+}
+
+/**
+ * Which library video a workout-log entry is about.
+ *
+ * A log entry names its video by ID, but a library rebuilt from scratch gives
+ * every video a new ID, which would orphan everything done before it. So an
+ * entry whose ID no longer exists is matched by filename instead — only when
+ * exactly one video has that name, so a guess never lands on the wrong one.
+ */
+export function logVideoResolver(videos: { id: string; filename: string }[]) {
+  const ids = new Set(videos.map(v => v.id));
+  const byName = new Map<string, string | null>();
+  for (const v of videos) byName.set(v.filename, byName.has(v.filename) ? null : v.id);
+  return (videoId: string | null, filename: string | null): string | null =>
+    videoId && ids.has(videoId) ? videoId : (filename && byName.get(filename)) || null;
+}
+
+/**
+ * How many times each video has been completed, from the durable workout log
+ * (see `logVideoResolver`). A video looped several times in one go counts once
+ * per round.
+ */
+function completionCounts(videos: { id: string; filename: string }[]): Map<string, number> {
+  const resolve = logVideoResolver(videos);
+
+  const rows = db.prepare(
+    'SELECT video_id, video_filename, loop_count FROM workout_log WHERE video_id IS NOT NULL OR video_filename IS NOT NULL'
+  ).all() as { video_id: string | null; video_filename: string | null; loop_count: number | null }[];
+
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const id = resolve(row.video_id, row.video_filename);
+    if (!id) continue;
+    counts.set(id, (counts.get(id) || 0) + Math.max(1, row.loop_count || 1));
+  }
+  return counts;
 }
 
 /**
@@ -315,15 +358,15 @@ normalizedDir = path.resolve(normalizedDir);
         const thumbnailPath = await generateThumbnail(file, id);
         const knownDuration = existingDurations.get(file) ?? null;
         const duration = knownDuration ?? await probeDuration(file);
-        db.prepare('UPDATE videos SET filename = ?, relative_path = ?, thumbnail_path = ?, duration_seconds = ? WHERE id = ?')
-          .run(path.basename(file), relativePath, thumbnailPath, duration, id);
+        db.prepare('UPDATE videos SET filename = ?, relative_path = ?, thumbnail_path = ?, duration_seconds = ?, file_created_at = COALESCE(file_created_at, ?) WHERE id = ?')
+          .run(path.basename(file), relativePath, thumbnailPath, duration, fileCreatedAt(file), id);
       } else {
         // Insert new video
         id = nanoid();
         const thumbnailPath = await generateThumbnail(file, id);
         const duration = await probeDuration(file);
-        db.prepare('INSERT INTO videos (id, filename, filepath, relative_path, thumbnail_path, duration_seconds) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(id, path.basename(file), file, relativePath, thumbnailPath, duration);
+        db.prepare('INSERT INTO videos (id, filename, filepath, relative_path, thumbnail_path, duration_seconds, file_created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(id, path.basename(file), file, relativePath, thumbnailPath, duration, fileCreatedAt(file));
       }
       scannedIds.add(id);
       scanProgress.processed++;
@@ -382,7 +425,8 @@ normalizedDir = path.resolve(normalizedDir);
 
   fastify.get('/videos', async (request, reply) => {
     const videos = db.prepare(`SELECT ${VIDEO_COLUMNS} FROM videos`).all() as any[];
-    return reply.send(videos.map(formatVideoRow));
+    const counts = completionCounts(videos);
+    return reply.send(videos.map(row => ({ ...formatVideoRow(row), completed_count: counts.get(row.id) || 0 })));
   });
 
   // Star or un-star a video.
