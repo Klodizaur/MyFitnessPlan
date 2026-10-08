@@ -27,7 +27,7 @@ import { DEFAULT_PATTERN } from '../WorkoutPatternPicker';
 import RhythmEditor from '../builder/RhythmEditor';
 import { BuilderWeek, createWeek } from '../../lib/builderModel';
 import { inLibrary, Video } from '../../types/video';
-import '../../styles/aiplan.css';
+import '../../styles/AiPlan.css';
 import '../../styles/builder.css';
 import { localDateString } from '../../lib/dates';
 import { formatDuration, stripVideoExt } from '../../lib/videoTags';
